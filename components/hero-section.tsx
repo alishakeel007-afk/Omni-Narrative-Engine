@@ -20,7 +20,7 @@ export function HeroSection() {
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <Link
-              href="/video"
+              href="/auth?next=/story/mode"
               className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950 shadow-glow transition hover:scale-[1.02]"
             >
               Launch Studio

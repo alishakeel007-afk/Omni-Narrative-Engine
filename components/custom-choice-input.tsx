@@ -30,7 +30,7 @@ export function CustomChoiceInput({ value, onChange, onSelect }: CustomChoiceInp
         onClick={handleSelect}
         className="mt-4 rounded-full bg-gradient-to-r from-aurora to-starlight px-5 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
       >
-        Continue with My Choice
+        Use My Choice
       </button>
       {!value.trim() ? (
         <p className="mt-3 text-xs leading-6 text-white/52">

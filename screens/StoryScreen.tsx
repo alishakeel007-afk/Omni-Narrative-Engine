@@ -79,7 +79,6 @@ export default function StoryScreen() {
                 mood={scene?.mood ?? ""}
                 location={scene?.location ?? ""}
                 imageLabel={state.generatedMedia?.imageLabel}
-                className="prose max-w-none text-lg"
               />
             </div>
 

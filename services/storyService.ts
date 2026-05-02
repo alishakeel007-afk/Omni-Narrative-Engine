@@ -104,6 +104,7 @@ export function createInitialStoryState(setup: StorySetupData = DEFAULT_STORY_SE
     isLoading: false,
     lastSavedAt: null,
     memoryTimeline: [],
+    pastScenes: [],
     selectedChoice: "",
     selectedChoiceType: null,
     setup

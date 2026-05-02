@@ -44,6 +44,14 @@ body {
   .text-gradient {
     @apply bg-gradient-to-r from-white via-starlight to-gold bg-clip-text text-transparent;
   }
+
+  .input {
+    @apply w-full rounded-[1rem] border border-slate-600/50 bg-slate-900/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/45 focus:ring-2 focus:ring-cyan-400/15;
+  }
+
+  .textarea {
+    @apply w-full resize-y rounded-[1rem] border border-slate-600/50 bg-slate-900/50 px-4 py-3 text-sm leading-7 text-white outline-none transition focus:border-cyan-400/45 focus:ring-2 focus:ring-cyan-400/15;
+  }
 }
 
 @layer utilities {

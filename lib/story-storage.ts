@@ -8,6 +8,7 @@ export type {
   MemoryItem,
   PersistedStoryState,
   StoryCharacter,
+  StorySetupCharacter,
   StoryMode,
   StoryScene,
   StorySetupData
@@ -26,12 +27,34 @@ export const DEFAULT_HEALTH_STATUS: HealthStatus = {
 export const DEFAULT_INVENTORY = ["Ancient Map", "Moon Key", "Echo Lantern"];
 
 export const DEFAULT_STORY_SETUP: StorySetupData = {
+  characterAttributes: {
+    agility: 55,
+    charisma: 58,
+    endurance: 60,
+    intelligence: 72,
+    strength: 48,
+    wisdom: 66
+  },
   characterName: "Lyra Voss",
   characterRole: "Relic Interpreter",
+  characterTraits: ["Observant", "Protective", "Curious"],
+  characters: [
+    {
+      name: "Lyra Voss",
+      role: "Relic Interpreter",
+      traits: ["Observant", "Protective", "Curious"]
+    }
+  ],
+  difficulty: "Adaptive",
   genre: "Fantasy",
+  genres: ["Fantasy"],
   lastUpdatedAt: "",
   mode: "guided",
   mood: "Suspenseful",
+  moods: ["Suspenseful"],
+  scenarioDescription:
+    "A hidden gate opens beneath a forgotten observatory, and the ancient machine inside already knows the hero's name.",
+  scenarioTitle: "The Whispering Gate",
   selectedTemplate: "Lost Kingdom",
   startingIdea:
     "A hidden gate opens beneath a forgotten observatory, and my character wants to discover why the machine inside already knows their name.",

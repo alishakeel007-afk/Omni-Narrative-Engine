@@ -28,7 +28,7 @@ type StoryContextValue = {
   generateAlternativeOptions: () => void;
   isReady: boolean;
   restartStory: () => void;
-  saveSetupOnly: () => void;
+  saveSetupOnly: (override?: Partial<StorySetupData>) => void;
   selectSuggestedChoice: (choice: string) => void;
   selectCustomChoice: () => boolean;
   setCustomChoiceInput: (value: string) => void;
@@ -38,6 +38,44 @@ type StoryContextValue = {
 };
 
 const StoryContext = createContext<StoryContextValue | null>(null);
+
+function normalizeSetup(savedSetup: Partial<StorySetupData>): StorySetupData {
+  const merged = {
+    ...DEFAULT_STORY_SETUP,
+    ...savedSetup
+  };
+  const characters =
+    Array.isArray(merged.characters) && merged.characters.length > 0
+      ? merged.characters
+      : [
+          {
+            name: merged.characterName,
+            role: merged.characterRole,
+            traits: merged.characterTraits
+          }
+        ];
+  const primaryCharacter = characters[0];
+  const genres =
+    Array.isArray(merged.genres) && merged.genres.length > 0
+      ? merged.genres
+      : [merged.genre || DEFAULT_STORY_SETUP.genre];
+  const moods =
+    Array.isArray(merged.moods) && merged.moods.length > 0
+      ? merged.moods
+      : [merged.mood || DEFAULT_STORY_SETUP.mood];
+
+  return {
+    ...merged,
+    characterName: primaryCharacter.name,
+    characterRole: primaryCharacter.role,
+    characterTraits: primaryCharacter.traits,
+    characters,
+    genre: genres[0],
+    genres,
+    mood: moods[0],
+    moods
+  };
+}
 
 export function StoryProvider({ children }: { children: React.ReactNode }) {
   const [setup, setSetup] = useState<StorySetupData>(DEFAULT_STORY_SETUP);
@@ -51,10 +89,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
     if (savedSetup) {
       try {
-        resolvedSetup = {
-          ...DEFAULT_STORY_SETUP,
-          ...(JSON.parse(savedSetup) as StorySetupData)
-        };
+        resolvedSetup = normalizeSetup(JSON.parse(savedSetup) as Partial<StorySetupData>);
       } catch {
         window.localStorage.removeItem(STORY_SETUP_STORAGE_KEY);
       }
@@ -69,6 +104,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
           ...parsedProgress,
           currentScene: parsedProgress.currentScene,
           generatedMedia: parsedProgress.generatedMedia,
+          pastScenes: parsedProgress.pastScenes ?? [],
           setup: resolvedSetup
         });
       } catch {
@@ -117,6 +153,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     state.healthStatus,
     state.inventory,
     state.memoryTimeline,
+    state.pastScenes,
     state.selectedChoice,
     state.selectedChoiceType
   ]);
@@ -125,11 +162,12 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     setSetup((current) => ({ ...current, ...partial }));
   };
 
-  const saveSetupOnly = () => {
+  const saveSetupOnly = (override: Partial<StorySetupData> = {}) => {
     window.localStorage.setItem(
       STORY_SETUP_STORAGE_KEY,
       JSON.stringify({
         ...setup,
+        ...override,
         lastUpdatedAt: new Date().toISOString()
       })
     );
@@ -220,6 +258,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
           inventory: nextSceneResult.inventory,
           isLoading: false,
           memoryTimeline: [...current.memoryTimeline, memoryItem],
+          pastScenes: [...current.pastScenes, current.currentScene],
           selectedChoice: "",
           selectedChoiceType: null
         };

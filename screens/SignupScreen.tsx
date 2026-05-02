@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { DEFAULT_AUTH_REDIRECT, getSafeRedirectPath } from "@/lib/auth-redirect";
 import ScreenLayout from "@/screens/ScreenLayout";
 
 function isValidEmail(email: string) {
@@ -32,14 +34,20 @@ export default function SignupScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [nextPath, setNextPath] = useState(DEFAULT_AUTH_REDIRECT);
   const passwordRules = useMemo(() => validatePassword(password), [password]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNextPath(getSafeRedirectPath(params.get("next")));
+  }, []);
 
   useEffect(() => {
     if (loading) return;
     if (currentUser) {
-      router.replace("/dashboard");
+      router.replace(nextPath as Route);
     }
-  }, [currentUser, loading, router]);
+  }, [currentUser, loading, nextPath, router]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -70,7 +78,7 @@ export default function SignupScreen() {
     try {
       setIsSubmitting(true);
       await signup(fullName.trim(), email.trim(), password);
-      router.push("/dashboard");
+      router.push(nextPath as Route);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create account.");
     } finally {
@@ -166,7 +174,7 @@ export default function SignupScreen() {
 
           <div className="mt-6 text-sm text-white/68">
             Already have an account?{' '}
-            <Link href="/auth" className="text-starlight transition hover:text-gold">
+            <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
               Login here
             </Link>
           </div>

@@ -33,6 +33,10 @@ export type MovieScene = {
   soundDesign: string;
   title: string;
   visualPrompt: string;
+  // Optional background music fields attached by the studio flow
+  backgroundMusicUrl?: string;
+  backgroundMusicTitle?: string;
+  backgroundMusicMood?: string;
 };
 
 export type VideoGenerationRequest = {

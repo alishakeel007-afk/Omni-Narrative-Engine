@@ -1,4 +1,5 @@
 import { AudioPlayerMock } from "@/components/audio-player-mock";
+import BackgroundMusicPlayer from "@/components/background-music-player";
 
 type MediaPanelProps = {
   backgroundMusicMood: string;
@@ -51,11 +52,9 @@ export function MediaPanel({
             </p>
           </div>
           <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.26em] text-white/45">
-              Background Music Placeholder
-            </p>
-            <div className="mt-3 h-20 rounded-[1.2rem] border border-dashed border-white/10 bg-black/20 px-4 py-3 text-sm text-white/62">
-              {backgroundMusicMood}
+            <p className="text-xs uppercase tracking-[0.26em] text-white/45">Background Music</p>
+            <div className="mt-3">
+              <BackgroundMusicPlayer sceneMood={backgroundMusicMood} sceneTitle={imageLabel} audioPrompt={audioPrompt} />
             </div>
           </div>
           <PromptBlock label="Image Prompt Preview" text={imagePrompt} />

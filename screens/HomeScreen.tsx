@@ -70,19 +70,19 @@ export default function HomeScreen() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
-                href="/setup"
+                href="/auth?next=/setup"
                 className="rounded-full bg-gradient-to-r from-aurora to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950"
               >
                 Build Your Story Setup
               </Link>
               <Link
-                href="/story"
+                href="/auth?next=/story/mode"
                 className="rounded-full border border-white/10 bg-white/5 px-7 py-4 text-center text-sm font-semibold text-white/82"
               >
                 Open Story Experience
               </Link>
               <Link
-                href="/video"
+                href="/auth?next=/video"
                 className="rounded-full border border-gold/20 bg-gold/10 px-7 py-4 text-center text-sm font-semibold text-gold"
               >
                 Open Video Studio

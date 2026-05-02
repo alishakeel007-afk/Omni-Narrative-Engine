@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 
 export const navLinks: { href: Route; label: string }[] = [
-  { href: "/", label: "Home" },
-  { href: "/setup", label: "Story Setup" },
-  { href: "/story", label: "Story Experience" },
+  { href: "/story/mode", label: "Start" },
+  { href: "/setup", label: "Setup" },
+  { href: "/story/play", label: "Play" },
+  { href: "/story/memory", label: "Memory" },
   { href: "/video", label: "Video Studio" },
   { href: "/dashboard", label: "Dashboard" }
 ];
@@ -84,7 +85,7 @@ export const storyModes = [
   {
     id: "custom",
     title: "Custom Story Mode",
-    description: "Write your own choices and control the story from start to end."
+    description: "Write your own story direction without AI choice suggestions."
   }
 ] as const;
 

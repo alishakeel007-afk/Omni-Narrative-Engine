@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { DEFAULT_AUTH_REDIRECT, getSafeRedirectPath } from "@/lib/auth-redirect";
 import ScreenLayout from "@/screens/ScreenLayout";
 
 function isValidEmail(email: string) {
@@ -19,13 +21,19 @@ export default function AuthScreen() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [nextPath, setNextPath] = useState(DEFAULT_AUTH_REDIRECT);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNextPath(getSafeRedirectPath(params.get("next")));
+  }, []);
 
   useEffect(() => {
     if (loading) return;
     if (currentUser) {
-      router.replace("/dashboard");
+      router.replace(nextPath as Route);
     }
-  }, [currentUser, loading, router]);
+  }, [currentUser, loading, nextPath, router]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,7 +52,7 @@ export default function AuthScreen() {
     try {
       setIsSubmitting(true);
       await login(email.trim(), password);
-      router.push("/dashboard");
+      router.push(nextPath as Route);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to log in.");
     } finally {
@@ -115,7 +123,7 @@ export default function AuthScreen() {
           </form>
 
           <div className="mt-6 flex flex-col gap-3 text-sm text-white/68 sm:flex-row sm:items-center sm:justify-between">
-            <Link href="/signup" className="text-starlight transition hover:text-gold">
+            <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
               Create an account
             </Link>
             <Link href="/forgot-password" className="text-starlight transition hover:text-gold">

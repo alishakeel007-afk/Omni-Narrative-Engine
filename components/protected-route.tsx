@@ -1,7 +1,8 @@
 "use client";
 
+import type { Route } from "next";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export function ProtectedRoute({
@@ -10,15 +11,16 @@ export function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { currentUser, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
 
     if (!currentUser) {
-      router.replace("/auth");
+      router.replace(`/auth?next=${encodeURIComponent(pathname)}` as Route);
     }
-  }, [currentUser, loading, router]);
+  }, [currentUser, loading, pathname, router]);
 
   if (loading || !currentUser) {
     return (

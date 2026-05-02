@@ -2,13 +2,34 @@ export type StoryMode = "guided" | "custom";
 
 export type ChoiceType = "AI Suggested" | "Custom";
 
+export type StorySetupCharacter = {
+  name: string;
+  role: string;
+  traits: string[];
+};
+
 export type StorySetupData = {
+  characterAttributes: {
+    agility: number;
+    charisma: number;
+    endurance: number;
+    intelligence: number;
+    strength: number;
+    wisdom: number;
+  };
   characterName: string;
   characterRole: string;
+  characterTraits: string[];
+  characters: StorySetupCharacter[];
+  difficulty: "Easy" | "Normal" | "Hard" | "Adaptive";
   genre: string;
+  genres: string[];
   lastUpdatedAt: string;
   mode: StoryMode;
   mood: string;
+  moods: string[];
+  scenarioDescription: string;
+  scenarioTitle: string;
   selectedTemplate: string;
   startingIdea: string;
   storyTitle: string;
@@ -73,6 +94,7 @@ export type PersistedStoryState = {
   isLoading: boolean;
   lastSavedAt: string | null;
   memoryTimeline: MemoryItem[];
+  pastScenes: StoryScene[];
   selectedChoice: string;
   selectedChoiceType: ChoiceType | null;
   setup: StorySetupData;

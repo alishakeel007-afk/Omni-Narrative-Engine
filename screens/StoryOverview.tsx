@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { StorySidebar } from "@/components/story-sidebar";
 import { CharacterPanel } from "@/components/character-panel";
@@ -9,6 +10,7 @@ import { useStory } from "@/context/StoryContext";
 
 export default function StoryOverview() {
   const { setup, state, restartStory } = useStory();
+  const router = useRouter();
   const scene = state.currentScene;
 
   const activeCharacterProfile = {
@@ -40,7 +42,7 @@ export default function StoryOverview() {
             inventory={state.inventory}
             mood={`${setup.mood} / ${scene?.mood ?? "neutral"}`}
             lastSavedAt={state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleString() : null}
-            onMemoryOpen={() => {}}
+            onMemoryOpen={() => router.push("/story/memory")}
             onRestart={restartStory}
           />
         </div>

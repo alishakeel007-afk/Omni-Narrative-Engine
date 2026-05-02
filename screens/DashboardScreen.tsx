@@ -31,7 +31,7 @@ export default function DashboardScreen() {
       <ScreenLayout eyebrow="User Dashboard" title="Narrative Command Center" description="Quick access to saved progress, genre preferences, and usage analytics for the AI story experience." maxWidth="max-w-7xl">
           <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Link
-              href="/story"
+              href="/story/play"
               className="glass-panel gold-ring rounded-[1.75rem] p-6 transition hover:-translate-y-1"
             >
               <p className="text-xs uppercase tracking-[0.28em] text-gold">Continue Last Story</p>
@@ -44,7 +44,7 @@ export default function DashboardScreen() {
             </Link>
 
             <Link
-              href="/setup"
+              href="/story/mode"
               className="glass-panel rounded-[1.75rem] p-6 transition hover:-translate-y-1"
             >
               <p className="text-xs uppercase tracking-[0.28em] text-starlight/78">Start New Story</p>
