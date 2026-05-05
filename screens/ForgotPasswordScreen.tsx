@@ -29,7 +29,7 @@ export default function ForgotPasswordScreen() {
     try {
       setIsSubmitting(true);
       await forgotPassword(email.trim());
-      setMessage("If the account exists, a password reset request has been recorded.");
+      setMessage("If an account exists for this email, a reset link has been sent.");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to send reset link.");
     } finally {
@@ -50,7 +50,7 @@ export default function ForgotPasswordScreen() {
             Reset Your Password
           </h1>
           <p className="mt-4 text-sm leading-7 text-white/68">
-            Enter your email address and we will record a reset request for this simple prototype flow.
+            Enter your email address and we will send a password reset link to your inbox.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">

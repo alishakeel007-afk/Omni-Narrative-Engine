@@ -4,40 +4,31 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   Clapperboard,
   Edit3,
   Loader2,
   Mic2,
+  Music2,
+  RefreshCcw,
   Sparkles,
   Wand2,
   X
 } from "lucide-react";
+import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
 import { ProtectedRoute } from "@/components/protected-route";
-import { VIDEO_DRAFT_STORAGE_KEY } from "@/lib/video-storage";
+import {
+  DEFAULT_VIDEO_GENRES,
+  DEFAULT_VIDEO_TONES,
+  VIDEO_STAGE_LABELS,
+  createStoryTextFromScript,
+  loadVideoStudioFlow,
+  saveVideoStudioFlow,
+  type VideoStudioFlowState,
+  type VideoStudioStage
+} from "@/lib/video-storage";
 import type { MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/types/video";
-
-const genreOptions = [
-  "Cinematic Drama",
-  "Fantasy",
-  "Sci-Fi",
-  "Mystery",
-  "Adventure",
-  "Horror",
-  "Romance"
-];
-
-const toneOptions = [
-  "Immersive and emotional",
-  "Suspenseful",
-  "Epic and heroic",
-  "Dark and tense",
-  "Warm and hopeful",
-  "Funny and fast-paced"
-];
-
-const sampleScenario =
-  "A young inventor in a flooded future city builds a machine that can replay memories from rainwater, but one memory reveals the mayor erased an entire district from history.";
 
 type EditableSceneField =
   | "directorNotes"
@@ -48,47 +39,128 @@ type EditableSceneField =
 
 export default function VideoStudioScreen() {
   const router = useRouter();
-  const [scenario, setScenario] = useState(sampleScenario);
-  const [genres, setGenres] = useState<string[]>([genreOptions[0]]);
-  const [tones, setTones] = useState<string[]>([toneOptions[0]]);
-  const [sceneCount, setSceneCount] = useState(3);
-  const [result, setResult] = useState<VideoGenerationResponse | null>(null);
+  const [flow, setFlow] = useState<VideoStudioFlowState | null>(null);
   const [error, setError] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const canGenerate = scenario.trim().length >= 12 && !isGenerating;
-  const totalDialogueLines = useMemo(
-    () => result?.scenes.reduce((total, scene) => total + scene.dialogues.length, 0) ?? 0,
-    [result]
-  );
 
   useEffect(() => {
-    try {
-      const savedDraft = window.localStorage.getItem(VIDEO_DRAFT_STORAGE_KEY);
-
-      if (savedDraft) {
-        setResult(JSON.parse(savedDraft) as VideoGenerationResponse);
-      }
-    } catch {
-      window.localStorage.removeItem(VIDEO_DRAFT_STORAGE_KEY);
-    }
+    setFlow(loadVideoStudioFlow());
   }, []);
 
-  const handleGenerate = async () => {
-    if (!canGenerate) return;
+  const visibleScript = flow?.voiceResult ?? flow?.script ?? null;
+  const totalDialogueLines = useMemo(
+    () => visibleScript?.scenes.reduce((total, scene) => total + scene.dialogues.length, 0) ?? 0,
+    [visibleScript]
+  );
 
-    setIsGenerating(true);
+  const persistFlow = (nextFlow: VideoStudioFlowState) => {
+    setFlow(nextFlow);
+    saveVideoStudioFlow(nextFlow);
+  };
+
+  const updateFlow = (partial: Partial<VideoStudioFlowState>) => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      ...partial
+    });
+  };
+
+  const setStage = (stage: VideoStudioStage) => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      stage
+    });
+    setError("");
+    setEditingKey(null);
+  };
+
+  const toggleGenre = (genre: string) => {
+    if (!flow) return;
+    const nextGenres = flow.genres.includes(genre)
+      ? flow.genres.length === 1
+        ? flow.genres
+        : flow.genres.filter((item) => item !== genre)
+      : [...flow.genres, genre];
+
+    persistFlow({
+      ...flow,
+      genres: nextGenres,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script)
+    });
+  };
+
+  const toggleTone = (tone: string) => {
+    if (!flow) return;
+    const nextTones = flow.tones.includes(tone)
+      ? flow.tones.length === 1
+        ? flow.tones
+        : flow.tones.filter((item) => item !== tone)
+      : [...flow.tones, tone];
+
+    persistFlow({
+      ...flow,
+      tones: nextTones,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script)
+    });
+  };
+
+  const updateSceneCount = (sceneCount: number) => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      sceneCount,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script)
+    });
+  };
+
+  const updateRoughIdea = (roughIdea: string) => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      roughIdea
+    });
+  };
+
+  const updateAcceptedStory = (acceptedStory: string) => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      acceptedStory,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script),
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const generateStory = async (scenarioOverride?: string) => {
+    if (!flow || isGeneratingStory) return;
+    const scenario = (scenarioOverride ?? flow.roughIdea).trim();
+
+    if (scenario.length < 12) {
+      setError("Write a clearer rough story idea before generating with Gemini.");
+      return;
+    }
+
+    setIsGeneratingStory(true);
     setError("");
     setEditingKey(null);
 
     try {
       const response = await fetch("/api/video/generate", {
         body: JSON.stringify({
-          genre: genres,
+          genre: flow.genres,
           includeAudio: false,
-          sceneCount,
+          sceneCount: flow.sceneCount,
           scenario,
-          tone: tones
+          tone: flow.tones
         }),
         headers: {
           "Content-Type": "application/json"
@@ -98,56 +170,110 @@ export default function VideoStudioScreen() {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Video generation failed.");
+        throw new Error(payload.error ?? "Gemini story generation failed.");
       }
 
-      const nextResult = payload as VideoGenerationResponse;
-      setResult(nextResult);
-      window.localStorage.setItem(VIDEO_DRAFT_STORAGE_KEY, JSON.stringify(nextResult));
+      const script = payload as VideoGenerationResponse;
+      const storyText = createStoryTextFromScript(script);
+      persistFlow({
+        ...flow,
+        acceptedStory: storyText,
+        generatedStory: storyText,
+        roughIdea: scenario,
+        scenesNeedRegeneration: false,
+        script,
+        stage: "storyReview",
+        videoOutdated: true,
+        voiceNeedsRegeneration: false,
+        voiceResult: null
+      });
     } catch (generationError) {
       setError(
         generationError instanceof Error
           ? generationError.message
-          : "Video generation failed."
+          : "Gemini story generation failed."
       );
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingStory(false);
     }
   };
 
-  const handleConfirmAndContinue = () => {
-    if (!result) return;
+  const regenerateScenes = async () => {
+    if (!flow || isGeneratingStory) return;
+    const scenario = (flow.acceptedStory || flow.generatedStory || flow.roughIdea).trim();
 
-    window.localStorage.setItem(VIDEO_DRAFT_STORAGE_KEY, JSON.stringify(result));
-    router.push("/video/voice");
-  };
+    if (scenario.length < 12) {
+      setError("The accepted story needs more text before regenerating scenes and dialogues.");
+      return;
+    }
 
-  const toggleGenre = (genre: string) => {
-    setGenres((current) => {
-      if (current.includes(genre)) {
-        return current.length === 1 ? current : current.filter((item) => item !== genre);
+    setIsGeneratingStory(true);
+    setError("");
+    setEditingKey(null);
+
+    try {
+      const response = await fetch("/api/video/generate", {
+        body: JSON.stringify({
+          genre: flow.genres,
+          includeAudio: false,
+          sceneCount: flow.sceneCount,
+          scenario,
+          tone: flow.tones
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Scene and dialogue regeneration failed.");
       }
 
-      return [...current, genre];
-    });
+      const script = payload as VideoGenerationResponse;
+      persistFlow({
+        ...flow,
+        generatedStory: flow.generatedStory || createStoryTextFromScript(script),
+        scenesNeedRegeneration: false,
+        script,
+        stage: "scenes",
+        videoOutdated: true,
+        voiceNeedsRegeneration: false,
+        voiceResult: null
+      });
+    } catch (generationError) {
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : "Scene and dialogue regeneration failed."
+      );
+    } finally {
+      setIsGeneratingStory(false);
+    }
   };
 
-  const toggleTone = (tone: string) => {
-    setTones((current) => {
-      if (current.includes(tone)) {
-        return current.length === 1 ? current : current.filter((item) => item !== tone);
-      }
+  const acceptStory = () => {
+    if (!flow?.script) {
+      setError("Generate the story first before continuing to scenes.");
+      return;
+    }
 
-      return [...current, tone];
-    });
+    setStage("scenes");
   };
 
   const updateFilmField = (field: "logline" | "title", value: string) => {
-    setResult((current) => {
-      if (!current) return current;
-      const next = { ...current, [field]: value };
-      window.localStorage.setItem(VIDEO_DRAFT_STORAGE_KEY, JSON.stringify(next));
-      return next;
+    if (!flow?.script) return;
+
+    const nextScript = {
+      ...flow.script,
+      [field]: value
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true
     });
   };
 
@@ -156,39 +282,169 @@ export default function VideoStudioScreen() {
     field: EditableSceneField,
     value: string
   ) => {
-    setResult((current) => {
-      if (!current) return current;
-      const next = {
-        ...current,
-        scenes: current.scenes.map((scene) =>
-          scene.sceneNumber === sceneNumber ? { ...scene, [field]: value } : scene
-        )
-      };
-      window.localStorage.setItem(VIDEO_DRAFT_STORAGE_KEY, JSON.stringify(next));
-      return next;
+    if (!flow?.script) return;
+
+    const nextScript = {
+      ...flow.script,
+      scenes: flow.script.scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber ? { ...scene, [field]: value } : scene
+      )
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true
     });
   };
 
   const updateDialogueLine = (sceneNumber: number, dialogueId: string, value: string) => {
-    setResult((current) => {
-      if (!current) return current;
-      const next = {
-        ...current,
-        scenes: current.scenes.map((scene) =>
-          scene.sceneNumber === sceneNumber
-            ? {
-                ...scene,
-                dialogues: scene.dialogues.map((dialogue) =>
-                  dialogue.id === dialogueId ? { ...dialogue, line: value } : dialogue
-                )
-              }
-            : scene
-        )
-      };
-      window.localStorage.setItem(VIDEO_DRAFT_STORAGE_KEY, JSON.stringify(next));
-      return next;
+    if (!flow?.script) return;
+
+    const nextScript = {
+      ...flow.script,
+      scenes: flow.script.scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber
+          ? {
+              ...scene,
+              dialogues: scene.dialogues.map((dialogue) =>
+                dialogue.id === dialogueId ? { ...dialogue, line: value } : dialogue
+              )
+            }
+          : scene
+      )
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
     });
   };
+
+  const generateVoice = async () => {
+    if (!flow?.script || isGeneratingVoice) return;
+
+    setIsGeneratingVoice(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/video/tts", {
+        body: JSON.stringify({ script: flow.script }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Voice generation failed.");
+      }
+
+      const voiceResult = payload as VideoGenerationResponse;
+      persistFlow({
+        ...flow,
+        script: voiceResult,
+        videoOutdated: true,
+        voiceNeedsRegeneration: false,
+        voiceResult
+      });
+    } catch (voiceError) {
+      setError(voiceError instanceof Error ? voiceError.message : "Voice generation failed.");
+    } finally {
+      setIsGeneratingVoice(false);
+    }
+  };
+
+  const generateBackgroundMusic = async () => {
+    if (!flow?.script || isGeneratingMusic) return;
+
+    const primaryScene = flow.script.scenes[0];
+    setIsGeneratingMusic(true);
+    setError("");
+    persistFlow({
+      ...flow,
+      music: {
+        ...flow.music,
+        message: "Generating background music...",
+        status: "generating"
+      }
+    });
+
+    try {
+      const response = await fetch("/api/background-music", {
+        body: JSON.stringify({
+          audioPrompt: flow.script.scenes.map((scene) => scene.soundDesign).join("\n"),
+          sceneMood: primaryScene?.mood ?? flow.tones.join(", "),
+          sceneTitle: flow.script.title
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Background music generation failed.");
+      }
+
+      persistFlow({
+        ...flow,
+        music: {
+          message: "Background music is ready.",
+          mood: payload.mood ?? primaryScene?.mood ?? "ambient",
+          status: "ready",
+          title: payload.title ?? "Generated Background Score",
+          trackUrl: payload.trackUrl ?? ""
+        },
+        videoOutdated: true
+      });
+    } catch (musicError) {
+      persistFlow({
+        ...flow,
+        music: {
+          ...flow.music,
+          message:
+            musicError instanceof Error
+              ? musicError.message
+              : "Background music generation failed.",
+          status: "error"
+        }
+      });
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  const openPreview = () => {
+    if (!flow) return;
+    persistFlow({
+      ...flow,
+      stage: "preview",
+      videoOutdated: false
+    });
+    router.push("/video-preview");
+  };
+
+  if (!flow) {
+    return (
+      <ProtectedRoute>
+        <div className="px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-xl">
+            <div className="glass-panel rounded-[2rem] p-8 text-center">
+              <Sparkles className="mx-auto h-8 w-8 text-gold" />
+              <h1 className="mt-4 font-[var(--font-heading)] text-3xl text-white">
+                Loading Video Studio
+              </h1>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -199,221 +455,629 @@ export default function VideoStudioScreen() {
 
           <section className="relative px-4 py-10 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl">
-              <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 backdrop-blur-sm">
                     <div className="h-2 w-2 rounded-full bg-cyan-400" />
-                    Step 1: AI Film Sequence
+                    Guided Video Studio
                   </div>
                   <div>
-                    <h1 className="font-[var(--font-heading)] text-5xl font-bold text-white sm:text-6xl lg:text-7xl">
+                    <h1 className="font-[var(--font-heading)] text-5xl font-bold text-white sm:text-6xl">
                       Cinematic
                       <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                         {" "}Story Engine
                       </span>
                     </h1>
-                    <p className="mt-4 max-w-2xl text-xl text-slate-300">
-                      Generate the film plan first, review and edit the AI text, then continue to Deepgram voice generation.
+                    <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">
+                      Create a cinematic story with AI, refine scenes and dialogue, generate voice, music, and preview your final video.
                     </p>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4 backdrop-blur-sm">
-                  <div className="text-xs font-medium uppercase tracking-wider text-emerald-300">Current Step</div>
-                  <div className="text-sm font-semibold text-emerald-200">Script + Dialogue Review</div>
-                  <div className="text-sm font-semibold text-emerald-200">Voice comes after confirmation</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-emerald-300">Current Stage</div>
+                  <div className="text-sm font-semibold text-emerald-200">
+                    {VIDEO_STAGE_LABELS.find((stage) => stage.id === flow.stage)?.label}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-8 xl:grid-cols-[0.85fr_1.15fr]">
-                <section className="space-y-6">
-                  <div className="rounded-3xl border border-slate-700/50 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl">
-                    <div className="mb-8 flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
-                        <Clapperboard className="h-7 w-7 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium uppercase tracking-wider text-cyan-300">
-                          Creative Input
-                        </p>
-                        <h2 className="text-2xl font-bold text-white">Story Blueprint</h2>
-                      </div>
-                    </div>
+              <StageIndicator currentStage={flow.stage} />
 
-                    <div className="space-y-6">
-                      <div>
-                        <label className="mb-3 block text-sm font-semibold text-slate-200">
-                          Narrative Concept
-                        </label>
-                        <textarea
-                          value={scenario}
-                          onChange={(event) => setScenario(event.target.value)}
-                          placeholder="Describe your story concept, characters, setting, and desired outcome..."
-                          className="min-h-48 w-full resize-none rounded-2xl border border-slate-600/50 bg-slate-800/50 px-6 py-5 text-sm leading-7 text-white outline-none backdrop-blur-sm transition-all duration-300 placeholder:text-slate-400 focus:border-cyan-400/50 focus:bg-slate-800/70 focus:ring-2 focus:ring-cyan-400/20"
-                        />
-                      </div>
+              {error ? (
+                <div className="mb-6 flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-200 backdrop-blur-sm">
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+                  <span>{error}</span>
+                </div>
+              ) : null}
 
-                      <div className="grid gap-6 sm:grid-cols-2">
-                        <PaletteGroup
-                          activeItems={genres}
-                          color="cyan"
-                          label="Genre Palette"
-                          options={genreOptions}
-                          onToggle={toggleGenre}
-                        />
-                        <PaletteGroup
-                          activeItems={tones}
-                          color="purple"
-                          label="Emotional Palette"
-                          options={toneOptions}
-                          onToggle={toggleTone}
-                        />
-                      </div>
+              <Warnings flow={flow} />
 
-                      <div>
-                        <label className="mb-4 block text-sm font-semibold text-slate-200">
-                          Scene Count
-                        </label>
-                        <input
-                          type="range"
-                          min={1}
-                          max={5}
-                          value={sceneCount}
-                          onChange={(event) => setSceneCount(Number(event.target.value))}
-                          className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-cyan-400"
-                        />
-                        <p className="mt-3 text-sm text-slate-400">{sceneCount} scene sequence</p>
-                      </div>
+              {flow.stage === "setup" ? (
+                <SetupStage
+                  flow={flow}
+                  onContinue={() => setStage("storyIdea")}
+                  onSceneCountChange={updateSceneCount}
+                  onToggleGenre={toggleGenre}
+                  onToggleTone={toggleTone}
+                />
+              ) : null}
 
-                      {error ? (
-                        <div className="flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-200 backdrop-blur-sm">
-                          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-                          <span>{error}</span>
-                        </div>
-                      ) : null}
+              {flow.stage === "storyIdea" ? (
+                <StoryIdeaStage
+                  flow={flow}
+                  isGenerating={isGeneratingStory}
+                  onBack={() => setStage("setup")}
+                  onGenerate={() => generateStory()}
+                  onRoughIdeaChange={updateRoughIdea}
+                />
+              ) : null}
 
-                      <button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={!canGenerate}
-                        className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-8 py-5 text-sm font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                        <div className="relative flex items-center justify-center gap-3">
-                          {isGenerating ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                              Generating Film Sequence...
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 className="h-5 w-5" />
-                              Generate Film Sequence
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </section>
+              {flow.stage === "storyReview" ? (
+                <StoryReviewStage
+                  flow={flow}
+                  isGenerating={isGeneratingStory}
+                  onAcceptedStoryChange={updateAcceptedStory}
+                  onBack={() => setStage("storyIdea")}
+                  onContinue={acceptStory}
+                  onRegenerate={() => generateStory()}
+                />
+              ) : null}
 
-                <section className="space-y-5">
-                  {result ? (
-                    <>
-                      <div className="glass-panel rounded-[2rem] p-6">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0 flex-1 space-y-4">
-                            <p className="text-xs uppercase tracking-[0.3em] text-starlight/80">
-                              Generated Film Blueprint
-                            </p>
-                            <EditableBlock
-                              editKey="film-title"
-                              editingKey={editingKey}
-                              label="Movie Title"
-                              singleLine
-                              text={result.title}
-                              onChange={(value) => updateFilmField("title", value)}
-                              onEditingChange={setEditingKey}
-                            />
-                            <EditableBlock
-                              editKey="film-logline"
-                              editingKey={editingKey}
-                              label="Logline"
-                              text={result.logline}
-                              onChange={(value) => updateFilmField("logline", value)}
-                              onEditingChange={setEditingKey}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <Stat label="Scenes" value={String(result.scenes.length)} />
-                            <Stat label="Runtime" value={result.estimatedRuntime} />
-                            <Stat label="Dialogue" value={String(totalDialogueLines)} />
-                            <Stat label="Cast" value={String(result.characterVoices.length)} />
-                          </div>
-                        </div>
+              {flow.stage === "scenes" ? (
+                <ScenesStage
+                  editingKey={editingKey}
+                  flow={flow}
+                  isGenerating={isGeneratingStory}
+                  totalDialogueLines={totalDialogueLines}
+                  onBack={() => setStage("storyReview")}
+                  onContinue={() => setStage("voice")}
+                  onDialogueChange={updateDialogueLine}
+                  onEditingChange={setEditingKey}
+                  onRegenerate={regenerateScenes}
+                  onSceneFieldChange={updateSceneField}
+                  onTitleChange={updateFilmField}
+                />
+              ) : null}
 
-                        {result.characterVoices.length > 0 ? (
-                          <div className="mt-5 rounded-[1.4rem] border border-white/10 bg-black/20 p-4">
-                            <p className="text-xs uppercase tracking-[0.24em] text-white/42">
-                              Fixed Voice Cast For Step 2
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {result.characterVoices.map((voice) => (
-                                <span
-                                  key={`${voice.character}-${voice.deepgramModel}`}
-                                  className="rounded-full border border-starlight/15 bg-starlight/10 px-3 py-1 text-xs text-white/70"
-                                >
-                                  {voice.character}: {voice.voiceName} / {voice.gender}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
+              {flow.stage === "voice" ? (
+                <VoiceStage
+                  flow={flow}
+                  isGenerating={isGeneratingVoice}
+                  script={visibleScript}
+                  totalDialogueLines={totalDialogueLines}
+                  onBack={() => setStage("scenes")}
+                  onContinue={() => setStage("music")}
+                  onGenerate={generateVoice}
+                />
+              ) : null}
 
-                        <button
-                          type="button"
-                          onClick={handleConfirmAndContinue}
-                          className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 px-7 py-4 text-sm font-bold text-slate-950 transition hover:scale-[1.01]"
-                        >
-                          <Check className="h-5 w-5" />
-                          Confirm and Continue to Voice Generation
-                        </button>
-                      </div>
+              {flow.stage === "music" ? (
+                <MusicStage
+                  flow={flow}
+                  isGenerating={isGeneratingMusic}
+                  onBack={() => setStage("voice")}
+                  onGenerate={generateBackgroundMusic}
+                  onPreview={openPreview}
+                />
+              ) : null}
 
-                      <div className="space-y-5">
-                        {result.scenes.map((scene) => (
-                          <SceneCard
-                            key={`${result.id}-${scene.sceneNumber}`}
-                            editingKey={editingKey}
-                            scene={scene}
-                            onDialogueChange={updateDialogueLine}
-                            onEditingChange={setEditingKey}
-                            onSceneFieldChange={updateSceneField}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="glass-panel flex min-h-[32rem] items-center justify-center rounded-[2rem] p-8">
-                      <div className="max-w-lg text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-white/10 bg-white/10 text-gold shadow-glow">
-                          <Sparkles className="h-7 w-7" />
-                        </div>
-                        <h2 className="mt-6 font-[var(--font-heading)] text-3xl text-white">
-                          Step 1 creates the editable film plan
-                        </h2>
-                        <p className="mt-4 text-sm leading-7 text-white/64">
-                          Gemini will generate the story, scenes, narration, prompts, and dialogue. You can edit the text here before Deepgram creates voices on the next page.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              </div>
+              {flow.stage === "preview" ? (
+                <PreviewShortcutStage
+                  flow={flow}
+                  onBackAudio={() => setStage("music")}
+                  onBackDialogues={() => setStage("scenes")}
+                  onPreview={openPreview}
+                />
+              ) : null}
             </div>
           </section>
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+function StageIndicator({ currentStage }: { currentStage: VideoStudioStage }) {
+  const currentIndex = VIDEO_STAGE_LABELS.findIndex((stage) => stage.id === currentStage);
+
+  return (
+    <div className="mb-8 grid gap-2 md:grid-cols-4 xl:grid-cols-7">
+      {VIDEO_STAGE_LABELS.map((stage, index) => {
+        const isCurrent = stage.id === currentStage;
+        const isPast = index < currentIndex;
+
+        return (
+          <div
+            key={stage.id}
+            className={`rounded-[1rem] border px-3 py-3 text-sm transition ${
+              isCurrent
+                ? "border-cyan-400/45 bg-cyan-400/15 text-cyan-100"
+                : isPast
+                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+                  : "border-white/10 bg-white/5 text-white/50"
+            }`}
+          >
+            <p className="text-xs uppercase tracking-[0.18em]">Step {index + 1}</p>
+            <p className="mt-1 font-semibold">{stage.label}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Warnings({ flow }: { flow: VideoStudioFlowState }) {
+  const warnings = [
+    flow.scenesNeedRegeneration
+      ? "Story/setup changed after scenes were generated. Regenerate scenes and dialogues when ready."
+      : null,
+    flow.voiceNeedsRegeneration
+      ? "Dialogues changed. Please regenerate voice audio."
+      : null,
+    flow.videoOutdated && flow.stage !== "preview"
+      ? "Preview may be outdated until you open it again after the latest changes."
+      : null
+  ].filter(Boolean) as string[];
+
+  if (warnings.length === 0) return null;
+
+  return (
+    <div className="mb-6 space-y-2">
+      {warnings.map((warning) => (
+        <div
+          key={warning}
+          className="rounded-[1rem] border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-6 text-gold"
+        >
+          {warning}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SetupStage({
+  flow,
+  onContinue,
+  onSceneCountChange,
+  onToggleGenre,
+  onToggleTone
+}: {
+  flow: VideoStudioFlowState;
+  onContinue: () => void;
+  onSceneCountChange: (value: number) => void;
+  onToggleGenre: (value: string) => void;
+  onToggleTone: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="rounded-3xl border border-slate-700/50 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl">
+        <SectionHeader
+          icon={<Clapperboard className="h-7 w-7 text-white" />}
+          label="Stage 1"
+          title="Setup"
+        />
+        <div className="grid gap-6 sm:grid-cols-2">
+          <PaletteGroup
+            activeItems={flow.genres}
+            color="cyan"
+            label="Genre Palette"
+            options={DEFAULT_VIDEO_GENRES}
+            onToggle={onToggleGenre}
+          />
+          <PaletteGroup
+            activeItems={flow.tones}
+            color="purple"
+            label="Emotional Palette"
+            options={DEFAULT_VIDEO_TONES}
+            onToggle={onToggleTone}
+          />
+        </div>
+
+        <div className="mt-6">
+          <label className="mb-4 block text-sm font-semibold text-slate-200">
+            Number of Scenes
+          </label>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={flow.sceneCount}
+            onChange={(event) => onSceneCountChange(Number(event.target.value))}
+            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-cyan-400"
+          />
+          <p className="mt-3 text-sm text-slate-400">{flow.sceneCount} scene sequence</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onContinue}
+          className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-8 py-5 text-sm font-bold text-white transition hover:scale-[1.01]"
+        >
+          Continue to Story Idea
+        </button>
+      </section>
+
+      <InfoPanel
+        title="What this stage saves"
+        text="Genre, tone, and scene count stay saved when you go forward or return from later stages."
+      />
+    </div>
+  );
+}
+
+function StoryIdeaStage({
+  flow,
+  isGenerating,
+  onBack,
+  onGenerate,
+  onRoughIdeaChange
+}: {
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  onBack: () => void;
+  onGenerate: () => void;
+  onRoughIdeaChange: (value: string) => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-700/50 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl">
+      <SectionHeader
+        icon={<Wand2 className="h-7 w-7 text-white" />}
+        label="Stage 2"
+        title="Rough Story Idea"
+      />
+      <label className="mb-3 block text-sm font-semibold text-slate-200">
+        Rough story idea
+      </label>
+      <textarea
+        value={flow.roughIdea}
+        onChange={(event) => onRoughIdeaChange(event.target.value)}
+        placeholder="Describe your rough story concept, characters, world, conflict, and ending..."
+        className="min-h-56 w-full resize-y rounded-2xl border border-slate-600/50 bg-slate-800/50 px-6 py-5 text-sm leading-7 text-white outline-none backdrop-blur-sm transition placeholder:text-slate-400 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+      />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <SecondaryButton onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Setup
+        </SecondaryButton>
+        <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          Generate Story with Gemini
+        </PrimaryButton>
+      </div>
+    </section>
+  );
+}
+
+function StoryReviewStage({
+  flow,
+  isGenerating,
+  onAcceptedStoryChange,
+  onBack,
+  onContinue,
+  onRegenerate
+}: {
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  onAcceptedStoryChange: (value: string) => void;
+  onBack: () => void;
+  onContinue: () => void;
+  onRegenerate: () => void;
+}) {
+  return (
+    <section className="glass-panel rounded-[2rem] p-6">
+      <SectionHeader
+        icon={<Sparkles className="h-7 w-7 text-white" />}
+        label="Stage 3"
+        title="Generated Story Review"
+      />
+      <label className="mb-3 block text-sm font-semibold text-white">
+        Accept or edit the Gemini-generated story
+      </label>
+      <textarea
+        value={flow.acceptedStory}
+        onChange={(event) => onAcceptedStoryChange(event.target.value)}
+        className="min-h-[28rem] w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-sm leading-7 text-white outline-none focus:border-gold/35"
+      />
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <SecondaryButton onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Story Idea
+        </SecondaryButton>
+        <SecondaryButton disabled={isGenerating} onClick={onRegenerate}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+          Regenerate Story
+        </SecondaryButton>
+        <PrimaryButton onClick={onContinue}>
+          <Check className="h-4 w-4" />
+          Accept Story / Continue to Scenes
+        </PrimaryButton>
+      </div>
+    </section>
+  );
+}
+
+function ScenesStage({
+  editingKey,
+  flow,
+  isGenerating,
+  totalDialogueLines,
+  onBack,
+  onContinue,
+  onDialogueChange,
+  onEditingChange,
+  onRegenerate,
+  onSceneFieldChange,
+  onTitleChange
+}: {
+  editingKey: string | null;
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  totalDialogueLines: number;
+  onBack: () => void;
+  onContinue: () => void;
+  onDialogueChange: (sceneNumber: number, dialogueId: string, value: string) => void;
+  onEditingChange: (key: string | null) => void;
+  onRegenerate: () => void;
+  onSceneFieldChange: (sceneNumber: number, field: EditableSceneField, value: string) => void;
+  onTitleChange: (field: "logline" | "title", value: string) => void;
+}) {
+  const script = flow.script;
+
+  if (!script) {
+    return (
+      <InfoPanel
+        title="No generated scenes yet"
+        text="Go back to Story Idea and generate a story before reviewing scenes and dialogues."
+      />
+    );
+  }
+
+  return (
+    <section className="space-y-5">
+      <div className="glass-panel rounded-[2rem] p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-starlight/80">
+              Stage 4: Scenes and Dialogues
+            </p>
+            <EditableBlock
+              editKey="film-title"
+              editingKey={editingKey}
+              label="Movie Title"
+              singleLine
+              text={script.title}
+              onChange={(value) => onTitleChange("title", value)}
+              onEditingChange={onEditingChange}
+            />
+            <EditableBlock
+              editKey="film-logline"
+              editingKey={editingKey}
+              label="Logline"
+              text={script.logline}
+              onChange={(value) => onTitleChange("logline", value)}
+              onEditingChange={onEditingChange}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <Stat label="Scenes" value={String(script.scenes.length)} />
+            <Stat label="Runtime" value={script.estimatedRuntime} />
+            <Stat label="Dialogue" value={String(totalDialogueLines)} />
+            <Stat label="Cast" value={String(script.characterVoices.length)} />
+          </div>
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <SecondaryButton onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to Story Review
+          </SecondaryButton>
+          <SecondaryButton disabled={isGenerating} onClick={onRegenerate}>
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            Regenerate Scenes & Dialogues
+          </SecondaryButton>
+          <PrimaryButton onClick={onContinue}>
+            <Mic2 className="h-4 w-4" />
+            Continue to Audio Generation
+          </PrimaryButton>
+        </div>
+      </div>
+
+      {script.scenes.map((scene) => (
+        <SceneCard
+          key={`${script.id}-${scene.sceneNumber}`}
+          editingKey={editingKey}
+          scene={scene}
+          onDialogueChange={onDialogueChange}
+          onEditingChange={onEditingChange}
+          onSceneFieldChange={onSceneFieldChange}
+        />
+      ))}
+    </section>
+  );
+}
+
+function VoiceStage({
+  flow,
+  isGenerating,
+  script,
+  totalDialogueLines,
+  onBack,
+  onContinue,
+  onGenerate
+}: {
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  script: VideoGenerationResponse | null;
+  totalDialogueLines: number;
+  onBack: () => void;
+  onContinue: () => void;
+  onGenerate: () => void;
+}) {
+  const generatedCount = flow.voiceResult?.audio.generatedCount ?? 0;
+
+  return (
+    <section className="space-y-6">
+      <div className="glass-panel rounded-[2rem] p-6">
+        <SectionHeader
+          icon={<Mic2 className="h-7 w-7 text-white" />}
+          label="Stage 5"
+          title="Voice Audio"
+        />
+        <div className="grid gap-3 md:grid-cols-4">
+          <Stat label="Dialogue" value={String(totalDialogueLines)} />
+          <Stat label="Voiced" value={String(generatedCount)} />
+          <Stat label="Provider" value="Deepgram" />
+          <Stat label="Status" value={flow.voiceNeedsRegeneration ? "Needs regen" : flow.voiceResult ? "Ready" : "Idle"} />
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-4">
+          <SecondaryButton onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to Edit Dialogues
+          </SecondaryButton>
+          <PrimaryButton disabled={!script || isGenerating} onClick={onGenerate}>
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />}
+            Generate Voice
+          </PrimaryButton>
+          <SecondaryButton disabled={!script || isGenerating} onClick={onGenerate}>
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            Regenerate Voice
+          </SecondaryButton>
+          <PrimaryButton disabled={!script} onClick={onContinue}>
+            <Music2 className="h-4 w-4" />
+            Continue to Background Music
+          </PrimaryButton>
+        </div>
+      </div>
+
+      {script?.scenes.map((scene) => (
+        <VoiceSceneCard key={`${script.id}-${scene.sceneNumber}`} scene={scene} />
+      ))}
+    </section>
+  );
+}
+
+function MusicStage({
+  flow,
+  isGenerating,
+  onBack,
+  onGenerate,
+  onPreview
+}: {
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  onBack: () => void;
+  onGenerate: () => void;
+  onPreview: () => void;
+}) {
+  return (
+    <section className="glass-panel rounded-[2rem] p-6">
+      <SectionHeader
+        icon={<Music2 className="h-7 w-7 text-white" />}
+        label="Stage 6"
+        title="Background Music"
+      />
+      <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-5">
+        <p className="text-xs uppercase tracking-[0.26em] text-white/45">Music Status</p>
+        <h3 className="mt-2 text-xl font-semibold capitalize text-white">{flow.music.status}</h3>
+        <p className="mt-3 text-sm leading-7 text-white/68">{flow.music.message}</p>
+        {flow.music.trackUrl ? (
+          <audio controls src={flow.music.trackUrl} className="mt-4 w-full" />
+        ) : null}
+      </div>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-4">
+        <SecondaryButton onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Audio Generation
+        </SecondaryButton>
+        <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music2 className="h-4 w-4" />}
+          Generate Background Music
+        </PrimaryButton>
+        <SecondaryButton disabled={isGenerating} onClick={onGenerate}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+          Regenerate Background Music
+        </SecondaryButton>
+        <PrimaryButton onClick={onPreview}>
+          <Clapperboard className="h-4 w-4" />
+          Preview Video
+        </PrimaryButton>
+      </div>
+    </section>
+  );
+}
+
+function PreviewShortcutStage({
+  flow,
+  onBackAudio,
+  onBackDialogues,
+  onPreview
+}: {
+  flow: VideoStudioFlowState;
+  onBackAudio: () => void;
+  onBackDialogues: () => void;
+  onPreview: () => void;
+}) {
+  return (
+    <section className="glass-panel rounded-[2rem] p-6">
+      <SectionHeader
+        icon={<Clapperboard className="h-7 w-7 text-white" />}
+        label="Stage 7"
+        title="Video Preview"
+      />
+      <p className="text-sm leading-7 text-white/68">
+        Preview data is saved for {flow.script?.title ?? "the current film"}. Open the dedicated preview page or jump back to editing.
+      </p>
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <SecondaryButton onClick={onBackDialogues}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Edit Dialogues
+        </SecondaryButton>
+        <SecondaryButton onClick={onBackAudio}>
+          <Music2 className="h-4 w-4" />
+          Back to Audio & Music
+        </SecondaryButton>
+        <PrimaryButton onClick={onPreview}>
+          <Clapperboard className="h-4 w-4" />
+          Open Preview Page
+        </PrimaryButton>
+      </div>
+    </section>
+  );
+}
+
+function SectionHeader({
+  icon,
+  label,
+  title
+}: {
+  icon: React.ReactNode;
+  label: string;
+  title: string;
+}) {
+  return (
+    <div className="mb-8 flex items-center gap-4">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm font-medium uppercase tracking-wider text-cyan-300">
+          {label}
+        </p>
+        <h2 className="text-2xl font-bold text-white">{title}</h2>
+      </div>
+    </div>
+  );
+}
+
+function InfoPanel({ title, text }: { title: string; text: string }) {
+  return (
+    <section className="glass-panel flex min-h-[24rem] items-center rounded-[2rem] p-8">
+      <div>
+        <Sparkles className="h-10 w-10 text-gold" />
+        <h2 className="mt-5 font-[var(--font-heading)] text-3xl text-white">{title}</h2>
+        <p className="mt-4 text-sm leading-7 text-white/64">{text}</p>
+      </div>
+    </section>
   );
 }
 
@@ -458,6 +1122,48 @@ function PaletteGroup({
   );
 }
 
+function PrimaryButton({
+  children,
+  disabled = false,
+  onClick
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-5 py-4 text-sm font-bold text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SecondaryButton({
+  children,
+  disabled = false,
+  onClick
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-white/80 transition hover:border-cyan-300/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-28 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -495,9 +1201,6 @@ function SceneCard({
           </span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/65">
             {scene.sceneTone}
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/65">
-            {scene.estimatedDuration}
           </span>
         </div>
         <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
@@ -589,7 +1292,7 @@ function DialogueReview({
                 {dialogue.delivery}
               </span>
               <span className="rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">
-                {dialogue.voiceProfile.voiceName} / fixed voice
+                {dialogue.voiceProfile.voiceName}
               </span>
             </div>
             <EditableBlock
@@ -604,6 +1307,42 @@ function DialogueReview({
         ))}
       </div>
     </div>
+  );
+}
+
+function VoiceSceneCard({ scene }: { scene: MovieScene }) {
+  return (
+    <article className="glass-panel overflow-hidden rounded-[2rem]">
+      <div className="border-b border-white/10 bg-white/[0.03] p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">
+              Scene {scene.sceneNumber}
+            </span>
+            <span className="rounded-full border border-starlight/20 bg-starlight/10 px-3 py-1 text-xs text-starlight">
+              {scene.mood}
+            </span>
+          </div>
+          <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
+        </div>
+        <PlaySceneAudioButton audioUrls={scene.dialogues.map(d => d.audioUrl || "")} />
+      </div>
+      <div className="grid gap-5 p-6 lg:grid-cols-2">
+        {scene.dialogues.map((dialogue) => (
+          <div key={dialogue.id} className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+            <p className="text-sm font-semibold text-white">{dialogue.character}</p>
+            <p className="mt-3 text-sm leading-7 text-white/72">"{dialogue.line}"</p>
+            {dialogue.audioUrl ? (
+              <audio controls src={dialogue.audioUrl} className="mt-3 w-full" />
+            ) : (
+              <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/48">
+                {dialogue.audioError ?? "Waiting for voice generation."}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -665,7 +1404,7 @@ function EditableBlock({
           </button>
         </div>
       ) : (
-        <p className={`text-sm text-white/72 ${singleLine ? "font-semibold text-lg" : "leading-7"}`}>
+        <p className={`text-sm text-white/72 ${singleLine ? "text-lg font-semibold" : "leading-7"}`}>
           {text}
         </p>
       )}

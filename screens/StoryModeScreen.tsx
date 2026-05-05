@@ -16,7 +16,7 @@ export default function StoryModeScreen() {
   };
 
   return (
-    <ScreenLayout eyebrow="Start a Story" title="Choose Story Mode" description="Guided mode uses Gemini to draft the film. Custom mode is fully manual and only uses Deepgram for voices.">
+    <ScreenLayout eyebrow="Start a Story" title="Choose Story Mode" description="Guided mode keeps the existing AI film flow. AI Story Studio lets you write scenes, dialogues, voices, music, and preview as a custom workflow.">
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="glass-panel rounded-[1.5rem] p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-starlight/80">Guided Mode</p>
@@ -29,13 +29,14 @@ export default function StoryModeScreen() {
 
         <div className="glass-panel rounded-[1.5rem] p-6">
           <p className="text-xs uppercase tracking-[0.28em] text-starlight/80">Custom Mode</p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">Your Own Idea</h2>
-          <p className="mt-3 text-sm text-white/65">Write the story, scenes, and dialogues yourself. AI choices and Gemini drafting stay off.</p>
+          <h2 className="mt-3 text-2xl font-semibold text-white">AI Story Studio</h2>
+          <p className="mt-3 text-sm text-white/65">Write your own story scene by scene, generate AI-assisted dialogue, add voices/music, and preview the final video.</p>
           <div className="mt-6">
-            <button onClick={() => selectMode("custom")} className="rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:border-gold/25">Use Custom Idea</button>
+            <button onClick={() => selectMode("custom")} className="rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:border-gold/25">Start AI Story Studio</button>
           </div>
         </div>
       </div>
+
     </ScreenLayout>
   );
 }

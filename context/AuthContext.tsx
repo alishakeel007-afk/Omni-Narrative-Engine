@@ -9,170 +9,149 @@ import {
 } from "react";
 
 export type AuthUser = {
-  displayName: string;
+  id: string;
+  name: string;
   email: string;
-  emailVerified: true;
-  uid: string;
-};
-
-type StoredAuthUser = {
-  createdAt: string;
-  displayName: string;
-  email: string;
-  password: string;
-  uid: string;
 };
 
 type AuthContextValue = {
   currentUser: AuthUser | null;
   forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, userId: string, newPassword: string, confirmPassword: string) => Promise<void>;
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
-  sendVerificationEmail: () => Promise<void>;
-  signup: (fullName: string, email: string, password: string) => Promise<AuthUser>;
+  signup: (fullName: string, email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
 };
-
-const USERS_STORAGE_KEY = "omni-auth-users";
-const SESSION_STORAGE_KEY = "omni-auth-session";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStoredUsers() {
-  if (typeof window === "undefined") {
-    return [] as StoredAuthUser[];
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
   }
 
   try {
-    const rawValue = window.localStorage.getItem(USERS_STORAGE_KEY);
-    return rawValue ? (JSON.parse(rawValue) as StoredAuthUser[]) : [];
+    return JSON.parse(text) as { error?: string; user?: AuthUser };
   } catch {
-    return [];
+    throw new Error(
+      response.ok
+        ? "Authentication server returned an invalid response."
+        : `Authentication route returned ${response.status}. Please rebuild and restart the app.`
+    );
   }
-}
-
-function writeStoredUsers(users: StoredAuthUser[]) {
-  window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-}
-
-function readStoredSession() {
-  if (typeof window === "undefined") {
-    return null as AuthUser | null;
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    return rawValue ? (JSON.parse(rawValue) as AuthUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredSession(user: AuthUser | null) {
-  if (user) {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
-    return;
-  }
-
-  window.localStorage.removeItem(SESSION_STORAGE_KEY);
-}
-
-function toAuthUser(user: StoredAuthUser): AuthUser {
-  return {
-    displayName: user.displayName,
-    email: user.email,
-    emailVerified: true,
-    uid: user.uid
-  };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      const data = await readJsonResponse(response);
+
+      if (response.ok) {
+        setCurrentUser(data.user ?? null);
+        return data.user ?? null;
+      } else {
+        setCurrentUser(null);
+        return null;
+      }
+    } catch (error) {
+      setCurrentUser(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const savedSession = readStoredSession();
-    setCurrentUser(savedSession);
-    setLoading(false);
+    refreshUser();
   }, []);
 
-  const signup = async (fullName: string, email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedName = fullName.trim();
-    const users = readStoredUsers();
-    const existingUser = users.find((user) => user.email.toLowerCase() === normalizedEmail);
-
-    if (existingUser) {
-      throw new Error("This email is already registered. Try logging in instead.");
+  const signup = async (name: string, email: string, password: string, confirmPassword: string) => {
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, confirmPassword })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(data.error || "Signup failed");
     }
 
-    const createdUser: StoredAuthUser = {
-      createdAt: new Date().toISOString(),
-      displayName: normalizedName,
-      email: normalizedEmail,
-      password,
-      uid: `omni-user-${Date.now()}`
-    };
+    if (!data.user) {
+      throw new Error("Signup response did not include a user.");
+    }
 
-    const nextUsers = [...users, createdUser];
-    writeStoredUsers(nextUsers);
-
-    const sessionUser = toAuthUser(createdUser);
-    writeStoredSession(sessionUser);
-    setCurrentUser(sessionUser);
-    return sessionUser;
+    setCurrentUser(data.user);
+    return data.user;
   };
 
   const login = async (email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = readStoredUsers();
-    const matchedUser = users.find((user) => user.email.toLowerCase() === normalizedEmail);
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
 
-    if (!matchedUser || matchedUser.password !== password) {
-      throw new Error("Incorrect email or password.");
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(data.error || "Login failed");
     }
 
-    const sessionUser = toAuthUser(matchedUser);
-    writeStoredSession(sessionUser);
-    setCurrentUser(sessionUser);
-    return sessionUser;
+    if (!data.user) {
+      throw new Error("Login response did not include a user.");
+    }
+
+    setCurrentUser(data.user);
+    return data.user;
   };
 
   const logout = async () => {
-    writeStoredSession(null);
+    await fetch("/api/auth/logout", { method: "POST" });
     setCurrentUser(null);
   };
 
   const forgotPassword = async (email: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = readStoredUsers();
-    const matchedUser = users.find((user) => user.email.toLowerCase() === normalizedEmail);
+    const response = await fetch("/api/auth/request-password-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
 
-    if (!matchedUser) {
-      return;
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to request password reset");
     }
   };
 
-  const refreshUser = async () => {
-    const savedSession = readStoredSession();
-    setCurrentUser(savedSession);
-    return savedSession;
-  };
+  const resetPassword = async (token: string, userId: string, newPassword: string, confirmPassword: string) => {
+    const response = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, userId, newPassword, confirmPassword })
+    });
 
-  const sendVerificationEmail = async () => {
-    return;
+    const data = await readJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to reset password");
+    }
   };
 
   const value = useMemo<AuthContextValue>(
     () => ({
       currentUser,
       forgotPassword,
+      resetPassword,
       loading,
       login,
       logout,
       refreshUser,
-      sendVerificationEmail,
       signup
     }),
     [currentUser, loading]

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { CreateStorySetupForm } from "@/components/create-story-setup-form";
 import { useStory } from "@/context/StoryContext";
 import { DEFAULT_STORY_SETUP } from "@/lib/story-storage";
 import { genres as genreOptions, moods as moodOptions, storyModes } from "@/lib/mock-data";
@@ -159,6 +160,16 @@ const scenarioCatalog: Record<string, ScenarioOption[]> = {
 };
 
 export function StorySetupForm() {
+  const { setup } = useStory();
+
+  if (setup.mode === "custom") {
+    return <CreateStorySetupForm />;
+  }
+
+  return <GuidedStorySetupForm />;
+}
+
+function GuidedStorySetupForm() {
   const router = useRouter();
   const { beginStoryFromSetup, saveSetupOnly, setup, updateSetup } = useStory();
   const visibleStoryModes =
@@ -263,8 +274,10 @@ export function StorySetupForm() {
         ...setup.characters,
         {
           name: "",
+          personalityTone: "Balanced cinematic tone",
           role: roleOptions[0],
-          traits: []
+          traits: [],
+          voiceStyle: "Voice style placeholder"
         }
       ]
     });

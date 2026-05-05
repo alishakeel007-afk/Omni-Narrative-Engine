@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DashboardCard } from "@/components/dashboard-card";
 import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
@@ -8,7 +9,8 @@ import { useStory } from "@/context/StoryContext";
 import { countCustomChoices } from "@/lib/story-engine";
 
 export default function DashboardScreen() {
-  const { setup, state } = useStory();
+  const router = useRouter();
+  const { saveSetupOnly, setup, state, updateSetup } = useStory();
   const currentScene = state.currentScene.sceneNumber;
   const hasProgress = state.memoryTimeline.length > 0 || state.currentScene.sceneNumber > 1;
   const customChoiceCount = countCustomChoices(state);
@@ -25,10 +27,28 @@ export default function DashboardScreen() {
     { label: "Total Scenes Generated", value: String(currentScene) },
     { label: "Total Custom Choices Made", value: String(customChoiceCount) }
   ];
+  const startCreateStory = () => {
+    updateSetup({ mode: "custom" });
+    saveSetupOnly({ mode: "custom" });
+    router.push("/setup");
+  };
 
   return (
     <ProtectedRoute>
       <ScreenLayout eyebrow="User Dashboard" title="Narrative Command Center" description="Quick access to saved progress, genre preferences, and usage analytics for the AI story experience." maxWidth="max-w-7xl">
+          <div className="mb-6 flex flex-col items-center justify-between gap-4 rounded-[1.5rem] border border-gold/20 bg-gold/5 p-6 sm:flex-row">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Ready for your next adventure?</h2>
+              <p className="mt-1 text-sm text-white/70">Start a new guided or custom story.</p>
+            </div>
+            <Link
+              href="/story/mode"
+              className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
+            >
+              Start New Story
+            </Link>
+          </div>
+
           <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Link
               href="/story/play"
@@ -53,6 +73,18 @@ export default function DashboardScreen() {
                 Pick a genre, define a protagonist, and choose guided or custom story mode.
               </p>
             </Link>
+
+            <button
+              type="button"
+              onClick={startCreateStory}
+              className="glass-panel rounded-[1.75rem] p-6 text-left transition hover:-translate-y-1"
+            >
+              <p className="text-xs uppercase tracking-[0.28em] text-gold">Create Your Own Story</p>
+              <h2 className="mt-4 text-2xl font-semibold text-white">Custom Scene Builder</h2>
+              <p className="mt-3 text-sm leading-7 text-white/65">
+                Write scenes and character dialogue yourself, then generate voices, music, and a preview placeholder.
+              </p>
+            </button>
 
             <Link
               href="/video"

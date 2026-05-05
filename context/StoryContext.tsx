@@ -39,30 +39,86 @@ type StoryContextValue = {
 
 const StoryContext = createContext<StoryContextValue | null>(null);
 
+function toStringArray(value: unknown, fallback: string[] = []) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return fallback;
+}
+
+function toCleanString(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 function normalizeSetup(savedSetup: Partial<StorySetupData>): StorySetupData {
   const merged = {
     ...DEFAULT_STORY_SETUP,
     ...savedSetup
   };
+  const fallbackTraits = toStringArray(
+    (merged as { characterTraits?: unknown }).characterTraits,
+    DEFAULT_STORY_SETUP.characterTraits
+  );
+  const savedGenres = toStringArray((merged as { genres?: unknown }).genres);
+  const savedMoods = toStringArray((merged as { moods?: unknown }).moods);
   const characters =
     Array.isArray(merged.characters) && merged.characters.length > 0
-      ? merged.characters
+      ? merged.characters.map((character, index) => {
+          const traits = toStringArray(
+            (character as { traits?: unknown }).traits,
+            index === 0 ? fallbackTraits : []
+          );
+
+          return {
+            ...character,
+            name:
+              typeof character.name === "string" && character.name.trim()
+                ? character.name
+                : `Character ${index + 1}`,
+            personalityTone: toCleanString(
+              (character as { personalityTone?: unknown }).personalityTone,
+              traits.join(", ") || "Balanced cinematic tone"
+            ),
+            role: toCleanString(
+              (character as { role?: unknown }).role,
+              index === 0 ? toCleanString(merged.characterRole, "Lead Character") : "Supporting Character"
+            ),
+            traits,
+            voiceStyle: toCleanString(
+              (character as { voiceStyle?: unknown }).voiceStyle,
+              "Voice style placeholder"
+            )
+          };
+        })
       : [
           {
-            name: merged.characterName,
-            role: merged.characterRole,
-            traits: merged.characterTraits
+            name: toCleanString(merged.characterName, DEFAULT_STORY_SETUP.characterName),
+            role: toCleanString(merged.characterRole, DEFAULT_STORY_SETUP.characterRole),
+            personalityTone: fallbackTraits.join(", ") || "Balanced cinematic tone",
+            traits: fallbackTraits,
+            voiceStyle: "Voice style placeholder"
           }
         ];
   const primaryCharacter = characters[0];
   const genres =
-    Array.isArray(merged.genres) && merged.genres.length > 0
-      ? merged.genres
-      : [merged.genre || DEFAULT_STORY_SETUP.genre];
+    savedGenres.length > 0
+      ? savedGenres
+      : [toCleanString(merged.genre, DEFAULT_STORY_SETUP.genre)];
   const moods =
-    Array.isArray(merged.moods) && merged.moods.length > 0
-      ? merged.moods
-      : [merged.mood || DEFAULT_STORY_SETUP.mood];
+    savedMoods.length > 0
+      ? savedMoods
+      : [toCleanString(merged.mood, DEFAULT_STORY_SETUP.mood)];
 
   return {
     ...merged,
@@ -74,6 +130,43 @@ function normalizeSetup(savedSetup: Partial<StorySetupData>): StorySetupData {
     genres,
     mood: moods[0],
     moods
+  };
+}
+
+function normalizeProgress(
+  savedProgress: Partial<PersistedStoryState>,
+  resolvedSetup: StorySetupData
+) {
+  const fallback = createInitialStoryState(resolvedSetup);
+  const selectedChoiceType =
+    savedProgress.selectedChoiceType === "AI Suggested" || savedProgress.selectedChoiceType === "Custom"
+      ? savedProgress.selectedChoiceType
+      : null;
+
+  return {
+    ...fallback,
+    ...savedProgress,
+    currentScene: savedProgress.currentScene ?? fallback.currentScene,
+    customChoiceInput:
+      typeof savedProgress.customChoiceInput === "string"
+        ? savedProgress.customChoiceInput
+        : fallback.customChoiceInput,
+    generatedMedia: savedProgress.generatedMedia ?? fallback.generatedMedia,
+    healthStatus: savedProgress.healthStatus ?? fallback.healthStatus,
+    inventory: Array.isArray(savedProgress.inventory)
+      ? savedProgress.inventory
+      : fallback.inventory,
+    isLoading: false,
+    memoryTimeline: Array.isArray(savedProgress.memoryTimeline)
+      ? savedProgress.memoryTimeline
+      : fallback.memoryTimeline,
+    pastScenes: Array.isArray(savedProgress.pastScenes)
+      ? savedProgress.pastScenes
+      : fallback.pastScenes,
+    selectedChoice:
+      typeof savedProgress.selectedChoice === "string" ? savedProgress.selectedChoice : "",
+    selectedChoiceType,
+    setup: resolvedSetup
   };
 }
 
@@ -100,13 +193,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     if (savedProgress) {
       try {
         const parsedProgress = JSON.parse(savedProgress) as PersistedStoryState;
-        setState({
-          ...parsedProgress,
-          currentScene: parsedProgress.currentScene,
-          generatedMedia: parsedProgress.generatedMedia,
-          pastScenes: parsedProgress.pastScenes ?? [],
-          setup: resolvedSetup
-        });
+        setState(normalizeProgress(parsedProgress, resolvedSetup));
       } catch {
         window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
         setState(createInitialStoryState(resolvedSetup));

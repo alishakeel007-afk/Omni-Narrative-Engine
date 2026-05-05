@@ -41,8 +41,10 @@ export const DEFAULT_STORY_SETUP: StorySetupData = {
   characters: [
     {
       name: "Lyra Voss",
+      personalityTone: "Observant, protective, curious",
       role: "Relic Interpreter",
-      traits: ["Observant", "Protective", "Curious"]
+      traits: ["Observant", "Protective", "Curious"],
+      voiceStyle: "Soft confident female voice"
     }
   ],
   difficulty: "Adaptive",
@@ -52,6 +54,7 @@ export const DEFAULT_STORY_SETUP: StorySetupData = {
   mode: "guided",
   mood: "Suspenseful",
   moods: ["Suspenseful"],
+  numberOfScenes: 3,
   scenarioDescription:
     "A hidden gate opens beneath a forgotten observatory, and the ancient machine inside already knows the hero's name.",
   scenarioTitle: "The Whispering Gate",

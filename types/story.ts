@@ -4,8 +4,10 @@ export type ChoiceType = "AI Suggested" | "Custom";
 
 export type StorySetupCharacter = {
   name: string;
+  personalityTone: string;
   role: string;
   traits: string[];
+  voiceStyle: string;
 };
 
 export type StorySetupData = {
@@ -28,6 +30,7 @@ export type StorySetupData = {
   mode: StoryMode;
   mood: string;
   moods: string[];
+  numberOfScenes: number;
   scenarioDescription: string;
   scenarioTitle: string;
   selectedTemplate: string;

@@ -6,7 +6,7 @@ export async function POST(req: Request) {
     const { sceneMood, sceneTitle, audioPrompt } = body || {};
 
     // Lookup env keys (support poorly-named example key)
-    const apiKey = process.env.BG_MUSIC_API_KEY || process.env.NEXT_PUBLIC_BG_MUSIC_KEY || process.env['background sound API key'];
+    const apiKey = process.env.BACKGROUND_SOUND_API_KEY || process.env.BG_MUSIC_API_KEY || process.env.NEXT_PUBLIC_BG_MUSIC_KEY;
     const apiUrl = process.env.BG_MUSIC_API_URL || process.env.NEXT_PUBLIC_BG_MUSIC_URL;
 
     if (!apiKey || !apiUrl) {

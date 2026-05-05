@@ -3,56 +3,62 @@ import {
   BookOpenText,
   BrainCircuit,
   Compass,
-  ImageIcon,
+  Film,
   Mic2,
   Orbit,
-  Sparkles
+  Sparkles,
+  Wand2
 } from "lucide-react";
 
 export const navLinks: { href: Route; label: string }[] = [
   { href: "/story/mode", label: "Start" },
   { href: "/setup", label: "Setup" },
-  { href: "/story/play", label: "Play" },
-  { href: "/story/memory", label: "Memory" },
-  { href: "/video", label: "Video Studio" },
+  { href: "/story/play", label: "Play Story" },
+  { href: "/story/memory", label: "Story Memory Board" },
+  { href: "/video", label: "AI Story Studio" },
   { href: "/dashboard", label: "Dashboard" }
 ];
 
 export const featureCards = [
   {
     title: "AI Story Generation",
-    description: "Responsive scene building, cinematic text, and branching narrative structure.",
+    description: "Generate cinematic stories and scenes using AI.",
     icon: Sparkles
   },
   {
-    title: "Custom Story Path",
-    description: "Let players write their own direction at every major turning point.",
-    icon: Compass
-  },
-  {
-    title: "Guided Choices",
-    description: "Offer curated AI options to keep pacing tight without removing freedom.",
+    title: "AI Guided Story Mode",
+    description: "Follow AI-suggested choices step by step.",
     icon: BookOpenText
   },
   {
+    title: "AI Story Studio",
+    description: "Build full stories with scenes, dialogues, voice, music, and video preview.",
+    icon: Wand2
+  },
+  {
+    title: "Custom Story Path",
+    description: "Write your own actions and control story direction.",
+    icon: Compass
+  },
+  {
     title: "Character Consistency",
-    description: "Track identity, relationships, mood, and continuity across scenes.",
+    description: "Keep character roles, traits, and identities consistent.",
     icon: Orbit
   },
   {
-    title: "Image Generation",
-    description: "Prepare slots for scene art, environment cards, and cinematic reveals.",
-    icon: ImageIcon
-  },
-  {
     title: "Audio Narration",
-    description: "Support spoken narration, voice mood, and background ambiance.",
+    description: "Generate character voices and narration for scenes.",
     icon: Mic2
   },
   {
     title: "Long-Term Memory",
-    description: "Preserve key events, user decisions, and world-state changes.",
+    description: "Store story events, locations, and decisions for continuity.",
     icon: BrainCircuit
+  },
+  {
+    title: "Video Preview",
+    description: "Preview final video-ready story scenes before export.",
+    icon: Film
   }
 ];
 
@@ -84,7 +90,7 @@ export const storyModes = [
   },
   {
     id: "custom",
-    title: "Custom Story Mode",
+    title: "AI Story Studio",
     description: "Write your own story direction without AI choice suggestions."
   }
 ] as const;

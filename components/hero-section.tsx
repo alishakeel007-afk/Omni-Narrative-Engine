@@ -2,35 +2,33 @@ import Link from "next/link";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden px-4 pb-20 pt-14 sm:px-6 lg:px-8 lg:pb-24 lg:pt-24">
-      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+    <section className="relative overflow-hidden px-2 pb-20 pt-14 sm:px-4 lg:px-6 lg:pb-24 lg:pt-24">
+      <div className="mx-auto grid max-w-[1500px] items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
           <div className="mb-6 inline-flex items-center rounded-full border border-purple-300/20 bg-purple-300/10 px-4 py-2 text-xs uppercase tracking-[0.32em] text-gold">
             Cinematic AI Studio
           </div>
           <h1 className="max-w-4xl font-[var(--font-heading)] text-4xl leading-tight text-white sm:text-5xl lg:text-7xl">
-            <span className="text-gradient">Create cinematic worlds,</span>
+            <span className="text-gradient">Create cinematic AI stories with dialogue,</span>
             <br />
-            <span className="text-white">film-ready stories, and AI video scripts</span>
-            <br />
-            <span className="text-gradient">in minutes.</span>
+            <span className="text-white">voice, music, and video-ready scenes.</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-white/72 sm:text-lg">
-            An AI-powered cinematic studio built for filmmakers, editors, and creative storytellers who demand precision, speed, and luxury-grade output.
+            Omni-Narrative Engine is an AI-powered storytelling platform where users can build guided adventures, create custom stories, generate character dialogues, add narration, compose background music, and preview video-ready scenes.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <Link
               href="/auth?next=/story/mode"
               className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950 shadow-glow transition hover:scale-[1.02]"
             >
-              Launch Studio
+              Start Your Story
             </Link>
-            <a
-              href="#features"
+            <Link
+              href="/auth?next=/video"
               className="rounded-full border border-white/15 bg-white/10 px-7 py-4 text-center text-sm font-semibold text-white/90 backdrop-blur-sm transition hover:bg-white/20"
             >
-              Explore Demo
-            </a>
+              Open AI Story Studio
+            </Link>
           </div>
         </div>
 
@@ -46,25 +44,27 @@ export function HeroSection() {
                 </h2>
               </div>
               <span className="rounded-full border border-gold/20 bg-gold/20 px-3 py-1 text-xs text-gold">
-                Scene 01
+                Scene 1
               </span>
             </div>
 
             <div className="relative h-72 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(141,183,255,0.3),transparent_30%),linear-gradient(160deg,#111633,#070b1d)]">
               <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(5,8,22,0.8))]" />
-              <div className="absolute left-6 right-6 top-6 flex items-center justify-between">
+              <div className="absolute left-6 right-6 top-6 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/70">
-                  Location: Ruins of Vel Astra
+                  Guided Story
                 </span>
                 <span className="rounded-full border border-starlight/20 bg-starlight/10 px-3 py-1 text-xs text-starlight">
                   Suspenseful
+                </span>
+                <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">
+                  Memory Active
                 </span>
               </div>
               <div className="absolute bottom-6 left-6 right-6 space-y-3">
                 <div className="h-2 w-24 rounded-full bg-gradient-to-r from-starlight to-gold" />
                 <p className="max-w-md text-sm leading-7 text-white/82">
-                  The ancient gate trembles as blue light leaks through broken symbols while your
-                  companion waits for your next move.
+                  The ancient gate trembles as blue light leaks through broken symbols. Your next decision will shape the story.
                 </p>
               </div>
             </div>
