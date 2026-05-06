@@ -51,6 +51,8 @@ const personalityOptions = [
 export function CreateStorySetupForm() {
   const router = useRouter();
   const { saveSetupOnly, setup, updateSetup } = useStory();
+  const [customGenreInput, setCustomGenreInput] = useState("");
+  const [customToneInput, setCustomToneInput] = useState("");
   const [personalityInputs, setPersonalityInputs] = useState<Record<number, string>>({});
 
   const missingRequiredFields = [
@@ -81,6 +83,28 @@ export function CreateStorySetupForm() {
         : setup.moods.filter((item) => item !== tone)
       : [...setup.moods, tone];
     updateSetup({ mood: nextTones[0], moods: nextTones });
+  };
+
+  const addCustomGenre = () => {
+    const customGenre = customGenreInput.trim();
+    if (!customGenre) return;
+    const nextGenres = setup.genres
+      .filter((genre) => genre !== "Custom Genre")
+      .includes(customGenre)
+      ? setup.genres.filter((genre) => genre !== "Custom Genre")
+      : [...setup.genres.filter((genre) => genre !== "Custom Genre"), customGenre];
+    updateSetup({ genre: nextGenres[0], genres: nextGenres });
+    setCustomGenreInput("");
+  };
+
+  const addCustomTone = () => {
+    const customTone = customToneInput.trim();
+    if (!customTone) return;
+    const nextTones = setup.moods.includes(customTone)
+      ? setup.moods
+      : [...setup.moods, customTone];
+    updateSetup({ mood: nextTones[0], moods: nextTones });
+    setCustomToneInput("");
   };
 
   const updateCharacter = (
@@ -236,14 +260,22 @@ export function CreateStorySetupForm() {
         <div className="grid gap-6 lg:grid-cols-2">
           <PaletteGroup
             activeItems={setup.genres}
+            customInput={customGenreInput}
+            customPlaceholder="Write a custom genre"
             label="Multiple genres"
-            options={genreOptions}
+            options={genreOptions.filter((option) => option !== "Custom Genre")}
+            onAddCustom={addCustomGenre}
+            onCustomInputChange={setCustomGenreInput}
             onToggle={toggleGenre}
           />
           <PaletteGroup
             activeItems={setup.moods}
+            customInput={customToneInput}
+            customPlaceholder="Write a custom tone"
             label="Multiple tones"
             options={toneOptions}
+            onAddCustom={addCustomTone}
+            onCustomInputChange={setCustomToneInput}
             onToggle={toggleTone}
           />
         </div>
@@ -258,7 +290,7 @@ export function CreateStorySetupForm() {
 
             return (
               <div
-                key={`${character.name}-${index}`}
+                key={`character-${index}`}
                 className="rounded-[1.35rem] border border-white/10 bg-black/20 p-5"
               >
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -431,25 +463,34 @@ export function CreateStorySetupForm() {
             type="button"
             onClick={handleStartBuilding}
             disabled={!canStart}
-            className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-bold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
           >
             Start Building Story
           </button>
         </div>
       </WorkflowPanel>
+
     </form>
   );
 }
 
 function PaletteGroup({
   activeItems,
+  customInput,
+  customPlaceholder,
   label,
   options,
+  onAddCustom,
+  onCustomInputChange,
   onToggle
 }: {
   activeItems: string[];
+  customInput: string;
+  customPlaceholder: string;
   label: string;
   options: string[];
+  onAddCustom: () => void;
+  onCustomInputChange: (value: string) => void;
   onToggle: (value: string) => void;
 }) {
   return (
@@ -470,6 +511,27 @@ function PaletteGroup({
             {option}
           </button>
         ))}
+      </div>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input
+          value={customInput}
+          onChange={(event) => onCustomInputChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onAddCustom();
+            }
+          }}
+          placeholder={customPlaceholder}
+          className="input min-w-0 flex-1"
+        />
+        <button
+          type="button"
+          onClick={onAddCustom}
+          className="rounded-[1rem] border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-bold text-gold transition hover:border-gold/45 hover:bg-gold/15"
+        >
+          Add
+        </button>
       </div>
     </div>
   );

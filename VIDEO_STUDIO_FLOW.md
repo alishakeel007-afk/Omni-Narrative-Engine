@@ -36,7 +36,7 @@ The user writes a rough story idea.
 Buttons:
 
 - **Back to Setup**
-- **Generate Story with Gemini**
+- **Generate Story with AI**
 
 Going back keeps the selected genre, tone, scene count, and rough idea.
 

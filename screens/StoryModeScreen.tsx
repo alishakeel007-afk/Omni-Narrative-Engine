@@ -3,12 +3,32 @@
 import { useRouter } from "next/navigation";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { useStory } from "@/context/StoryContext";
+import { resetCreateStoryDraft } from "@/lib/create-story-storage";
+import { resetVideoStudioFlow } from "@/lib/video-storage";
 
 export default function StoryModeScreen() {
   const router = useRouter();
-  const { updateSetup, saveSetupOnly } = useStory();
+  const { saveSetupOnly, startFreshStorySetup, updateSetup } = useStory();
 
   const selectMode = (mode: "guided" | "custom") => {
+    const isFreshStart =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("fresh") === "1";
+
+    if (isFreshStart) {
+      startFreshStorySetup(mode);
+
+      if (mode === "guided") {
+        resetVideoStudioFlow();
+        router.push("/video");
+        return;
+      }
+
+      resetCreateStoryDraft();
+      router.push("/setup");
+      return;
+    }
+
     updateSetup({ mode });
     saveSetupOnly({ mode });
 

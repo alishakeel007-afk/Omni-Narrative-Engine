@@ -49,10 +49,14 @@ export default function StoryBuilderScreen() {
     saveCreateStoryDraft(nextDraft);
   }, []);
 
-  const activeScene = useMemo(
-    () => draft?.scenes.find((s) => s.id === activeSceneId) ?? draft?.scenes[0] ?? null,
-    [activeSceneId, draft]
-  );
+  const activeScene = useMemo(() => draft?.scenes.find((s) => s.id === activeSceneId) ?? draft?.scenes[0] ?? null, [activeSceneId, draft]);
+
+  const isReadyToContinue = useMemo(() => {
+    return draft?.scenes && draft.scenes.length > 0 && draft.scenes.every(scene =>
+      scene.title.trim().length > 0 &&
+      (scene.storyDescription?.trim().length || scene.selectedSuggestion?.trim().length)
+    );
+  }, [draft?.scenes]);
 
   const persistDraft = (nextDraft: CreateStoryDraft) => {
     const withAudio = {
@@ -597,14 +601,22 @@ export default function StoryBuilderScreen() {
                     Add Next Scene
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={endStory}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.01]"
-                >
-                  <Check className="h-4 w-4" />
-                  End Story
-                </button>
+                <div className="flex flex-col gap-1 flex-1">
+                  <button
+                    type="button"
+                    onClick={endStory}
+                    disabled={!isReadyToContinue}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+                  >
+                    <Check className="h-4 w-4" />
+                    Complete Story & Continue
+                  </button>
+                  {!isReadyToContinue && (
+                    <p className="mt-2 text-xs text-white/40 italic">
+                      Please ensure each scene has a title and description to continue.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </section>

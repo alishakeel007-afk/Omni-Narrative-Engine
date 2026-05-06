@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
+import { PreviewFinalAudioButton } from "@/components/preview-final-audio-button";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { AiStoryStudioStepper, type AiStoryStudioStep } from "@/components/ai-story-studio-stepper";
 import {
@@ -224,7 +225,7 @@ export default function AudioGenerationScreen() {
 
     persistDraft(nextDraft);
     await logActivity("video_previewed", { storyTitle: draft.storyTitle });
-    router.push("/video-preview");
+    router.push("/video-preview?mode=custom");
   };
 
   if (!draft) {
@@ -277,50 +278,80 @@ export default function AudioGenerationScreen() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-4">
-            <button
-              type="button"
-              onClick={generateVoices}
-              disabled={draft.audio.voiceStatus === "generating"}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-5 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {draft.audio.voiceStatus === "generating" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Mic2 className="h-4 w-4" />
+          <div className="mt-6 flex flex-wrap items-stretch gap-3 [&>*]:flex-1 [&>*]:min-w-[200px] xl:[&>*]:min-w-[180px]">
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={generateVoices}
+                disabled={draft.audio.voiceStatus === "generating"}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-5 py-3 text-sm font-semibold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+              >
+                {draft.audio.voiceStatus === "generating" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mic2 className="h-4 w-4" />
+                )}
+                {draft.audio.voiceStatus === "ready" ? "Regenerate Voices" : "Generate Voices"}
+              </button>
+              {draft.audio.voiceStatus === "idle" && (
+                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter">Required for music</p>
               )}
-              {draft.audio.voiceStatus === "ready" ? "Regenerate Character Voices" : "Generate Character Voices"}
-            </button>
-            <button
-              type="button"
-              onClick={generateBackgroundMusic}
-              disabled={draft.audio.backgroundMusicStatus === "generating"}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-starlight/20 bg-starlight/10 px-5 py-3 text-sm font-semibold text-starlight transition hover:bg-starlight/15 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {draft.audio.backgroundMusicStatus === "generating" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Music2 className="h-4 w-4" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={generateBackgroundMusic}
+                disabled={draft.audio.backgroundMusicStatus === "generating" || draft.audio.voiceStatus !== "ready"}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-starlight/20 bg-starlight/10 px-5 py-3 text-sm font-semibold text-starlight transition-all duration-300 hover:bg-starlight/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+              >
+                {draft.audio.backgroundMusicStatus === "generating" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Music2 className="h-4 w-4" />
+                )}
+                {draft.audio.backgroundMusicStatus === "ready" ? "Regenerate Music" : "Generate Music"}
+              </button>
+              {draft.audio.voiceStatus !== "ready" && (
+                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Generate voices first</p>
               )}
-              {draft.audio.backgroundMusicStatus === "ready" ? "Regenerate Background Music" : "Generate Background Music"}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/story-builder")}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-gold/25 hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Story Builder
-            </button>
-            <button
-              type="button"
-              onClick={generateVideo}
-              disabled={!canGenerateVideo}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition hover:bg-gold/15 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Clapperboard className="h-4 w-4" />
-              Generate Video
-            </button>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => router.push("/story-builder")}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition-all duration-300 hover:border-gold/25 hover:text-white hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <PreviewFinalAudioButton
+                backgroundMusicUrl={draft.audio.backgroundMusicUrl}
+                voiceAudioUrls={draft.scenes.flatMap(scene => scene.dialogues.map(d => (d as any).audioUrl))}
+              />
+              {draft.audio.backgroundMusicStatus !== "ready" && (
+                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Music required</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={generateVideo}
+                disabled={!canGenerateVideo}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition-all duration-300 hover:bg-gold/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+              >
+                <Clapperboard className="h-4 w-4" />
+                Generate Video
+              </button>
+              {!canGenerateVideo && (
+                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Complete all audio</p>
+              )}
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -333,7 +364,7 @@ export default function AudioGenerationScreen() {
             <div className="flex flex-col gap-3">
               <StatusPanel
                 icon={<Music2 className="h-4 w-4" />}
-                label="Background Music Status"
+                label="Music Status"
                 message={draft.audio.backgroundMusicMessage}
                 status={draft.audio.backgroundMusicStatus}
               />

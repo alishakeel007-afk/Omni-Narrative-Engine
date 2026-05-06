@@ -1,16 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardCard } from "@/components/dashboard-card";
 import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { useStory } from "@/context/StoryContext";
 import { countCustomChoices } from "@/lib/story-engine";
+import {
+  CREATE_STORY_STORAGE_KEY,
+  createDefaultDraft,
+  loadCreateStoryDraft
+} from "@/lib/create-story-storage";
+import {
+  DEFAULT_VIDEO_SCENARIO,
+  VIDEO_DRAFT_STORAGE_KEY,
+  VIDEO_STUDIO_FLOW_STORAGE_KEY,
+  VIDEO_VOICE_RESULT_STORAGE_KEY,
+  loadVideoStudioFlow
+} from "@/lib/video-storage";
+import {
+  STORY_COMPLETED_STORAGE_KEY,
+  STORY_PROGRESS_STORAGE_KEY
+} from "@/lib/story-storage";
+
+type ResumeTarget = {
+  canDelete: boolean;
+  description: string;
+  href: string;
+  label: string;
+  source: "active-story" | "custom-story" | "saved-setup" | "video-studio";
+  title: string;
+};
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { saveSetupOnly, setup, state, updateSetup } = useStory();
+  const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
   const currentScene = state.currentScene.sceneNumber;
   const hasProgress = state.memoryTimeline.length > 0 || state.currentScene.sceneNumber > 1;
   const customChoiceCount = countCustomChoices(state);
@@ -32,6 +59,105 @@ export default function DashboardScreen() {
     saveSetupOnly({ mode: "custom" });
     router.push("/setup");
   };
+  const fallbackResumeTarget = useMemo<ResumeTarget>(() => ({
+    canDelete: hasProgress,
+    description: hasProgress
+      ? `Resume Scene ${currentScene} with ${setup.characterName}'s latest decisions still tracked in memory.`
+      : `Open the first scene for ${setup.characterName} and begin the saved ${setup.mode} setup.`,
+    href: hasProgress ? "/story/play" : "/setup",
+    label: hasProgress ? "Continue Last Story" : "Saved Setup",
+    source: hasProgress ? "active-story" : "saved-setup",
+    title: setup.storyTitle
+  }), [currentScene, hasProgress, setup]);
+
+  useEffect(() => {
+    const customRaw = window.localStorage.getItem(CREATE_STORY_STORAGE_KEY);
+
+    if (customRaw) {
+      const draft = loadCreateStoryDraft();
+      const defaultDraft = createDefaultDraft();
+      const hasCustomWork =
+        draft.scenes.length > 0 ||
+        draft.storyTitle !== defaultDraft.storyTitle ||
+        draft.audio.voiceStatus !== "idle" ||
+        draft.audio.backgroundMusicStatus !== "idle" ||
+        draft.video.status !== "idle";
+
+      if (hasCustomWork) {
+        setResumeTarget({
+          canDelete: true,
+          description:
+            draft.video.status === "ready"
+              ? `Open the custom video preview for ${draft.scenes.length} scene${draft.scenes.length === 1 ? "" : "s"}.`
+              : `Resume the custom scene builder with ${draft.scenes.length || 1} scene${draft.scenes.length === 1 ? "" : "s"} saved.`,
+          href: draft.video.status === "ready" ? "/video-preview?mode=custom" : "/story-builder",
+          label: "Continue AI Story Studio",
+          source: "custom-story",
+          title: draft.storyTitle
+        });
+        return;
+      }
+    }
+
+    const videoRaw = window.localStorage.getItem(VIDEO_STUDIO_FLOW_STORAGE_KEY);
+
+    if (videoRaw) {
+      const flow = loadVideoStudioFlow();
+      const hasVideoWork =
+        Boolean(flow.script) ||
+        Boolean(flow.generatedStory) ||
+        Boolean(flow.acceptedStory) ||
+        Boolean(flow.voiceResult) ||
+        flow.stage !== "setup" ||
+        flow.roughIdea !== DEFAULT_VIDEO_SCENARIO ||
+        flow.music.status !== "idle";
+
+      if (hasVideoWork) {
+        setResumeTarget({
+          canDelete: true,
+          description: flow.script
+            ? `Resume Guided Video Studio at ${flow.stage} with ${flow.script.scenes.length} generated scene${flow.script.scenes.length === 1 ? "" : "s"}.`
+            : "Resume the Guided Video Studio setup where you left off.",
+          href: flow.stage === "preview" ? "/video-preview?mode=guided" : "/video",
+          label: "Continue Guided Video Studio",
+          source: "video-studio",
+          title: flow.script?.title || "Guided Video Studio Draft"
+        });
+        return;
+      }
+    }
+
+    setResumeTarget(fallbackResumeTarget);
+  }, [fallbackResumeTarget]);
+
+  const activeResumeTarget = resumeTarget ?? fallbackResumeTarget;
+
+  const deleteSavedStory = () => {
+    if (!activeResumeTarget.canDelete) return;
+
+    const confirmed = window.confirm(
+      `Delete "${activeResumeTarget.title}"? This removes the saved story from this browser.`
+    );
+
+    if (!confirmed) return;
+
+    if (activeResumeTarget.source === "custom-story") {
+      window.localStorage.removeItem(CREATE_STORY_STORAGE_KEY);
+    }
+
+    if (activeResumeTarget.source === "video-studio") {
+      window.localStorage.removeItem(VIDEO_STUDIO_FLOW_STORAGE_KEY);
+      window.localStorage.removeItem(VIDEO_DRAFT_STORAGE_KEY);
+      window.localStorage.removeItem(VIDEO_VOICE_RESULT_STORAGE_KEY);
+    }
+
+    if (activeResumeTarget.source === "active-story") {
+      window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
+      window.localStorage.removeItem(STORY_COMPLETED_STORAGE_KEY);
+    }
+
+    window.location.reload();
+  };
 
   return (
     <ProtectedRoute>
@@ -42,7 +168,7 @@ export default function DashboardScreen() {
               <p className="mt-1 text-sm text-white/70">Start a new guided or custom story.</p>
             </div>
             <Link
-              href="/story/mode"
+              href="/story/mode?fresh=1"
               className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
             >
               Start New Story
@@ -51,20 +177,16 @@ export default function DashboardScreen() {
 
           <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Link
-              href="/story/play"
+              href={activeResumeTarget.href}
               className="glass-panel gold-ring rounded-[1.75rem] p-6 transition hover:-translate-y-1"
             >
-              <p className="text-xs uppercase tracking-[0.28em] text-gold">Continue Last Story</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">{setup.storyTitle}</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">
-                {hasProgress
-                  ? `Resume Scene ${currentScene} with ${setup.characterName}'s latest decisions still tracked in memory.`
-                  : `Open the first scene for ${setup.characterName} and begin the saved ${setup.mode} setup.`}
-              </p>
+              <p className="text-xs uppercase tracking-[0.28em] text-gold">{activeResumeTarget.label}</p>
+              <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
+              <p className="mt-3 text-sm leading-7 text-white/65">{activeResumeTarget.description}</p>
             </Link>
 
             <Link
-              href="/story/mode"
+              href="/story/mode?fresh=1"
               className="glass-panel rounded-[1.75rem] p-6 transition hover:-translate-y-1"
             >
               <p className="text-xs uppercase tracking-[0.28em] text-starlight/78">Start New Story</p>
@@ -98,12 +220,22 @@ export default function DashboardScreen() {
             </Link>
 
             <div className="glass-panel rounded-[1.75rem] p-6">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Saved Stories</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">{setup.storyTitle}</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">
-                {setup.genre} story anchored by {setup.characterName} in{' '}
-                {setup.mode === "custom" ? "Custom Mode" : "Guided Mode"}.
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <Link href={activeResumeTarget.href} className="min-w-0 flex-1">
+                  <p className="text-xs uppercase tracking-[0.28em] text-white/45">Saved Stories</p>
+                  <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-white/65">{activeResumeTarget.description}</p>
+                </Link>
+                {activeResumeTarget.canDelete ? (
+                  <button
+                    type="button"
+                    onClick={deleteSavedStory}
+                    className="shrink-0 rounded-full border border-red-400/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15"
+                  >
+                    Delete
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="glass-panel rounded-[1.75rem] p-6">

@@ -12,8 +12,10 @@ import type {
 export const runtime = "nodejs";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const DEEPGRAM_TTS_ENDPOINT = "https://api.deepgram.com/v1/speak";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 const DEFAULT_DEEPGRAM_TTS_MODEL = "aura-2-thalia-en";
 const MAX_SCENES = 5;
 const MAX_AUDIO_LINES = 18;
@@ -661,6 +663,19 @@ function extractGeminiText(payload: unknown) {
     .join("\n");
 }
 
+function extractGroqText(payload: unknown) {
+  const choices = (payload as { choices?: unknown[] }).choices;
+
+  if (!Array.isArray(choices)) {
+    return "";
+  }
+
+  return choices
+    .map((choice) => (choice as { message?: { content?: unknown } }).message?.content)
+    .filter((content): content is string => typeof content === "string")
+    .join("\n");
+}
+
 function parseJsonFromText(text: string) {
   const cleaned = text
     .replace(/^```json\s*/i, "")
@@ -790,6 +805,113 @@ async function generateMovieScript(params: {
     title: textValue(parsed.title, "Untitled Omni-Narrative Film"),
     tone: textValue(parsed.tone, params.tones.join(" + "))
   };
+}
+
+async function generateMovieScriptWithGroq(params: {
+  apiKey: string;
+  genres: string[];
+  model: string;
+  sceneCount: number;
+  scenario: string;
+  tones: string[];
+}) {
+  const response = await fetch(
+    GROQ_ENDPOINT,
+    {
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "system",
+            content: "You are the Omni-Narrative Engine. Return valid JSON only, with no markdown."
+          },
+          {
+            role: "user",
+            content: buildGeminiPrompt(params)
+          }
+        ],
+        model: params.model,
+        response_format: { type: "json_object" },
+        temperature: 0.85
+      }),
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Groq fallback request failed (${response.status}): ${errorText.slice(0, 500)}`);
+  }
+
+  const payload = await response.json() as unknown;
+  const text = extractGroqText(payload);
+  const parsed = parseJsonFromText(text);
+  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+
+  if (rawScenes.length === 0) {
+    throw new Error("Groq fallback returned no scenes.");
+  }
+
+  const scenes = rawScenes.slice(0, params.sceneCount).map(normalizeScene);
+  const voiceResult = assignCharacterVoices(scenes);
+
+  return {
+    characterVoices: voiceResult.characterVoices,
+    estimatedRuntime: textValue(parsed.estimatedRuntime, `${params.sceneCount * 45} seconds`),
+    genre: textValue(parsed.genre, params.genres.join(" + ")),
+    logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
+    scenes: voiceResult.scenes,
+    title: textValue(parsed.title, "Untitled Omni-Narrative Film"),
+    tone: textValue(parsed.tone, params.tones.join(" + "))
+  };
+}
+
+async function generateMovieScriptWithFallback(params: {
+  geminiApiKey: string;
+  genres: string[];
+  sceneCount: number;
+  scenario: string;
+  tones: string[];
+}) {
+  const geminiModel = getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL;
+  const groqApiKey = getEnvValue([
+    "GROQ_FALLBACK_API",
+    "GROQ_API_KEY",
+    "groq_fallback_api"
+  ]);
+
+  try {
+    return await generateMovieScript({
+      apiKey: params.geminiApiKey,
+      genres: params.genres,
+      model: geminiModel,
+      sceneCount: params.sceneCount,
+      scenario: params.scenario,
+      tones: params.tones
+    });
+  } catch (geminiError) {
+    if (!groqApiKey) {
+      throw geminiError;
+    }
+
+    try {
+      return await generateMovieScriptWithGroq({
+        apiKey: groqApiKey,
+        genres: params.genres,
+        model: getEnvValue(["GROQ_FALLBACK_MODEL", "GROQ_MODEL"]) || DEFAULT_GROQ_MODEL,
+        sceneCount: params.sceneCount,
+        scenario: params.scenario,
+        tones: params.tones
+      });
+    } catch (groqError) {
+      const geminiMessage = geminiError instanceof Error ? geminiError.message : "Gemini request failed.";
+      const groqMessage = groqError instanceof Error ? groqError.message : "Groq fallback failed.";
+      throw new Error(`${geminiMessage} Groq fallback also failed: ${groqMessage}`);
+    }
+  }
 }
 
 function applySituationalSpeechPacing(line: MovieDialogueLine, scene: MovieScene) {
@@ -966,10 +1088,9 @@ export async function POST(request: Request) {
     const genres = listValue(body.genre, ["Cinematic Drama"]);
     const tones = listValue(body.tone, ["Immersive and emotional"]);
     const includeAudio = body.includeAudio !== false;
-    const script = await generateMovieScript({
-      apiKey: geminiApiKey,
+    const script = await generateMovieScriptWithFallback({
+      geminiApiKey,
       genres,
-      model: getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL,
       sceneCount,
       scenario,
       tones

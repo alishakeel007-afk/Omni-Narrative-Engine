@@ -17,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
+import { PreviewFinalAudioButton } from "@/components/preview-final-audio-button";
 import { ProtectedRoute } from "@/components/protected-route";
 import {
   DEFAULT_VIDEO_GENRES,
@@ -45,6 +46,8 @@ export default function VideoStudioScreen() {
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [customGenreInput, setCustomGenreInput] = useState("");
+  const [customToneInput, setCustomToneInput] = useState("");
 
   useEffect(() => {
     setFlow(loadVideoStudioFlow());
@@ -109,6 +112,38 @@ export default function VideoStudioScreen() {
       scenesNeedRegeneration: Boolean(flow.script),
       videoOutdated: Boolean(flow.script)
     });
+  };
+
+  const addCustomGenre = () => {
+    if (!flow) return;
+    const customGenre = customGenreInput.trim();
+    if (!customGenre) return;
+    const nextGenres = flow.genres.includes(customGenre)
+      ? flow.genres
+      : [...flow.genres, customGenre];
+    persistFlow({
+      ...flow,
+      genres: nextGenres,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script)
+    });
+    setCustomGenreInput("");
+  };
+
+  const addCustomTone = () => {
+    if (!flow) return;
+    const customTone = customToneInput.trim();
+    if (!customTone) return;
+    const nextTones = flow.tones.includes(customTone)
+      ? flow.tones
+      : [...flow.tones, customTone];
+    persistFlow({
+      ...flow,
+      tones: nextTones,
+      scenesNeedRegeneration: Boolean(flow.script),
+      videoOutdated: Boolean(flow.script)
+    });
+    setCustomToneInput("");
   };
 
   const updateSceneCount = (sceneCount: number) => {
@@ -426,7 +461,7 @@ export default function VideoStudioScreen() {
       stage: "preview",
       videoOutdated: false
     });
-    router.push("/video-preview");
+    router.push("/video-preview?mode=guided");
   };
 
   if (!flow) {
@@ -493,12 +528,18 @@ export default function VideoStudioScreen() {
               <Warnings flow={flow} />
 
               {flow.stage === "setup" ? (
-                <SetupStage
-                  flow={flow}
-                  onContinue={() => setStage("storyIdea")}
-                  onSceneCountChange={updateSceneCount}
-                  onToggleGenre={toggleGenre}
-                  onToggleTone={toggleTone}
+          <SetupStage
+            flow={flow}
+            customGenreInput={customGenreInput}
+            customToneInput={customToneInput}
+            onAddCustomGenre={addCustomGenre}
+            onAddCustomTone={addCustomTone}
+            onContinue={() => setStage("storyIdea")}
+            onCustomGenreInputChange={setCustomGenreInput}
+            onCustomToneInputChange={setCustomToneInput}
+            onSceneCountChange={updateSceneCount}
+            onToggleGenre={toggleGenre}
+            onToggleTone={toggleTone}
                 />
               ) : null}
 
@@ -573,6 +614,52 @@ export default function VideoStudioScreen() {
           </section>
         </div>
       </div>
+      {/* Floating Action Bar */}
+      {(() => {
+        let isReady = false;
+        let label = "";
+        let sublabel = "";
+        let action = () => {};
+        let actionLabel = "";
+
+        if (flow.stage === "voice" && flow.voiceResult && !flow.voiceNeedsRegeneration) {
+          isReady = true;
+          label = "Voices Ready";
+          sublabel = "All character dialogues generated.";
+          action = () => setStage("music");
+          actionLabel = "Continue to Music";
+        } else if (flow.stage === "music" && flow.music.status === "ready") {
+          isReady = true;
+          label = "Music Ready";
+          sublabel = "Cinematic score generated.";
+          action = openPreview;
+          actionLabel = "Continue to Video";
+        }
+
+        if (!isReady) return null;
+
+        return (
+          <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center gap-6 rounded-full border border-cyan-500/30 bg-black/60 px-8 py-4 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-400">
+                  <Check className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">{label}</p>
+                  <p className="text-[10px] text-white/60">{sublabel}</p>
+                </div>
+              </div>
+              <button
+                onClick={action}
+                className="rounded-full bg-cyan-500 px-6 py-2 text-xs font-black uppercase tracking-tighter text-slate-950 transition hover:scale-105 active:scale-95"
+              >
+                {actionLabel}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </ProtectedRoute>
   );
 }
@@ -637,13 +724,25 @@ function Warnings({ flow }: { flow: VideoStudioFlowState }) {
 
 function SetupStage({
   flow,
+  customGenreInput,
+  customToneInput,
+  onAddCustomGenre,
+  onAddCustomTone,
   onContinue,
+  onCustomGenreInputChange,
+  onCustomToneInputChange,
   onSceneCountChange,
   onToggleGenre,
   onToggleTone
 }: {
   flow: VideoStudioFlowState;
+  customGenreInput: string;
+  customToneInput: string;
+  onAddCustomGenre: () => void;
+  onAddCustomTone: () => void;
   onContinue: () => void;
+  onCustomGenreInputChange: (value: string) => void;
+  onCustomToneInputChange: (value: string) => void;
   onSceneCountChange: (value: number) => void;
   onToggleGenre: (value: string) => void;
   onToggleTone: (value: string) => void;
@@ -660,15 +759,23 @@ function SetupStage({
           <PaletteGroup
             activeItems={flow.genres}
             color="cyan"
+            customInput={customGenreInput}
+            customPlaceholder="Write a custom genre"
             label="Genre Palette"
             options={DEFAULT_VIDEO_GENRES}
+            onAddCustom={onAddCustomGenre}
+            onCustomInputChange={onCustomGenreInputChange}
             onToggle={onToggleGenre}
           />
           <PaletteGroup
             activeItems={flow.tones}
             color="purple"
+            customInput={customToneInput}
+            customPlaceholder="Write a custom tone"
             label="Emotional Palette"
             options={DEFAULT_VIDEO_TONES}
+            onAddCustom={onAddCustomTone}
+            onCustomInputChange={onCustomToneInputChange}
             onToggle={onToggleTone}
           />
         </div>
@@ -741,7 +848,7 @@ function StoryIdeaStage({
         </SecondaryButton>
         <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-          Generate Story with Gemini
+          Generate Story with AI
         </PrimaryButton>
       </div>
     </section>
@@ -941,10 +1048,18 @@ function VoiceStage({
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             Regenerate Voice
           </SecondaryButton>
-          <PrimaryButton disabled={!script} onClick={onContinue}>
+          <PrimaryButton
+            disabled={!script || isGenerating || !flow.voiceResult || flow.voiceNeedsRegeneration}
+            onClick={onContinue}
+          >
             <Music2 className="h-4 w-4" />
-            Continue to Background Music
+            Continue to Music
           </PrimaryButton>
+          {!flow.voiceResult && !isGenerating && (
+            <p className="col-span-full mt-2 text-center text-xs text-white/40 italic">
+              Please generate voice audio to unlock background music.
+            </p>
+          )}
         </div>
       </div>
 
@@ -984,23 +1099,37 @@ function MusicStage({
         ) : null}
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-4">
+      <div className="mt-6 flex flex-wrap items-stretch gap-3 [&>*]:flex-1 [&>*]:min-w-[200px] xl:[&>*]:min-w-[180px]">
         <SecondaryButton onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
-          Back to Audio Generation
+          Back
         </SecondaryButton>
         <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music2 className="h-4 w-4" />}
-          Generate Background Music
+          Generate Music
         </PrimaryButton>
         <SecondaryButton disabled={isGenerating} onClick={onGenerate}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-          Regenerate Background Music
+          Regenerate Music
         </SecondaryButton>
-        <PrimaryButton onClick={onPreview}>
+        <div className="flex">
+          <PreviewFinalAudioButton
+            backgroundMusicUrl={flow.music.trackUrl}
+            voiceAudioUrls={flow.script?.scenes.flatMap(scene => scene.dialogues.map(d => d.audioUrl)).filter((url): url is string => !!url) || []}
+          />
+        </div>
+        <PrimaryButton
+          disabled={!flow.music.trackUrl || isGenerating}
+          onClick={onPreview}
+        >
           <Clapperboard className="h-4 w-4" />
           Preview Video
         </PrimaryButton>
+        {!flow.music.trackUrl && !isGenerating && (
+          <p className="col-span-full mt-2 text-center text-xs text-white/40 italic">
+            Complete background music to unlock final video preview.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -1084,14 +1213,22 @@ function InfoPanel({ title, text }: { title: string; text: string }) {
 function PaletteGroup({
   activeItems,
   color,
+  customInput,
+  customPlaceholder,
   label,
   options,
+  onAddCustom,
+  onCustomInputChange,
   onToggle
 }: {
   activeItems: string[];
   color: "cyan" | "purple";
+  customInput: string;
+  customPlaceholder: string;
   label: string;
   options: string[];
+  onAddCustom: () => void;
+  onCustomInputChange: (value: string) => void;
   onToggle: (value: string) => void;
 }) {
   const activeClass =
@@ -1118,6 +1255,27 @@ function PaletteGroup({
           </button>
         ))}
       </div>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input
+          value={customInput}
+          onChange={(event) => onCustomInputChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onAddCustom();
+            }
+          }}
+          placeholder={customPlaceholder}
+          className="min-w-0 flex-1 rounded-xl border border-slate-600/50 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+        />
+        <button
+          type="button"
+          onClick={onAddCustom}
+          className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-white transition hover:border-cyan-400/40 hover:bg-cyan-500/10"
+        >
+          Add
+        </button>
+      </div>
     </div>
   );
 }
@@ -1136,7 +1294,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-5 py-4 text-sm font-bold text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-5 py-4 text-sm font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:pointer-events-none disabled:shadow-none"
     >
       {children}
     </button>
@@ -1157,7 +1315,7 @@ function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-white/80 transition hover:border-cyan-300/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-white/80 transition-all duration-300 hover:border-cyan-300/35 hover:bg-white/10 hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:pointer-events-none"
     >
       {children}
     </button>

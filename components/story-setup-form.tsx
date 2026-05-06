@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { CreateStorySetupForm } from "@/components/create-story-setup-form";
 import { useStory } from "@/context/StoryContext";
 import { DEFAULT_STORY_SETUP } from "@/lib/story-storage";
@@ -453,7 +454,7 @@ function GuidedStorySetupForm() {
 
         <div className="grid gap-4">
           {setup.characters.map((character, index) => (
-            <div key={`${character.name}-${index}`} className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
+            <div key={`character-${index}`} className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-white/45">
@@ -616,19 +617,42 @@ function GuidedStorySetupForm() {
             type="button"
             onClick={handleBeginStory}
             disabled={!canBeginStory}
-            className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-bold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
           >
             Begin Active Story
           </button>
           <button
             type="button"
             onClick={handleOpenDashboard}
-            className="rounded-full border border-white/10 bg-white/5 px-7 py-4 text-center text-sm font-semibold text-white/82 transition hover:border-gold/25 hover:bg-white/10"
+            className="rounded-full border border-white/10 bg-white/5 px-7 py-4 text-center text-sm font-semibold text-white/82 transition-all duration-300 hover:border-gold/25 hover:bg-white/10 active:scale-[0.98]"
           >
             Save and View Dashboard
           </button>
         </div>
       </WorkflowPanel>
+
+      {/* Floating Action Bar */}
+      {canBeginStory && (
+        <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-6 rounded-full border border-starlight/30 bg-black/60 px-8 py-4 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-starlight/20 text-starlight">
+                <Check className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-starlight">Ready to Begin</p>
+                <p className="text-[10px] text-white/60">Story foundation is complete.</p>
+              </div>
+            </div>
+            <button
+              onClick={handleBeginStory}
+              className="rounded-full bg-starlight px-6 py-2 text-xs font-black uppercase tracking-tighter text-slate-950 transition hover:scale-105 active:scale-95"
+            >
+              Start Story
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

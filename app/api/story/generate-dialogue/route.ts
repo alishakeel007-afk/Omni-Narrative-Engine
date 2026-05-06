@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 
 export const runtime = "nodejs";
 
@@ -11,6 +13,14 @@ function getGeminiKey() {
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    ""
+  );
+}
+
+function getGroqFallbackKey() {
+  return (
+    process.env.GROQ_FALLBACK_API ||
+    process.env.GROQ_API_KEY ||
     ""
   );
 }
@@ -70,6 +80,146 @@ Example format:
 [{"characterId": "id1", "characterName": "Name", "text": "Dialogue line here."}]`;
 }
 
+function extractGeminiText(payload: unknown) {
+  return (
+    (payload as { candidates?: { content?: { parts?: { text?: string }[] } }[] }).candidates
+      ?.flatMap((candidate) => candidate.content?.parts ?? [])
+      .map((part) => part.text ?? "")
+      .join("") ?? ""
+  );
+}
+
+function extractGroqText(payload: unknown) {
+  return (
+    (payload as { choices?: { message?: { content?: string } }[] }).choices
+      ?.map((choice) => choice.message?.content ?? "")
+      .join("") ?? ""
+  );
+}
+
+function parseDialogues(rawText: string) {
+  let dialogues: { characterId: string; characterName: string; text: string }[] = [];
+
+  try {
+    const cleaned = rawText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```$/i, "")
+      .trim();
+    const parsed = JSON.parse(cleaned);
+    const source = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.dialogues)
+        ? parsed.dialogues
+        : [];
+
+    dialogues = source
+      .filter((dialogue: unknown) => {
+        const item = dialogue as { characterId?: unknown; text?: unknown };
+        return item && typeof item.characterId === "string" && typeof item.text === "string";
+      })
+      .map((dialogue: { characterId: string; characterName?: string; text: string }) => ({
+        characterId: String(dialogue.characterId),
+        characterName: String(dialogue.characterName || ""),
+        text: String(dialogue.text).trim(),
+      }));
+  } catch {
+    const match = rawText.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed)) {
+          dialogues = parsed
+            .filter((dialogue) => dialogue && typeof dialogue.characterId === "string")
+            .map((dialogue) => ({
+              characterId: String(dialogue.characterId),
+              characterName: String(dialogue.characterName || ""),
+              text: String(dialogue.text || "").trim(),
+            }));
+        }
+      } catch { /* keep empty */ }
+    }
+  }
+
+  return dialogues.filter((dialogue) => dialogue.text);
+}
+
+async function requestGeminiDialogue(params: {
+  apiKey: string;
+  prompt: string;
+}) {
+  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": params.apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: params.prompt }] }],
+        generationConfig: { temperature: 0.85, responseMimeType: "application/json" },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const payload = await response.json() as unknown;
+  const dialogues = parseDialogues(extractGeminiText(payload));
+
+  if (dialogues.length === 0) {
+    throw new Error("Gemini returned no dialogue lines.");
+  }
+
+  return dialogues;
+}
+
+async function requestGroqDialogue(params: {
+  apiKey: string;
+  prompt: string;
+}) {
+  const response = await fetch(GROQ_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: "system",
+          content: "You are the Omni-Narrative Engine. Return valid JSON only, with no markdown.",
+        },
+        {
+          role: "user",
+          content: params.prompt,
+        },
+      ],
+      model: process.env.GROQ_FALLBACK_MODEL || process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
+      temperature: 0.85,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq fallback error (${response.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const payload = await response.json() as unknown;
+  const dialogues = parseDialogues(extractGroqText(payload));
+
+  if (dialogues.length === 0) {
+    throw new Error("Groq fallback returned no dialogue lines.");
+  }
+
+  return dialogues;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();
@@ -91,15 +241,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = getGeminiKey();
-    if (!apiKey) {
+    const geminiApiKey = getGeminiKey();
+    const groqApiKey = getGroqFallbackKey();
+    if (!geminiApiKey && !groqApiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is missing from .env.local" },
+        { error: "GEMINI_API_KEY or GROQ_FALLBACK_API is missing from .env.local" },
         { status: 500 }
       );
     }
 
-    const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
     const prompt = buildDialoguePrompt({
       characters: characters || [],
       genres: genres || ["Cinematic"],
@@ -110,79 +260,32 @@ export async function POST(request: Request) {
       tones: tones || ["Dramatic"],
     });
 
-    const response = await fetch(
-      `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.85, responseMimeType: "application/json" },
-        }),
-      }
-    );
+    if (geminiApiKey) {
+      try {
+        const dialogues = await requestGeminiDialogue({ apiKey: geminiApiKey, prompt });
+        return NextResponse.json({ dialogues, provider: "Gemini" });
+      } catch (geminiError) {
+        if (!groqApiKey) {
+          const message = geminiError instanceof Error ? geminiError.message : "Gemini dialogue generation failed.";
+          return NextResponse.json({ error: message }, { status: 500 });
+        }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return NextResponse.json(
-        { error: `Gemini error (${response.status}): ${errText.slice(0, 300)}` },
-        { status: 500 }
-      );
-    }
-
-    const payload = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    const rawText =
-      payload.candidates
-        ?.flatMap((c) => c.content?.parts ?? [])
-        .map((p) => p.text ?? "")
-        .join("") ?? "";
-
-    let dialogues: { characterId: string; characterName: string; text: string }[] = [];
-    try {
-      const cleaned = rawText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/```$/i, "")
-        .trim();
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed)) {
-        dialogues = parsed
-          .filter((d) => d && typeof d.characterId === "string" && typeof d.text === "string")
-          .map((d) => ({
-            characterId: String(d.characterId),
-            characterName: String(d.characterName || ""),
-            text: String(d.text).trim(),
-          }));
-      }
-    } catch {
-      const match = rawText.match(/\[[\s\S]*\]/);
-      if (match) {
         try {
-          const parsed = JSON.parse(match[0]);
-          if (Array.isArray(parsed)) {
-            dialogues = parsed
-              .filter((d) => d && typeof d.characterId === "string")
-              .map((d) => ({
-                characterId: String(d.characterId),
-                characterName: String(d.characterName || ""),
-                text: String(d.text || "").trim(),
-              }));
-          }
-        } catch { /* keep empty */ }
+          const dialogues = await requestGroqDialogue({ apiKey: groqApiKey, prompt });
+          return NextResponse.json({ dialogues, provider: "Groq fallback" });
+        } catch (groqError) {
+          const geminiMessage = geminiError instanceof Error ? geminiError.message : "Gemini dialogue generation failed.";
+          const groqMessage = groqError instanceof Error ? groqError.message : "Groq fallback failed.";
+          return NextResponse.json(
+            { error: `${geminiMessage} Groq fallback also failed: ${groqMessage}` },
+            { status: 500 }
+          );
+        }
       }
     }
 
-    if (dialogues.length === 0) {
-      return NextResponse.json(
-        { error: "Gemini returned no dialogue lines." },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ dialogues });
+    const dialogues = await requestGroqDialogue({ apiKey: groqApiKey, prompt });
+    return NextResponse.json({ dialogues, provider: "Groq fallback" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Dialogue generation failed.";
     return NextResponse.json({ error: message }, { status: 500 });

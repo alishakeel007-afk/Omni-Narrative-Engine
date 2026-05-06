@@ -28,6 +28,7 @@ type StoryContextValue = {
   generateAlternativeOptions: () => void;
   isReady: boolean;
   restartStory: () => void;
+  startFreshStorySetup: (mode: StorySetupData["mode"]) => StorySetupData;
   saveSetupOnly: (override?: Partial<StorySetupData>) => void;
   selectSuggestedChoice: (choice: string) => void;
   selectCustomChoice: () => boolean;
@@ -359,6 +360,27 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
   };
 
+  const startFreshStorySetup = (mode: StorySetupData["mode"]) => {
+    const nextSetup = normalizeSetup({
+      ...DEFAULT_STORY_SETUP,
+      mode
+    });
+    const nextState = createInitialStoryState(nextSetup);
+
+    setSetup(nextSetup);
+    setState(nextState);
+    window.localStorage.setItem(
+      STORY_SETUP_STORAGE_KEY,
+      JSON.stringify({
+        ...nextSetup,
+        lastUpdatedAt: new Date().toISOString()
+      })
+    );
+    window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
+
+    return nextSetup;
+  };
+
   const value = useMemo<StoryContextValue>(
     () => ({
       beginStoryFromSetup,
@@ -366,6 +388,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       generateAlternativeOptions,
       isReady,
       restartStory,
+      startFreshStorySetup,
       saveSetupOnly,
       selectCustomChoice,
       selectSuggestedChoice,

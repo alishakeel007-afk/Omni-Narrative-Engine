@@ -30,9 +30,29 @@ export default function VideoPreviewScreen() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    const previewMode = new URLSearchParams(window.location.search).get("mode");
     const loadedVideoFlow = loadVideoStudioFlow();
-    setVideoFlow(loadedVideoFlow.script ? loadedVideoFlow : null);
-    setCreateDraft(loadCreateStoryDraft());
+    const loadedCreateDraft = loadCreateStoryDraft();
+
+    setCreateDraft(loadedCreateDraft);
+
+    if (previewMode === "custom") {
+      setVideoFlow(null);
+      return;
+    }
+
+    if (previewMode === "guided") {
+      setVideoFlow(loadedVideoFlow.script ? loadedVideoFlow : null);
+      return;
+    }
+
+    setVideoFlow(
+      loadedCreateDraft.video.status === "ready"
+        ? null
+        : loadedVideoFlow.script
+          ? loadedVideoFlow
+          : null
+    );
   }, []);
 
   const openVideoStage = (stage: VideoStudioStage) => {

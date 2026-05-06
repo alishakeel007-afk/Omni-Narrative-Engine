@@ -274,6 +274,18 @@ export function saveVideoStudioFlow(flow: VideoStudioFlowState) {
   }
 }
 
+export function resetVideoStudioFlow() {
+  if (typeof window === "undefined") {
+    return createDefaultVideoStudioFlow();
+  }
+
+  const freshFlow = createDefaultVideoStudioFlow();
+  window.localStorage.removeItem(VIDEO_DRAFT_STORAGE_KEY);
+  window.localStorage.removeItem(VIDEO_VOICE_RESULT_STORAGE_KEY);
+  window.localStorage.setItem(VIDEO_STUDIO_FLOW_STORAGE_KEY, JSON.stringify(freshFlow));
+  return freshFlow;
+}
+
 export function setVideoStudioStage(stage: VideoStudioStage) {
   const flow = loadVideoStudioFlow();
   saveVideoStudioFlow({

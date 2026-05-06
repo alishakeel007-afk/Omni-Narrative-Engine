@@ -38,6 +38,7 @@ export function createDefaultDraft(): CreateStoryDraft {
     },
     characters: defaultCharacters,
     genres: ["Fantasy"],
+    includeNarration: true,
     numberOfScenes: 3,
     scenes: [],
     selectedMode: "create-your-own",
@@ -241,4 +242,14 @@ export function saveCreateStoryDraft(draft: CreateStoryDraft) {
       updatedAt: new Date().toISOString()
     })
   );
+}
+
+export function resetCreateStoryDraft() {
+  if (typeof window === "undefined") {
+    return createDefaultDraft();
+  }
+
+  const freshDraft = createDefaultDraft();
+  window.localStorage.setItem(CREATE_STORY_STORAGE_KEY, JSON.stringify(freshDraft));
+  return freshDraft;
 }
