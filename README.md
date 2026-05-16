@@ -8,6 +8,8 @@ A cinematic Next.js frontend for an AI-powered multimedia storytelling platform.
 - React
 - Tailwind CSS
 - TypeScript
+- Prisma ORM
+- Supabase PostgreSQL and Supabase Storage
 
 ## Pages
 
@@ -25,7 +27,18 @@ A cinematic Next.js frontend for an AI-powered multimedia storytelling platform.
 - Character consistency panel
 - Generated media panel
 - Backend API route for Gemini scene generation and multi-character Deepgram dialogue voices
-- Responsive glassmorphism UI with cinematic dark styling
+- Database-ready story projects with multiple draft versions
+- Character image and voice-sample metadata for personalized media generation
+- Supabase Storage metadata for generated images, audio, and short MVP videos
+
+## Database And Storage
+
+The MVP uses Supabase in two parts:
+
+- Supabase PostgreSQL stores users, story projects, drafts, characters, scenes, choices, memories, media metadata, and video-generation jobs.
+- Supabase Storage stores uploaded character photos, recorded voice samples, generated audio, generated images, and short video outputs.
+
+Prisma reads the Supabase PostgreSQL connection string from `DATABASE_URL`.
 
 ## Video Voice Casting
 
@@ -45,6 +58,12 @@ have different pacing while preserving the character's base voice identity.
 The backend reads these server-side values from `.env.local`:
 
 ```bash
+DATABASE_URL=your_supabase_postgres_connection_string
+DIRECT_URL=your_supabase_direct_connection_string_for_prisma_migrations
+JWT_SECRET=your_random_64_character_session_secret
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 GEMINI_API_KEY=your_gemini_key
 GEMINI_MODEL=gemini-2.5-flash
 DEEPGRAM_TTS_API_KEY=your_deepgram_key
@@ -58,8 +77,18 @@ For compatibility with the current prototype, the API route also accepts the exi
 
 ```bash
 npm install
+npm run prisma:generate
 npm run dev
 ```
+
+To apply the schema to a fresh Supabase project:
+
+```bash
+npm run prisma:migrate
+```
+
+If the Supabase database password contains special characters such as `@`, encode them in both URLs.
+For example, `my@pass` becomes `my%40pass`.
 
 ## Build
 

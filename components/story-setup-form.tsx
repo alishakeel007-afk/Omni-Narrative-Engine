@@ -315,7 +315,7 @@ function GuidedStorySetupForm() {
       <WorkflowPanel
         number="1"
         title={setup.mode === "custom" ? "Custom story mode" : "Choose story mode"}
-        subtitle="Module 7.13"
+        subtitle="Story mode"
       >
         <div className="grid gap-4 lg:grid-cols-2">
           {visibleStoryModes.map((mode) => (
@@ -336,7 +336,7 @@ function GuidedStorySetupForm() {
         </div>
       </WorkflowPanel>
 
-      <WorkflowPanel number="2" title="Genre and scenario" subtitle="Module 7.1 setup pipeline">
+      <WorkflowPanel number="2" title="Genre and scenario" subtitle="Story foundation">
         <div className="grid gap-5 lg:grid-cols-[0.7fr_1fr]">
           <div>
             <Label>Genre palette</Label>
@@ -389,7 +389,7 @@ function GuidedStorySetupForm() {
         </div>
       </WorkflowPanel>
 
-      <WorkflowPanel number="3" title="Tone and difficulty" subtitle="Modules 7.10 and 7.11">
+      <WorkflowPanel number="3" title="Tone and difficulty" subtitle="Experience settings">
         <div className="grid gap-5 lg:grid-cols-2">
           <div>
             <Label>Emotional palette</Label>
@@ -433,7 +433,7 @@ function GuidedStorySetupForm() {
         </div>
       </WorkflowPanel>
 
-      <WorkflowPanel number="4" title="Character identity" subtitle="Modules 7.3 and 7.12">
+      <WorkflowPanel number="4" title="Character identity" subtitle="Cast setup">
         <div className="mb-6 grid gap-5 md:grid-cols-2">
           <Field label="Story Title">
             <input
@@ -675,7 +675,7 @@ function WorkflowPanel({
           {number}
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-starlight/70">{subtitle}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-white/45">{subtitle}</p>
           <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
         </div>
       </div>

@@ -34,10 +34,26 @@ type ResumeTarget = {
   title: string;
 };
 
+type DatabaseDraft = {
+  id: string;
+  isActive: boolean;
+  status: string;
+  title: string;
+  updatedAt: string;
+  versionNumber: number;
+};
+
+type DatabaseProject = {
+  id: string;
+  title: string;
+  drafts: DatabaseDraft[];
+};
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { saveSetupOnly, setup, state, updateSetup } = useStory();
   const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
+  const [databaseProjects, setDatabaseProjects] = useState<DatabaseProject[]>([]);
   const currentScene = state.currentScene.sceneNumber;
   const hasProgress = state.memoryTimeline.length > 0 || state.currentScene.sceneNumber > 1;
   const customChoiceCount = countCustomChoices(state);
@@ -130,6 +146,31 @@ export default function DashboardScreen() {
     setResumeTarget(fallbackResumeTarget);
   }, [fallbackResumeTarget]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDatabaseProjects() {
+      try {
+        const response = await fetch("/api/story/projects");
+        if (!response.ok) return;
+        const data = await response.json() as { projects?: DatabaseProject[] };
+        if (!cancelled) {
+          setDatabaseProjects(data.projects ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setDatabaseProjects([]);
+        }
+      }
+    }
+
+    loadDatabaseProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const activeResumeTarget = resumeTarget ?? fallbackResumeTarget;
 
   const deleteSavedStory = () => {
@@ -157,6 +198,21 @@ export default function DashboardScreen() {
     }
 
     window.location.reload();
+  };
+
+  const createNewDraftVersion = async (storyProjectId: string) => {
+    const response = await fetch("/api/story/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storyProjectId })
+    });
+
+    if (!response.ok) return;
+
+    const projectsResponse = await fetch("/api/story/projects");
+    if (!projectsResponse.ok) return;
+    const data = await projectsResponse.json() as { projects?: DatabaseProject[] };
+    setDatabaseProjects(data.projects ?? []);
   };
 
   return (
@@ -252,6 +308,61 @@ export default function DashboardScreen() {
               <DashboardCard key={item.label} title={item.label} value={item.value} accent={index === 0 ? "gold" : "blue"} />
             ))}
           </div>
+
+          <section className="mt-8 glass-panel rounded-[1.75rem] p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Database Draft Versions</p>
+                <h2 className="mt-3 text-2xl font-semibold text-white">Multi-Draft System</h2>
+                <p className="mt-2 text-sm leading-7 text-white/65">
+                  Each database story project can keep several draft versions, with one active draft at a time.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4">
+              {databaseProjects.length > 0 ? (
+                databaseProjects.map((project) => (
+                  <div key={project.id} className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">{project.title}</h3>
+                        <p className="mt-1 text-sm text-white/55">
+                          {project.drafts.length} draft version{project.drafts.length === 1 ? "" : "s"} saved in Supabase.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => createNewDraftVersion(project.id)}
+                        className="rounded-full border border-gold/25 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15"
+                      >
+                        Create New Draft Version
+                      </button>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {project.drafts.map((draft) => (
+                        <span
+                          key={draft.id}
+                          className={`rounded-full border px-3 py-1 text-xs ${
+                            draft.isActive
+                              ? "border-gold/30 bg-gold/10 text-gold"
+                              : "border-white/10 bg-white/5 text-white/60"
+                          }`}
+                        >
+                          v{draft.versionNumber} {draft.isActive ? "Active" : draft.status.toLowerCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-sm leading-7 text-white/60">
+                  No Supabase story projects yet. New database-backed projects created through the story API will appear here with all draft versions.
+                </div>
+              )}
+            </div>
+          </section>
     </ScreenLayout>
     </ProtectedRoute>
   );

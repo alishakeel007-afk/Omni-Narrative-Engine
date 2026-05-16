@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       data: {
         userId: session.userId as string,
         activityType: activityType.trim(),
-        metadata: metadata ? JSON.stringify(metadata) : null,
+        metadata: metadata ?? null,
       },
     });
 

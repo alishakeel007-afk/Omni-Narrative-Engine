@@ -2,18 +2,25 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 const secretKey = process.env.JWT_SECRET;
-const key = new TextEncoder().encode(secretKey);
+
+function getJwtKey() {
+  if (!secretKey || secretKey.length < 32) {
+    throw new Error("JWT_SECRET must be set to a random string with at least 32 characters.");
+  }
+
+  return new TextEncoder().encode(secretKey);
+}
 
 export async function encrypt(payload: any) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(key);
+    .sign(getJwtKey());
 }
 
 export async function decrypt(input: string): Promise<any> {
-  const { payload } = await jwtVerify(input, key, {
+  const { payload } = await jwtVerify(input, getJwtKey(), {
     algorithms: ["HS256"],
   });
   return payload;

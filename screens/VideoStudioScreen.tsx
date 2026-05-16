@@ -483,10 +483,8 @@ export default function VideoStudioScreen() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen bg-black">
         <div className="relative">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-purple-900/10 via-transparent to-transparent" />
 
           <section className="relative px-4 py-10 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl">
@@ -499,7 +497,7 @@ export default function VideoStudioScreen() {
                   <div>
                     <h1 className="font-[var(--font-heading)] text-5xl font-bold text-white sm:text-6xl">
                       Cinematic
-                      <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                      <span className="text-gold">
                         {" "}Story Engine
                       </span>
                     </h1>
@@ -508,9 +506,9 @@ export default function VideoStudioScreen() {
                     </p>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4 backdrop-blur-sm">
-                  <div className="text-xs font-medium uppercase tracking-wider text-emerald-300">Current Stage</div>
-                  <div className="text-sm font-semibold text-emerald-200">
+                <div className="rounded-2xl border border-gold/20 bg-gold/10 px-6 py-4 backdrop-blur-sm">
+                  <div className="text-xs font-medium uppercase tracking-wider text-gold">Current Stage</div>
+                  <div className="text-sm font-semibold text-white">
                     {VIDEO_STAGE_LABELS.find((stage) => stage.id === flow.stage)?.label}
                   </div>
                 </div>
@@ -680,7 +678,7 @@ function StageIndicator({ currentStage }: { currentStage: VideoStudioStage }) {
               isCurrent
                 ? "border-cyan-400/45 bg-cyan-400/15 text-cyan-100"
                 : isPast
-                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+                  ? "border-gold/20 bg-white/5 text-white/70"
                   : "border-white/10 bg-white/5 text-white/50"
             }`}
           >
@@ -798,7 +796,7 @@ function SetupStage({
         <button
           type="button"
           onClick={onContinue}
-          className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-8 py-5 text-sm font-bold text-white transition hover:scale-[1.01]"
+          className="mt-8 w-full rounded-2xl bg-blue-500 px-8 py-5 text-sm font-bold text-white transition hover:bg-blue-400"
         >
           Continue to Story Idea
         </button>
@@ -1185,7 +1183,7 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-8 flex items-center gap-4">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 shadow-lg">
         {icon}
       </div>
       <div>
@@ -1294,7 +1292,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 px-5 py-4 text-sm font-bold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:pointer-events-none disabled:shadow-none"
+      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-4 text-sm font-bold text-white transition-all duration-300 hover:bg-blue-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale disabled:pointer-events-none disabled:shadow-none"
     >
       {children}
     </button>

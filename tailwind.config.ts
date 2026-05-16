@@ -10,20 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        midnight: "#06030e",
-        abyss: "#090518",
-        velvet: "#190a31",
-        aurora: "#7c3aed",
-        starlight: "#d6bcff",
-        gold: "#f472b6"
+        midnight: "#030712",
+        abyss: "#060b16",
+        velvet: "#0b1220",
+        aurora: "#111827",
+        starlight: "#e5f7ff",
+        gold: "#7dd3fc"
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(196,181,253,0.18), 0 24px 90px rgba(21, 8, 63, 0.55)",
-        card: "0 24px 90px rgba(8, 6, 24, 0.55)"
+        glow: "0 0 0 1px rgba(125,211,252,0.18), 0 24px 70px rgba(0, 0, 0, 0.45)",
+        card: "0 24px 70px rgba(0, 0, 0, 0.38)"
       },
       backgroundImage: {
         haze:
-          "radial-gradient(circle at top, rgba(168,85,247,0.16), transparent 30%), radial-gradient(circle at 20% 20%, rgba(196,181,253,0.12), transparent 30%), linear-gradient(145deg, rgba(12,6,24,0.96), rgba(7,4,18,1))"
+          "radial-gradient(circle at top, rgba(125,211,252,0.08), transparent 28%), linear-gradient(145deg, #030712, #060b16)"
       },
       animation: {
         float: "float 8s ease-in-out infinite",

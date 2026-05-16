@@ -20,7 +20,7 @@ function SetupContent() {
 
   return (
       <ScreenLayout
-        eyebrow={isCreateStoryMode ? "AI Story Studio" : "Story Setup Pipeline"}
+        eyebrow={isCreateStoryMode ? "AI Story Studio" : "Story Setup"}
         title={isCreateStoryMode ? "AI Story Studio Setup" : "Build the Run"}
         description={
           isCreateStoryMode

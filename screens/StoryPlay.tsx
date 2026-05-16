@@ -199,7 +199,7 @@ export default function StoryPlay() {
           <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-starlight/80">Module 7.13</p>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Interactive Story</p>
                 <h2 className="mt-2 text-xl font-semibold text-white">Choose the next action</h2>
               </div>
               <button

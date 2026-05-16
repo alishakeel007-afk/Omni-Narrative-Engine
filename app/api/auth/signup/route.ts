@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     // Log signup activity
     try {
       await prisma.userActivity.create({
-        data: { userId: user.id, activityType: "user_signup", metadata: JSON.stringify({ name: user.name, email: user.email }) }
+        data: { userId: user.id, activityType: "user_signup", metadata: { name: user.name, email: user.email } }
       });
     } catch { /* non-blocking */ }
 

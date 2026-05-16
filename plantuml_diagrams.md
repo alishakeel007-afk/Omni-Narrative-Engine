@@ -642,27 +642,22 @@ AUTHENTICATED --> LOGIN_FORM : session expired
 
 ---
 
-## Figure 15: ER Diagram: Data Design
+## Figure 15: ER Diagram: Supabase PostgreSQL Data Design
 
 ```plantuml
 @startuml
 skinparam monochrome true
+hide circle
+left to right direction
 
 entity User {
   * id : string <<PK>>
   --
   name : string
-  email : string
+  email : string <<unique>>
   passwordHash : string
   createdAt : DateTime
-}
-
-entity UserActivity {
-  * id : string <<PK>>
-  --
-  userId : string <<FK>>
-  activityType : string
-  metadata : string
+  updatedAt : DateTime
 }
 
 entity PasswordResetToken {
@@ -671,98 +666,335 @@ entity PasswordResetToken {
   userId : string <<FK>>
   tokenHash : string
   expiresAt : DateTime
+  used : boolean
+  createdAt : DateTime
 }
 
-entity PersistedStoryState {
+entity UserActivity {
   * id : string <<PK>>
   --
-  currentSceneIndex : int
-  isLoading : boolean
+  userId : string <<FK>>
+  activityType : string
+  metadata : Json
+  createdAt : DateTime
 }
 
-entity StorySetupData {
-  genre : string
-  mode : string
+entity StoryProject {
+  * id : string <<PK>>
+  --
+  userId : string <<FK>>
+  title : string
+  mode : StoryMode
+  status : ProjectStatus
+  createdAt : DateTime
+  updatedAt : DateTime
 }
 
-entity StoryScene {
+entity StoryDraft {
+  * id : string <<PK>>
+  --
+  storyProjectId : string <<FK>>
+  versionNumber : int
+  title : string
+  genres : Json
+  tones : Json
+  numberOfScenes : int
+  includeNarration : boolean
+  status : DraftStatus
+  isActive : boolean
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+entity Character {
+  * id : string <<PK>>
+  --
+  draftId : string <<FK>>
+  name : string
+  role : string
+  personalityTone : string
+  traits : Json
+  voiceStyle : string
+  appearancePrompt : string
+  referenceImageUrl : string
+  voiceSampleUrl : string
+  sourceType : CharacterSource
+}
+
+entity Scene {
+  * id : string <<PK>>
+  --
+  draftId : string <<FK>>
   sceneNumber : int
+  title : string
+  description : string
+  location : string
+  mood : string
+  selectedSuggestion : string
+}
+
+entity Dialogue {
+  * id : string <<PK>>
+  --
+  sceneId : string <<FK>>
+  characterId : string <<FK>>
   text : string
+  delivery : string
+  audioUrl : string
 }
 
-entity MemoryItem {
-  sceneNumber : int
-  userChoice : string
+entity Choice {
+  * id : string <<PK>>
+  --
+  sceneId : string <<FK>>
+  choiceText : string
+  choiceType : ChoiceType
+  selected : boolean
+  resultText : string
 }
 
-User ||--o{ UserActivity
-User ||--o{ PasswordResetToken
-PersistedStoryState ||--|| StorySetupData
-PersistedStoryState ||--|| StoryScene
-PersistedStoryState ||--o{ StoryScene
-PersistedStoryState ||--o{ MemoryItem
+entity StoryMemory {
+  * id : string <<PK>>
+  --
+  draftId : string <<FK>>
+  sceneId : string <<FK>>
+  memoryType : string
+  content : string
+  importanceScore : int
+  createdAt : DateTime
+}
+
+entity MediaAsset {
+  * id : string <<PK>>
+  --
+  draftId : string <<FK>>
+  sceneId : string <<FK>>
+  characterId : string <<FK>>
+  type : MediaType
+  url : string
+  storagePath : string
+  prompt : string
+  provider : string
+  status : MediaStatus
+  createdAt : DateTime
+}
+
+entity VideoGenerationJob {
+  * id : string <<PK>>
+  --
+  draftId : string <<FK>>
+  status : JobStatus
+  outputUrl : string
+  outputStoragePath : string
+  errorMessage : string
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+User ||--o{ PasswordResetToken : owns
+User ||--o{ UserActivity : logs
+User ||--o{ StoryProject : creates
+StoryProject ||--o{ StoryDraft : has_versions
+StoryDraft ||--o{ Character : defines
+StoryDraft ||--o{ Scene : contains
+StoryDraft ||--o{ StoryMemory : remembers
+StoryDraft ||--o{ MediaAsset : stores_metadata_for
+StoryDraft ||--o{ VideoGenerationJob : generates
+Scene ||--o{ Dialogue : contains
+Scene ||--o{ Choice : offers
+Scene ||--o{ StoryMemory : creates
+Scene ||--o{ MediaAsset : uses
+Character ||--o{ Dialogue : speaks
+Character ||--o{ MediaAsset : references
 @enduml
 ```
 
+Notes:
+- Supabase PostgreSQL stores relational data and metadata.
+- Supabase Storage stores uploaded character images, voice samples, generated audio, generated images, and short video outputs.
+- `StoryProject` to `StoryDraft` supports multiple drafts and version history.
+- `Character.referenceImageUrl` supports camera/upload character appearance.
+- `Character.voiceSampleUrl` supports personalized cloned voice generation.
+
 ---
 
-## Figure 16: Class Diagram
+## Figure 16: Class Diagram: Application Domain Design
 
 ```plantuml
 @startuml
 skinparam monochrome true
+left to right direction
 
-class StorySetupData {
-  + characterName : string
-  + genre : string
-  + mode : string
-  + difficulty : string
+class AuthService {
+  + register(name, email, password) : User
+  + login(email, password) : Session
+  + logout() : void
+  + requestPasswordReset(email) : void
+  + resetPassword(token, password) : void
 }
 
-class PersistedStoryState {
-  + currentSceneIndex : number
-  + isLoading : boolean
-  + lastSavedAt : string
+class StoryProjectService {
+  + createProject(userId, setup) : StoryProject
+  + getUserProjects(userId) : StoryProject[]
+  + updateProjectStatus(projectId, status) : StoryProject
 }
 
-class StoryScene {
+class DraftService {
+  + createDraft(projectId, input) : StoryDraft
+  + createNewVersion(projectId, baseDraftId) : StoryDraft
+  + setActiveDraft(draftId) : StoryDraft
+  + saveDraft(draftId, input) : StoryDraft
+}
+
+class CharacterService {
+  + addCharacter(draftId, input) : Character
+  + uploadReferenceImage(characterId, file) : MediaAsset
+  + uploadVoiceSample(characterId, file) : MediaAsset
+  + updateCharacter(characterId, input) : Character
+}
+
+class ContextAwarenessService {
+  + buildContextPackage(draftId, sceneId) : StoryContext
+  + retrieveRelevantMemory(draftId) : StoryMemory[]
+  + storeMemory(draftId, sceneId, content) : StoryMemory
+}
+
+class StoryGenerationService {
+  + generateScene(draftId, choiceText) : Scene
+  + generateDialogue(sceneId) : Dialogue[]
+  + generateChoices(sceneId) : Choice[]
+}
+
+class MediaGenerationService {
+  + generateSceneImage(sceneId) : MediaAsset
+  + generateCharacterImage(characterId) : MediaAsset
+  + generateMusic(draftId) : MediaAsset
+}
+
+class VoiceGenerationService {
+  + generateTts(dialogueId) : MediaAsset
+  + generateClonedVoice(dialogueId, voiceSampleUrl) : MediaAsset
+}
+
+class VideoGenerationService {
+  + createVideoJob(draftId) : VideoGenerationJob
+  + renderPreview(jobId) : VideoGenerationJob
+  + saveOutput(jobId, outputUrl) : VideoGenerationJob
+}
+
+class StorageService {
+  + uploadFile(bucket, path, file) : string
+  + getPublicUrl(path) : string
+  + deleteFile(path) : void
+}
+
+class User {
+  + id : string
+  + name : string
+  + email : string
+}
+
+class StoryProject {
+  + id : string
+  + title : string
+  + mode : StoryMode
+  + status : ProjectStatus
+}
+
+class StoryDraft {
+  + id : string
+  + versionNumber : number
+  + title : string
+  + genres : string[]
+  + tones : string[]
+  + status : DraftStatus
+  + isActive : boolean
+}
+
+class Character {
+  + id : string
+  + name : string
+  + role : string
+  + traits : string[]
+  + referenceImageUrl : string
+  + voiceSampleUrl : string
+  + sourceType : CharacterSource
+}
+
+class Scene {
+  + id : string
   + sceneNumber : number
   + title : string
-  + text : string
+  + description : string
   + location : string
-  + options : string[]
+  + mood : string
 }
 
-class MemoryItem {
-  + sceneNumber : number
-  + userChoice : string
-  + choiceType : string
-  + timestamp : string
-}
-
-class VideoStudioFlowState {
-  + stage : string
-  + sceneCount : number
-  + scenesNeedRegeneration : boolean
-}
-
-class MovieScene {
-  + sceneNumber : number
-  + narration : string
-  + imagePrompt : string
-}
-
-class MovieDialogueLine {
-  + character : string
-  + line : string
+class Dialogue {
+  + id : string
+  + text : string
+  + delivery : string
   + audioUrl : string
 }
 
-PersistedStoryState "1" *-- "1" StorySetupData
-PersistedStoryState "1" *-- "1..*" StoryScene
-PersistedStoryState "1" *-- "0..*" MemoryItem
+class Choice {
+  + id : string
+  + choiceText : string
+  + choiceType : ChoiceType
+  + selected : boolean
+}
 
-VideoStudioFlowState "1" *-- "1..*" MovieScene
-MovieScene "1" *-- "1..*" MovieDialogueLine
+class StoryMemory {
+  + id : string
+  + memoryType : string
+  + content : string
+  + importanceScore : number
+}
+
+class MediaAsset {
+  + id : string
+  + type : MediaType
+  + url : string
+  + storagePath : string
+  + provider : string
+  + status : MediaStatus
+}
+
+class VideoGenerationJob {
+  + id : string
+  + status : JobStatus
+  + outputUrl : string
+  + errorMessage : string
+}
+
+AuthService ..> User
+StoryProjectService ..> StoryProject
+DraftService ..> StoryDraft
+CharacterService ..> Character
+CharacterService ..> StorageService
+StoryGenerationService ..> ContextAwarenessService
+StoryGenerationService ..> Scene
+StoryGenerationService ..> Dialogue
+StoryGenerationService ..> Choice
+ContextAwarenessService ..> StoryMemory
+MediaGenerationService ..> MediaAsset
+MediaGenerationService ..> StorageService
+VoiceGenerationService ..> MediaAsset
+VoiceGenerationService ..> StorageService
+VideoGenerationService ..> VideoGenerationJob
+VideoGenerationService ..> StorageService
+
+User "1" -- "0..*" StoryProject
+StoryProject "1" *-- "1..*" StoryDraft
+StoryDraft "1" *-- "1..*" Character
+StoryDraft "1" *-- "1..*" Scene
+StoryDraft "1" *-- "0..*" StoryMemory
+StoryDraft "1" *-- "0..*" MediaAsset
+StoryDraft "1" *-- "0..*" VideoGenerationJob
+Scene "1" *-- "0..*" Dialogue
+Scene "1" *-- "0..*" Choice
+Scene "1" -- "0..*" MediaAsset
+Character "1" -- "0..*" Dialogue
+Character "1" -- "0..*" MediaAsset
 @enduml
 ```

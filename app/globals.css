@@ -12,14 +12,13 @@ html {
 
 body {
   @apply min-h-screen bg-midnight text-white antialiased;
-  background-image:
-    radial-gradient(circle at top, rgba(124, 58, 237, 0.18), transparent 26%),
-    radial-gradient(circle at 15% 18%, rgba(214, 188, 255, 0.12), transparent 24%),
-    linear-gradient(160deg, #080214 0%, #04020d 55%, #02010a 100%);
+  background:
+    radial-gradient(circle at top, rgba(125, 211, 252, 0.08), transparent 30%),
+    linear-gradient(160deg, #030712 0%, #060b16 58%, #02030a 100%);
 }
 
 ::selection {
-  background: rgba(124, 58, 237, 0.35);
+  background: rgba(125, 211, 252, 0.22);
   color: #f8fafc;
 }
 
@@ -30,27 +29,27 @@ body {
 
   .story-grid {
     background-image:
-      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 
   .gold-ring {
     box-shadow:
-      0 0 0 1px rgba(124, 58, 237, 0.18),
-      0 20px 70px rgba(28, 8, 70, 0.55);
+      0 0 0 1px rgba(125, 211, 252, 0.14),
+      0 24px 70px rgba(0, 0, 0, 0.45);
   }
 
   .text-gradient {
-    @apply bg-gradient-to-r from-white via-starlight to-gold bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-white via-white to-gold bg-clip-text text-transparent;
   }
 
   .input {
-    @apply w-full rounded-[1rem] border border-slate-600/50 bg-slate-900/50 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/45 focus:ring-2 focus:ring-cyan-400/15;
+    @apply w-full rounded-[1rem] border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none transition focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
   }
 
   .textarea {
-    @apply w-full resize-y rounded-[1rem] border border-slate-600/50 bg-slate-900/50 px-4 py-3 text-sm leading-7 text-white outline-none transition focus:border-cyan-400/45 focus:ring-2 focus:ring-cyan-400/15;
+    @apply w-full resize-y rounded-[1rem] border border-white/10 bg-black/25 px-4 py-3 text-sm leading-7 text-white outline-none transition focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
   }
 }
 
@@ -70,4 +69,79 @@ body {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+body [class*="text-pink-"],
+body [class*="text-fuchsia-"],
+body [class*="text-purple-"],
+body [class*="text-violet-"],
+body [class*="text-gold"] {
+  color: #7dd3fc !important;
+}
+
+body [class*="bg-pink-"],
+body [class*="bg-fuchsia-"],
+body [class*="bg-purple-"],
+body [class*="bg-violet-"],
+body [class*="bg-gold"] {
+  background-color: rgba(125, 211, 252, 0.08) !important;
+}
+
+body [class*="border-pink-"],
+body [class*="border-fuchsia-"],
+body [class*="border-purple-"],
+body [class*="border-violet-"],
+body [class*="border-gold"] {
+  border-color: rgba(125, 211, 252, 0.18) !important;
+}
+
+body [class*="from-pink-"],
+body [class*="from-fuchsia-"],
+body [class*="from-purple-"],
+body [class*="from-violet-"],
+body [class*="from-gold"] {
+  --tw-gradient-from: #111827 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(17, 24, 39, 0) var(--tw-gradient-to-position) !important;
+}
+
+body [class*="via-pink-"],
+body [class*="via-fuchsia-"],
+body [class*="via-purple-"],
+body [class*="via-violet-"],
+body [class*="via-gold"] {
+  --tw-gradient-to: rgba(125, 211, 252, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #7dd3fc var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+body [class*="to-pink-"],
+body [class*="to-fuchsia-"],
+body [class*="to-purple-"],
+body [class*="to-violet-"],
+body [class*="to-gold"] {
+  --tw-gradient-to: #7dd3fc var(--tw-gradient-to-position) !important;
+}
+
+body button[class*="bg-gradient"],
+body a[class*="bg-gradient"],
+body button[class*="bg-cyan"],
+body a[class*="bg-cyan"],
+body button[class*="bg-blue"],
+body a[class*="bg-blue"],
+body button[class*="bg-gold"],
+body a[class*="bg-gold"] {
+  background: #0ea5e9 !important;
+  background-image: none !important;
+  border-color: rgba(14, 165, 233, 0.55) !important;
+  color: #ffffff !important;
+}
+
+body button[class*="bg-gradient"]:hover,
+body a[class*="bg-gradient"]:hover,
+body button[class*="bg-cyan"]:hover,
+body a[class*="bg-cyan"]:hover,
+body button[class*="bg-blue"]:hover,
+body a[class*="bg-blue"]:hover,
+body button[class*="bg-gold"]:hover,
+body a[class*="bg-gold"]:hover {
+  background: #38bdf8 !important;
 }
