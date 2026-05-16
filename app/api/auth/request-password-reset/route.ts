@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -28,9 +29,9 @@ export async function POST(req: Request) {
         }
       });
 
-      // Log reset link for development since email sending is not configured
-      const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${resetToken}&id=${user.id}`;
-      console.log(`\n\n=== PASSWORD RESET LINK ===\n${resetUrl}\n===========================\n\n`);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const resetUrl = `${appUrl.replace(/\/$/, "")}/reset-password?token=${resetToken}&id=${user.id}`;
+      await sendPasswordResetEmail({ email: user.email, resetUrl });
     }
 
     // Always return success to prevent email enumeration

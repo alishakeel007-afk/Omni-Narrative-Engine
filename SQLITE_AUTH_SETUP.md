@@ -60,7 +60,8 @@ Passwords and reset tokens are never stored in plain text.
 2. Copy the PostgreSQL connection string into `.env.local` as `DATABASE_URL`.
 3. Add `DIRECT_URL` for Prisma migrations.
 4. Add `JWT_SECRET` for signing auth session cookies.
-5. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` for storage.
+5. Add `RESEND_API_KEY`, `EMAIL_FROM`, and `NEXT_PUBLIC_APP_URL` for password reset email delivery.
+6. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` for storage.
 4. Run:
 
 ```bash
