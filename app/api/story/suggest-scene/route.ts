@@ -18,8 +18,12 @@ function getGeminiKey() {
 function buildSuggestionsPrompt(params: {
   characters: { name: string; role: string; personalityTone: string }[];
   genres: string[];
+  currentSceneDescription?: string;
   previousScenes: { sceneNumber: number; title: string; description: string }[];
+  sceneGenre?: string;
   sceneNumber: number;
+  sceneTitle: string;
+  sceneTone?: string;
   storyTitle: string;
   tones: string[];
 }) {
@@ -45,10 +49,21 @@ ${charList}
 Previous scenes:
 ${prevScenes}
 
-Generate exactly 3 distinct, creative scene suggestions for Scene ${params.sceneNumber}.
+Current scene being regenerated:
+- Scene number: ${params.sceneNumber}
+- Scene title: "${params.sceneTitle}"
+- Scene genre: ${params.sceneGenre || params.genres.join(", ")}
+- Scene tone: ${params.sceneTone || params.tones.join(", ")}
+- Existing scene idea, if any: ${params.currentSceneDescription?.trim() || "None yet"}
+
+Generate exactly 3 distinct, creative scene suggestions for this current scene.
 Each suggestion should:
+- Follow the current scene title closely, as if the user renamed the scene and expects the AI to immediately adapt
+- Treat any name, place, object, or event mentioned in the scene title as intentional, even if it is not in the character list
+- Do not force existing character names into the scene unless the title, prior context, or story logic naturally calls for them
 - Be contextually relevant to what came before
 - Move the story forward in a meaningful way
+- Match the current scene genre and tone
 - Feel cinematically engaging
 - Be 1-2 sentences (under 200 characters each)
 
@@ -64,7 +79,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { storyTitle, genres, tones, characters, sceneNumber, previousScenes } = body;
+    const {
+      characters,
+      currentSceneDescription,
+      genres,
+      previousScenes,
+      sceneGenre,
+      sceneNumber,
+      sceneTitle,
+      sceneTone,
+      storyTitle,
+      tones
+    } = body;
 
     const apiKey = getGeminiKey();
     if (!apiKey) {
@@ -77,9 +103,13 @@ export async function POST(request: Request) {
     const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
     const prompt = buildSuggestionsPrompt({
       characters: characters || [],
+      currentSceneDescription: String(currentSceneDescription || ""),
       genres: genres || ["Cinematic"],
       previousScenes: previousScenes || [],
+      sceneGenre: String(sceneGenre || ""),
       sceneNumber: sceneNumber || 1,
+      sceneTitle: String(sceneTitle || `Scene ${sceneNumber || 1}`),
+      sceneTone: String(sceneTone || ""),
       storyTitle: storyTitle || "Untitled Story",
       tones: tones || ["Dramatic"],
     });

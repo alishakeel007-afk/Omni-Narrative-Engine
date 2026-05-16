@@ -11,13 +11,18 @@ export type CreateStoryCharacter = {
 export type CreateStoryDialogue = {
   characterId: string;
   characterName: string;
+  id: string;
   text: string;
+  voiceStyle?: string;
 };
 
 export type CreateStoryScene = {
+  activeCharacterIds: string[];
   dialogues: CreateStoryDialogue[];
   id: string;
+  sceneGenre: string;
   sceneNumber: number;
+  sceneTone: string;
   selectedSuggestion: string;
   storyDescription: string;
   suggestions: string[];

@@ -14,8 +14,6 @@ import { useStory } from "@/context/StoryContext";
 import type { StorySetupCharacter } from "@/types/story";
 import { logActivity } from "@/lib/log-activity";
 
-const MAX_SCENES = 10;
-
 const roleOptions = [
   "Hero", "Heroine", "Villain", "Antagonist", "Mentor", "Guide",
   "Detective", "Rogue", "Inventor", "Scholar", "Guardian", "Warrior",
@@ -27,17 +25,33 @@ const roleOptions = [
 const voiceStyleOptions = [
   "Confident hero (male)",
   "Bold heroine (female)",
+  "Warm young male voice",
+  "Warm young female voice",
+  "Bright teen voice (male)",
+  "Bright teen voice (female)",
   "Deep commanding villain (male)",
   "Cold calculating villain (female)",
+  "Quiet mysterious villain",
   "Wise elder mentor (male)",
   "Warm nurturing mentor (female)",
-  "Bright young male voice",
-  "Warm young female voice",
   "Calm elder male voice",
   "Mature elder female voice",
+  "Soft emotional female voice",
+  "Soft emotional male voice",
+  "Energetic comic voice",
+  "Dry sarcastic voice",
+  "Nervous hesitant voice",
+  "Royal noble voice",
+  "Detective noir voice",
+  "Military commander voice",
+  "Scholar / professor voice",
+  "Child voice",
   "Narrator voice (male)",
   "Narrator voice (female)",
-  "Creature / robot voice"
+  "Documentary narrator voice",
+  "Creature / monster voice",
+  "Robot / AI voice",
+  "Ghostly whisper voice"
 ];
 
 const personalityOptions = [
@@ -59,7 +73,6 @@ export function CreateStorySetupForm() {
     !setup.storyTitle.trim() ? "story title" : null,
     setup.genres.length === 0 ? "at least one genre" : null,
     setup.moods.length === 0 ? "at least one tone" : null,
-    !setup.numberOfScenes ? "number of scenes" : null,
     setup.characters.every((character) => !character.name.trim()) ? "at least one character" : null,
     setup.characters.some((character) => character.name.trim() && !character.role.trim())
       ? "role for every named character"
@@ -191,7 +204,7 @@ export function CreateStorySetupForm() {
     const draft = normalizeCreateStoryDraft({
       characters,
       genres: setup.genres,
-      numberOfScenes: setup.numberOfScenes,
+      numberOfScenes: 1,
       scenes: [],
       storyTitle: setup.storyTitle,
       tones: setup.moods
@@ -212,7 +225,7 @@ export function CreateStorySetupForm() {
       mode: "custom",
       mood: setup.moods[0],
       moods: setup.moods,
-      numberOfScenes: setup.numberOfScenes,
+      numberOfScenes: 1,
       storyTitle: setup.storyTitle
     });
 
@@ -221,7 +234,7 @@ export function CreateStorySetupForm() {
       genres: setup.genres,
       tones: setup.moods,
       characterCount: characters.length,
-      numberOfScenes: setup.numberOfScenes
+      flow: "scene-by-scene"
     });
 
     router.push("/story-builder");
@@ -230,26 +243,12 @@ export function CreateStorySetupForm() {
   return (
     <form className="space-y-6">
       <WorkflowPanel number="1" subtitle="AI Story Studio" title="Story Foundation">
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.45fr]">
+        <div className="grid gap-5">
           <Field label="Story title">
             <input
               value={setup.storyTitle}
               onChange={(event) => updateSetup({ storyTitle: event.target.value })}
               placeholder="Give your film a working title"
-              className="input"
-            />
-          </Field>
-          <Field label={`Number of scenes (max ${MAX_SCENES})`}>
-            <input
-              min={1}
-              max={MAX_SCENES}
-              type="number"
-              value={setup.numberOfScenes}
-              onChange={(event) =>
-                updateSetup({
-                  numberOfScenes: Math.max(1, Math.min(MAX_SCENES, Number(event.target.value) || 1))
-                })
-              }
               className="input"
             />
           </Field>
@@ -431,7 +430,7 @@ export function CreateStorySetupForm() {
               {setup.storyTitle || "Untitled Cinematic Story"}
             </h2>
             <div className="mt-4 flex flex-wrap gap-2">
-              {[...setup.genres, ...setup.moods, `${setup.numberOfScenes} scenes`].map((item) => (
+              {[...setup.genres, ...setup.moods, "scene-by-scene"].map((item) => (
                 <span
                   key={item}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/72"

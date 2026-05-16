@@ -65,14 +65,16 @@ export default function AudioGenerationScreen() {
           .map((d) => {
             const char = draft.characters.find((c) => c.id === d.characterId);
             return {
-              id: d.characterId,
+              id: d.id,
               character: d.characterName,
               delivery: "neutral",
               line: d.text,
               voiceProfile: {
-                deepgramModel: char?.voiceStyle?.toLowerCase().includes("female")
+                deepgramModel: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female")
                   ? "aura-asteria-en"
                   : "aura-orion-en",
+                description: d.voiceStyle || char?.voiceStyle || "Character voice",
+                gender: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female") ? "female" : "male",
                 tone: "neutral"
               }
             };
@@ -84,7 +86,12 @@ export default function AudioGenerationScreen() {
             character: "Narrator",
             delivery: "neutral",
             line: scene.storyDescription,
-            voiceProfile: { deepgramModel: "aura-asteria-en", tone: "neutral" }
+            voiceProfile: {
+              deepgramModel: "aura-asteria-en",
+              description: "Narrator voice",
+              gender: "female",
+              tone: "neutral"
+            }
           });
         }
 
@@ -92,8 +99,9 @@ export default function AudioGenerationScreen() {
           id: scene.id,
           sceneNumber: scene.sceneNumber,
           title: scene.title,
-          sceneTone: draft.tones[0] || "cinematic",
-          mood: draft.tones[0] || "cinematic",
+          sceneTone: scene.sceneTone || draft.tones[0] || "cinematic",
+          mood: scene.sceneTone || draft.tones[0] || "cinematic",
+          sceneGenre: scene.sceneGenre || draft.genres[0] || "cinematic",
           narration: scene.storyDescription || scene.selectedSuggestion,
           dialogues: dialoguesToGenerate
         };
@@ -402,7 +410,7 @@ export default function AudioGenerationScreen() {
               <div className="grid gap-5 p-6 lg:grid-cols-2">
                 {scene.dialogues.map((dialogue) => (
                   <div
-                    key={`${scene.id}-${dialogue.characterId}`}
+                    key={dialogue.id}
                     className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4"
                   >
                     <p className="text-sm font-semibold text-white">{dialogue.characterName}</p>

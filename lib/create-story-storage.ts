@@ -56,17 +56,31 @@ export function createDialoguesForCharacters(
   characters: CreateStoryCharacter[],
   existingDialogues: CreateStoryDialogue[] = []
 ) {
-  return characters.map((character) => {
-    const existingDialogue = existingDialogues.find(
-      (dialogue) => dialogue.characterId === character.id
-    );
+  const normalizedExisting = existingDialogues
+    .filter((dialogue) => characters.some((character) => character.id === dialogue.characterId))
+    .map((dialogue, index) => {
+      const character = characters.find((item) => item.id === dialogue.characterId);
 
-    return {
+      return {
+        characterId: dialogue.characterId,
+        characterName: character?.name || dialogue.characterName || "Unnamed Character",
+        id: dialogue.id || createId(`dialogue-${index + 1}`),
+        text: dialogue.text ?? "",
+        voiceStyle: dialogue.voiceStyle || character?.voiceStyle || "Voice style placeholder"
+      };
+    });
+
+  const missingCharacterDialogues = characters
+    .filter((character) => !normalizedExisting.some((dialogue) => dialogue.characterId === character.id))
+    .map((character) => ({
       characterId: character.id,
       characterName: character.name || "Unnamed Character",
-      text: existingDialogue?.text ?? ""
-    };
-  });
+      id: createId("dialogue"),
+      text: "",
+      voiceStyle: character.voiceStyle || "Voice style placeholder"
+    }));
+
+  return [...normalizedExisting, ...missingCharacterDialogues];
 }
 
 export function createSceneSuggestions(params: {
@@ -97,9 +111,12 @@ export function createEmptyScene(params: {
   tones: string[];
 }): CreateStoryScene {
   return {
+    activeCharacterIds: params.characters.map((character) => character.id),
     dialogues: createDialoguesForCharacters(params.characters),
     id: createId("scene"),
+    sceneGenre: params.genres[0] || "Cinematic",
     sceneNumber: params.sceneNumber,
+    sceneTone: params.tones[0] || "Dramatic",
     selectedSuggestion: "",
     storyDescription: "",
     suggestions: createSceneSuggestions(params),
@@ -130,7 +147,9 @@ export function createMockDialogue(params: {
     return {
       characterId: character.id,
       characterName: character.name || `Character ${index + 1}`,
-      text: line
+      id: createId("dialogue"),
+      text: line,
+      voiceStyle: character.voiceStyle || "Voice style placeholder"
     };
   });
 }
@@ -168,12 +187,18 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
               : [];
 
           return {
+            activeCharacterIds:
+              Array.isArray(scene.activeCharacterIds) && scene.activeCharacterIds.length > 0
+                ? scene.activeCharacterIds.filter((id) => characters.some((character) => character.id === id))
+                : characters.map((character) => character.id),
             dialogues: createDialoguesForCharacters(
               characters,
               Array.isArray(scene.dialogues) ? scene.dialogues : []
             ),
             id: scene.id || createId(`scene-${index + 1}`),
+            sceneGenre: scene.sceneGenre || genres[0] || "Cinematic",
             sceneNumber: index + 1,
+            sceneTone: scene.sceneTone || tones[0] || "Dramatic",
             selectedSuggestion: scene.selectedSuggestion || "",
             storyDescription: scene.storyDescription || "",
             suggestions:

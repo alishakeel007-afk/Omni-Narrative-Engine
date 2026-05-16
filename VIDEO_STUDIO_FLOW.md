@@ -21,7 +21,7 @@ The user selects:
 
 - Genre palette
 - Emotional tone palette
-- Number of scenes
+- No fixed scene count. Scene length is decided later while editing the story.
 
 Button:
 
@@ -38,7 +38,7 @@ Buttons:
 - **Back to Setup**
 - **Generate Story with AI**
 
-Going back keeps the selected genre, tone, scene count, and rough idea.
+Going back keeps the selected genre, tone, and rough idea.
 
 ## Stage 3: Generated Story Review
 
@@ -54,12 +54,13 @@ If the user edits the story after scenes already exist, the UI warns that scenes
 
 ## Stage 4: Scenes & Dialogues
 
-This stage shows Gemini-generated scenes, narration, visual prompts, sound design, and character-wise dialogues.
+This stage shows Gemini-generated scenes, narration, visual prompts, sound design, and character-wise dialogues. Users can add/remove scenes, edit scene genre/tone/location/mood, add dialogue lines, change speaking character, and change voice choices.
 
 Buttons:
 
 - **Back to Story Review**
 - **Regenerate Scenes & Dialogues**
+- **Add Next Scene**
 - **Continue to Audio Generation**
 
 Regeneration calls the existing Gemini generation endpoint again using the latest accepted story.

@@ -134,17 +134,17 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[rgba(8,5,24,0.82)] backdrop-blur-2xl shadow-glow">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/92 backdrop-blur-2xl shadow-card">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link href={brandHref} className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gold/20 bg-gold/10 shadow-glow">
             <Sparkles className="h-5 w-5 text-gold" />
           </div>
           <div>
-            <p className="font-[var(--font-heading)] text-lg tracking-[0.24em] text-white/90">
+            <p className="font-[var(--font-heading)] text-lg tracking-[0.24em] text-slate-950">
               OMNI-NARRATIVE
             </p>
-            <p className="text-xs uppercase tracking-[0.3em] text-starlight/80">Engine</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Engine</p>
           </div>
         </Link>
 
@@ -157,7 +157,7 @@ export function Navbar() {
                 className={`rounded-full border px-4 py-2 text-sm transition ${
                   isActive(item.href)
                     ? "border-gold/30 bg-gold/10 text-gold"
-                    : "border-white/10 text-white/80 hover:border-starlight/30 hover:bg-white/10 hover:text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-gold/30 hover:text-slate-950"
                 }`}
               >
                 {item.label}
@@ -169,7 +169,7 @@ export function Navbar() {
             <>
               <Link
                 href="/auth"
-                className="rounded-full border border-white/10 px-4 py-2 text-sm text-white/80 transition hover:border-starlight/30 hover:bg-white/10 hover:text-white"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:border-gold/30 hover:text-slate-950"
               >
                 Login
               </Link>
@@ -194,7 +194,7 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setMenuOpen((current) => !current)}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 md:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-gold/30 md:hidden"
           aria-label="Toggle navigation menu"
           aria-expanded={menuOpen}
         >

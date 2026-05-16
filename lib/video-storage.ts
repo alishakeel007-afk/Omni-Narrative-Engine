@@ -173,7 +173,7 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
       trackUrl: ""
     },
     roughIdea: DEFAULT_VIDEO_SCENARIO,
-    sceneCount: 3,
+    sceneCount: 0,
     scenesNeedRegeneration: false,
     script: null,
     stage: "setup",
@@ -195,7 +195,7 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
   const source = value as Partial<VideoStudioFlowState>;
   const script = normalizeVideoScript(source.script);
   const voiceResult = normalizeVideoScript(source.voiceResult);
-  const sceneCount = Math.max(1, Math.min(5, Number(source.sceneCount) || fallback.sceneCount));
+  const sceneCount = Math.max(0, Math.min(20, Number(source.sceneCount) || fallback.sceneCount));
 
   return {
     ...fallback,

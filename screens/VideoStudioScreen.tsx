@@ -11,8 +11,10 @@ import {
   Loader2,
   Mic2,
   Music2,
+  Plus,
   RefreshCcw,
   Sparkles,
+  Trash2,
   Wand2,
   X
 } from "lucide-react";
@@ -33,10 +35,27 @@ import type { MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/t
 
 type EditableSceneField =
   | "directorNotes"
+  | "estimatedDuration"
   | "imagePrompt"
+  | "location"
+  | "mood"
   | "narration"
+  | "sceneGenre"
+  | "sceneTone"
   | "soundDesign"
   | "visualPrompt";
+
+const VIDEO_VOICE_OPTIONS = [
+  { deepgramModel: "aura-orion-en", gender: "male", voiceName: "Orion - warm male" },
+  { deepgramModel: "aura-asteria-en", gender: "female", voiceName: "Asteria - clear female" },
+  { deepgramModel: "aura-athena-en", gender: "female", voiceName: "Athena - confident female" },
+  { deepgramModel: "aura-arcas-en", gender: "male", voiceName: "Arcas - expressive male" },
+  { deepgramModel: "aura-orpheus-en", gender: "male", voiceName: "Orpheus - narrator male" }
+];
+
+function createDialogueId() {
+  return `dialogue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export default function VideoStudioScreen() {
   const router = useRouter();
@@ -45,6 +64,8 @@ export default function VideoStudioScreen() {
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [generatingDialogueScene, setGeneratingDialogueScene] = useState<number | null>(null);
+  const [generatingDialogueLineId, setGeneratingDialogueLineId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [customGenreInput, setCustomGenreInput] = useState("");
   const [customToneInput, setCustomToneInput] = useState("");
@@ -146,16 +167,6 @@ export default function VideoStudioScreen() {
     setCustomToneInput("");
   };
 
-  const updateSceneCount = (sceneCount: number) => {
-    if (!flow) return;
-    persistFlow({
-      ...flow,
-      sceneCount,
-      scenesNeedRegeneration: Boolean(flow.script),
-      videoOutdated: Boolean(flow.script)
-    });
-  };
-
   const updateRoughIdea = (roughIdea: string) => {
     if (!flow) return;
     persistFlow({
@@ -193,7 +204,6 @@ export default function VideoStudioScreen() {
         body: JSON.stringify({
           genre: flow.genres,
           includeAudio: false,
-          sceneCount: flow.sceneCount,
           scenario,
           tone: flow.tones
         }),
@@ -251,7 +261,6 @@ export default function VideoStudioScreen() {
         body: JSON.stringify({
           genre: flow.genres,
           includeAudio: false,
-          sceneCount: flow.sceneCount,
           scenario,
           tone: flow.tones
         }),
@@ -356,6 +365,384 @@ export default function VideoStudioScreen() {
       videoOutdated: true,
       voiceNeedsRegeneration: Boolean(flow.voiceResult)
     });
+  };
+
+  const updateDialogueMeta = (
+    sceneNumber: number,
+    dialogueId: string,
+    partial: Partial<Pick<MovieDialogueLine, "character" | "delivery">> & {
+      voiceProfile?: Partial<MovieDialogueLine["voiceProfile"]>;
+    }
+  ) => {
+    if (!flow?.script) return;
+
+    const nextScript = {
+      ...flow.script,
+      scenes: flow.script.scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber
+          ? {
+              ...scene,
+              dialogues: scene.dialogues.map((dialogue) =>
+                dialogue.id === dialogueId
+                  ? {
+                      ...dialogue,
+                      ...partial,
+                      audioUrl: undefined,
+                      voiceProfile: {
+                        ...dialogue.voiceProfile,
+                        ...partial.voiceProfile,
+                        character: partial.character || dialogue.character
+                      }
+                    }
+                  : dialogue
+              )
+            }
+          : scene
+      )
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const addScene = () => {
+    if (!flow?.script) return;
+    const previousScene = flow.script.scenes[flow.script.scenes.length - 1];
+    const baseVoice = flow.script.characterVoices[0] ?? previousScene?.dialogues[0]?.voiceProfile;
+    if (!previousScene || !baseVoice) return;
+
+    const nextSceneNumber = flow.script.scenes.length + 1;
+    const nextScene: MovieScene = {
+      directorNotes: "Describe camera movement, pacing, and the key action for this new scene.",
+      dialogues: [
+        {
+          character: baseVoice.character,
+          delivery: "neutral",
+          id: createDialogueId(),
+          line: "",
+          voiceProfile: baseVoice
+        }
+      ],
+      estimatedDuration: "45 seconds",
+      imagePrompt: "Detailed image prompt for the new scene.",
+      location: previousScene.location,
+      mood: previousScene.mood,
+      narration: "",
+      sceneGenre: previousScene.sceneGenre,
+      sceneNumber: nextSceneNumber,
+      sceneTone: previousScene.sceneTone,
+      soundDesign: "Ambient sound and music direction for this new scene.",
+      title: `Scene ${nextSceneNumber}`,
+      visualPrompt: "Describe the visual look, character blocking, and atmosphere."
+    };
+
+    persistFlow({
+      ...flow,
+      sceneCount: nextSceneNumber,
+      script: {
+        ...flow.script,
+        scenes: [...flow.script.scenes, nextScene]
+      },
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const deleteScene = (sceneNumber: number) => {
+    if (!flow?.script || flow.script.scenes.length <= 1) return;
+    const nextScenes = flow.script.scenes
+      .filter((scene) => scene.sceneNumber !== sceneNumber)
+      .map((scene, index) => ({ ...scene, sceneNumber: index + 1 }));
+
+    persistFlow({
+      ...flow,
+      sceneCount: nextScenes.length,
+      script: {
+        ...flow.script,
+        scenes: nextScenes
+      },
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const addDialogueLine = (sceneNumber: number, characterName?: string, line = "") => {
+    if (!flow?.script) return;
+    const targetScene = flow.script.scenes.find((scene) => scene.sceneNumber === sceneNumber);
+    const baseDialogue =
+      targetScene?.dialogues.find((dialogue) => dialogue.character === characterName) ??
+      targetScene?.dialogues[0];
+
+    if (!targetScene || !baseDialogue) return;
+
+    const nextDialogue: MovieDialogueLine = {
+      ...baseDialogue,
+      audioError: undefined,
+      audioMimeType: undefined,
+      audioUrl: undefined,
+      delivery: "Manual line",
+      id: createDialogueId(),
+      line
+    };
+
+    const nextScript = {
+      ...flow.script,
+      scenes: flow.script.scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, dialogues: [...scene.dialogues, nextDialogue] }
+          : scene
+      )
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const addSceneCharacter = (sceneNumber: number, characterName: string) => {
+    if (!flow?.script) return;
+    const cleanName = characterName.trim();
+    if (!cleanName) return;
+
+    const targetScene = flow.script.scenes.find((scene) => scene.sceneNumber === sceneNumber);
+    const baseDialogue = targetScene?.dialogues[0];
+    const selectedVoice = VIDEO_VOICE_OPTIONS[0];
+
+    if (!targetScene || !baseDialogue) return;
+
+    const nextDialogue: MovieDialogueLine = {
+      ...baseDialogue,
+      audioError: undefined,
+      audioMimeType: undefined,
+      audioUrl: undefined,
+      character: cleanName,
+      delivery: "neutral",
+      id: createDialogueId(),
+      line: "",
+      voiceProfile: {
+        ...baseDialogue.voiceProfile,
+        archetype: "neutral_male",
+        character: cleanName,
+        deepgramModel: selectedVoice.deepgramModel,
+        description: selectedVoice.voiceName,
+        gender: selectedVoice.gender,
+        tone: "neutral",
+        voiceName: selectedVoice.voiceName
+      }
+    };
+
+    const nextScript = {
+      ...flow.script,
+      characterVoices: flow.script.characterVoices.some((voice) => voice.character === cleanName)
+        ? flow.script.characterVoices
+        : [...flow.script.characterVoices, nextDialogue.voiceProfile],
+      scenes: flow.script.scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber
+          ? { ...scene, dialogues: [...scene.dialogues, nextDialogue] }
+          : scene
+      )
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const deleteDialogueLine = (sceneNumber: number, dialogueId: string) => {
+    if (!flow?.script) return;
+
+    const nextScript = {
+      ...flow.script,
+      scenes: flow.script.scenes.map((scene) => {
+        if (scene.sceneNumber !== sceneNumber) return scene;
+
+        if (scene.dialogues.length <= 1) {
+          return {
+            ...scene,
+            dialogues: scene.dialogues.map((dialogue) =>
+              dialogue.id === dialogueId ? { ...dialogue, line: "", audioUrl: undefined } : dialogue
+            )
+          };
+        }
+
+        return {
+          ...scene,
+          dialogues: scene.dialogues.filter((dialogue) => dialogue.id !== dialogueId)
+        };
+      })
+    };
+
+    persistFlow({
+      ...flow,
+      script: nextScript,
+      videoOutdated: true,
+      voiceNeedsRegeneration: Boolean(flow.voiceResult)
+    });
+  };
+
+  const generateAdditionalDialogue = async (sceneNumber: number) => {
+    if (!flow?.script || generatingDialogueScene) return;
+    const scene = flow.script.scenes.find((item) => item.sceneNumber === sceneNumber);
+    if (!scene) return;
+
+    setGeneratingDialogueScene(sceneNumber);
+    setError("");
+
+    try {
+      const uniqueDialogues = Array.from(
+        new Map(scene.dialogues.map((dialogue) => [dialogue.character, dialogue])).values()
+      );
+      const response = await fetch("/api/story/generate-dialogue", {
+        body: JSON.stringify({
+          characters: uniqueDialogues.map((dialogue) => ({
+            id: dialogue.character,
+            name: dialogue.character,
+            personalityTone: dialogue.voiceProfile.tone,
+            role: dialogue.voiceProfile.archetype,
+            voiceStyle: dialogue.voiceProfile.voiceName
+          })),
+          genres: [scene.sceneGenre],
+          linesPerCharacter: 1,
+          previousScenes: flow.script.scenes
+            .filter((item) => item.sceneNumber < scene.sceneNumber)
+            .map((item) => ({
+              description: item.narration || item.directorNotes,
+              dialogues: item.dialogues.map((dialogue) => ({
+                characterName: dialogue.character,
+                text: dialogue.line
+              })),
+              sceneNumber: item.sceneNumber,
+              title: item.title
+            })),
+          sceneDescription: [scene.narration, scene.directorNotes, scene.visualPrompt].filter(Boolean).join("\n"),
+          sceneNumber: scene.sceneNumber,
+          storyTitle: flow.script.title,
+          tones: [scene.sceneTone]
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !Array.isArray(payload.dialogues)) {
+        throw new Error(payload.error ?? "Dialogue generation failed.");
+      }
+
+      const generatedLines: MovieDialogueLine[] = payload.dialogues.map(
+        (dialogue: { characterId: string; characterName?: string; text: string }) => {
+          const baseDialogue =
+            scene.dialogues.find((item) => item.character === dialogue.characterId) ?? scene.dialogues[0];
+
+          return {
+            ...baseDialogue,
+            audioError: undefined,
+            audioMimeType: undefined,
+            audioUrl: undefined,
+            character: baseDialogue?.character ?? dialogue.characterName ?? dialogue.characterId,
+            delivery: "AI added line",
+            id: createDialogueId(),
+            line: dialogue.text,
+            voiceProfile: baseDialogue.voiceProfile
+          };
+        }
+      );
+
+      const nextScript = {
+        ...flow.script,
+        scenes: flow.script.scenes.map((item) =>
+          item.sceneNumber === sceneNumber
+            ? { ...item, dialogues: [...item.dialogues, ...generatedLines] }
+            : item
+        )
+      };
+
+      persistFlow({
+        ...flow,
+        script: nextScript,
+        videoOutdated: true,
+        voiceNeedsRegeneration: Boolean(flow.voiceResult)
+      });
+    } catch (dialogueError) {
+      setError(dialogueError instanceof Error ? dialogueError.message : "Dialogue generation failed.");
+    } finally {
+      setGeneratingDialogueScene(null);
+    }
+  };
+
+  const generateDialogueForLine = async (sceneNumber: number, dialogueId: string) => {
+    if (!flow?.script || generatingDialogueLineId) return;
+    const scene = flow.script.scenes.find((item) => item.sceneNumber === sceneNumber);
+    const dialogue = scene?.dialogues.find((item) => item.id === dialogueId);
+    if (!scene || !dialogue) return;
+
+    setGeneratingDialogueLineId(dialogueId);
+    setError("");
+
+    try {
+      const response = await fetch("/api/story/generate-dialogue", {
+        body: JSON.stringify({
+          characters: [
+            {
+              id: dialogue.character,
+              name: dialogue.character,
+              personalityTone: dialogue.voiceProfile.tone || dialogue.delivery,
+              role: dialogue.voiceProfile.archetype || "Supporting Character",
+              voiceStyle: dialogue.voiceProfile.voiceName
+            }
+          ],
+          genres: [scene.sceneGenre],
+          linesPerCharacter: 1,
+          previousScenes: flow.script.scenes
+            .filter((item) => item.sceneNumber < scene.sceneNumber)
+            .map((item) => ({
+              description: item.narration || item.directorNotes,
+              dialogues: item.dialogues.map((line) => ({
+                characterName: line.character,
+                text: line.line
+              })),
+              sceneNumber: item.sceneNumber,
+              title: item.title
+            })),
+          sceneDescription: [
+            scene.title,
+            scene.narration,
+            scene.directorNotes,
+            scene.visualPrompt,
+            dialogue.delivery ? `Requested delivery: ${dialogue.delivery}` : ""
+          ].filter(Boolean).join("\n"),
+          sceneNumber: scene.sceneNumber,
+          storyTitle: flow.script.title,
+          tones: [scene.sceneTone]
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !Array.isArray(payload.dialogues) || !payload.dialogues[0]?.text) {
+        throw new Error(payload.error ?? "Dialogue generation failed.");
+      }
+
+      updateDialogueLine(sceneNumber, dialogueId, String(payload.dialogues[0].text));
+    } catch (dialogueError) {
+      setError(dialogueError instanceof Error ? dialogueError.message : "Dialogue generation failed.");
+    } finally {
+      setGeneratingDialogueLineId(null);
+    }
   };
 
   const generateVoice = async () => {
@@ -483,7 +870,7 @@ export default function VideoStudioScreen() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-midnight">
         <div className="relative">
 
           <section className="relative px-4 py-10 sm:px-6 lg:px-8">
@@ -527,17 +914,16 @@ export default function VideoStudioScreen() {
 
               {flow.stage === "setup" ? (
           <SetupStage
-            flow={flow}
-            customGenreInput={customGenreInput}
-            customToneInput={customToneInput}
+                  flow={flow}
+                  customGenreInput={customGenreInput}
+                  customToneInput={customToneInput}
             onAddCustomGenre={addCustomGenre}
             onAddCustomTone={addCustomTone}
-            onContinue={() => setStage("storyIdea")}
-            onCustomGenreInputChange={setCustomGenreInput}
-            onCustomToneInputChange={setCustomToneInput}
-            onSceneCountChange={updateSceneCount}
-            onToggleGenre={toggleGenre}
-            onToggleTone={toggleTone}
+                  onContinue={() => setStage("storyIdea")}
+                  onCustomGenreInputChange={setCustomGenreInput}
+                  onCustomToneInputChange={setCustomToneInput}
+                  onToggleGenre={toggleGenre}
+                  onToggleTone={toggleTone}
                 />
               ) : null}
 
@@ -566,12 +952,22 @@ export default function VideoStudioScreen() {
                 <ScenesStage
                   editingKey={editingKey}
                   flow={flow}
+                  generatingDialogueLineId={generatingDialogueLineId}
+                  generatingDialogueScene={generatingDialogueScene}
                   isGenerating={isGeneratingStory}
                   totalDialogueLines={totalDialogueLines}
+                  onAddDialogueLine={addDialogueLine}
+                  onAddSceneCharacter={addSceneCharacter}
+                  onAddScene={addScene}
                   onBack={() => setStage("storyReview")}
                   onContinue={() => setStage("voice")}
+                  onDeleteDialogueLine={deleteDialogueLine}
+                  onDeleteScene={deleteScene}
                   onDialogueChange={updateDialogueLine}
+                  onDialogueMetaChange={updateDialogueMeta}
                   onEditingChange={setEditingKey}
+                  onGenerateAdditionalDialogue={generateAdditionalDialogue}
+                  onGenerateDialogueForLine={generateDialogueForLine}
                   onRegenerate={regenerateScenes}
                   onSceneFieldChange={updateSceneField}
                   onTitleChange={updateFilmField}
@@ -650,7 +1046,7 @@ export default function VideoStudioScreen() {
               </div>
               <button
                 onClick={action}
-                className="rounded-full bg-cyan-500 px-6 py-2 text-xs font-black uppercase tracking-tighter text-slate-950 transition hover:scale-105 active:scale-95"
+                className="rounded-full bg-cyan-500 px-6 py-2 text-xs font-black uppercase tracking-tighter text-white transition hover:scale-105 active:scale-95"
               >
                 {actionLabel}
               </button>
@@ -729,7 +1125,6 @@ function SetupStage({
   onContinue,
   onCustomGenreInputChange,
   onCustomToneInputChange,
-  onSceneCountChange,
   onToggleGenre,
   onToggleTone
 }: {
@@ -741,7 +1136,6 @@ function SetupStage({
   onContinue: () => void;
   onCustomGenreInputChange: (value: string) => void;
   onCustomToneInputChange: (value: string) => void;
-  onSceneCountChange: (value: number) => void;
   onToggleGenre: (value: string) => void;
   onToggleTone: (value: string) => void;
 }) {
@@ -778,19 +1172,8 @@ function SetupStage({
           />
         </div>
 
-        <div className="mt-6">
-          <label className="mb-4 block text-sm font-semibold text-slate-200">
-            Number of Scenes
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={flow.sceneCount}
-            onChange={(event) => onSceneCountChange(Number(event.target.value))}
-            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-cyan-400"
-          />
-          <p className="mt-3 text-sm text-slate-400">{flow.sceneCount} scene sequence</p>
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-white/70">
+          Scenes are now built dynamically. Start with an AI-generated draft, then add, remove, and edit scenes until the story naturally ends.
         </div>
 
         <button
@@ -804,7 +1187,7 @@ function SetupStage({
 
       <InfoPanel
         title="What this stage saves"
-        text="Genre, tone, and scene count stay saved when you go forward or return from later stages."
+        text="Genre and tone stay saved as your base palette. You can still change genre, tone, cast, voice, and dialogue inside each scene later."
       />
     </div>
   );
@@ -904,24 +1287,50 @@ function StoryReviewStage({
 function ScenesStage({
   editingKey,
   flow,
+  generatingDialogueLineId,
+  generatingDialogueScene,
   isGenerating,
   totalDialogueLines,
+  onAddDialogueLine,
+  onAddSceneCharacter,
+  onAddScene,
   onBack,
   onContinue,
+  onDeleteDialogueLine,
+  onDeleteScene,
   onDialogueChange,
+  onDialogueMetaChange,
   onEditingChange,
+  onGenerateAdditionalDialogue,
+  onGenerateDialogueForLine,
   onRegenerate,
   onSceneFieldChange,
   onTitleChange
 }: {
   editingKey: string | null;
   flow: VideoStudioFlowState;
+  generatingDialogueLineId: string | null;
+  generatingDialogueScene: number | null;
   isGenerating: boolean;
   totalDialogueLines: number;
+  onAddDialogueLine: (sceneNumber: number, characterName?: string, line?: string) => void;
+  onAddSceneCharacter: (sceneNumber: number, characterName: string) => void;
+  onAddScene: () => void;
   onBack: () => void;
   onContinue: () => void;
+  onDeleteDialogueLine: (sceneNumber: number, dialogueId: string) => void;
+  onDeleteScene: (sceneNumber: number) => void;
   onDialogueChange: (sceneNumber: number, dialogueId: string, value: string) => void;
+  onDialogueMetaChange: (
+    sceneNumber: number,
+    dialogueId: string,
+    partial: Partial<Pick<MovieDialogueLine, "character" | "delivery">> & {
+      voiceProfile?: Partial<MovieDialogueLine["voiceProfile"]>;
+    }
+  ) => void;
   onEditingChange: (key: string | null) => void;
+  onGenerateAdditionalDialogue: (sceneNumber: number) => void;
+  onGenerateDialogueForLine: (sceneNumber: number, dialogueId: string) => void;
   onRegenerate: () => void;
   onSceneFieldChange: (sceneNumber: number, field: EditableSceneField, value: string) => void;
   onTitleChange: (field: "logline" | "title", value: string) => void;
@@ -990,12 +1399,29 @@ function ScenesStage({
         <SceneCard
           key={`${script.id}-${scene.sceneNumber}`}
           editingKey={editingKey}
+          generatingDialogueLineId={generatingDialogueLineId}
+          generatingDialogueScene={generatingDialogueScene}
           scene={scene}
+          onAddDialogueLine={onAddDialogueLine}
+          onAddSceneCharacter={onAddSceneCharacter}
+          onDeleteDialogueLine={onDeleteDialogueLine}
+          onDeleteScene={onDeleteScene}
           onDialogueChange={onDialogueChange}
+          onDialogueMetaChange={onDialogueMetaChange}
           onEditingChange={onEditingChange}
+          onGenerateAdditionalDialogue={onGenerateAdditionalDialogue}
+          onGenerateDialogueForLine={onGenerateDialogueForLine}
           onSceneFieldChange={onSceneFieldChange}
         />
       ))}
+      <button
+        type="button"
+        onClick={onAddScene}
+        className="w-full rounded-[1.4rem] border border-starlight/20 bg-starlight/10 px-5 py-4 text-sm font-semibold text-starlight transition hover:bg-starlight/15"
+      >
+        <Plus className="mr-2 inline h-4 w-4" />
+        Add Next Scene
+      </button>
     </section>
   );
 }
@@ -1331,15 +1757,39 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function SceneCard({
   editingKey,
+  generatingDialogueLineId,
+  generatingDialogueScene,
   scene,
+  onAddDialogueLine,
+  onAddSceneCharacter,
+  onDeleteDialogueLine,
+  onDeleteScene,
   onDialogueChange,
+  onDialogueMetaChange,
   onEditingChange,
+  onGenerateAdditionalDialogue,
+  onGenerateDialogueForLine,
   onSceneFieldChange
 }: {
   editingKey: string | null;
+  generatingDialogueLineId: string | null;
+  generatingDialogueScene: number | null;
   scene: MovieScene;
+  onAddDialogueLine: (sceneNumber: number, characterName?: string, line?: string) => void;
+  onAddSceneCharacter: (sceneNumber: number, characterName: string) => void;
+  onDeleteDialogueLine: (sceneNumber: number, dialogueId: string) => void;
+  onDeleteScene: (sceneNumber: number) => void;
   onDialogueChange: (sceneNumber: number, dialogueId: string, value: string) => void;
+  onDialogueMetaChange: (
+    sceneNumber: number,
+    dialogueId: string,
+    partial: Partial<Pick<MovieDialogueLine, "character" | "delivery">> & {
+      voiceProfile?: Partial<MovieDialogueLine["voiceProfile"]>;
+    }
+  ) => void;
   onEditingChange: (key: string | null) => void;
+  onGenerateAdditionalDialogue: (sceneNumber: number) => void;
+  onGenerateDialogueForLine: (sceneNumber: number, dialogueId: string) => void;
   onSceneFieldChange: (sceneNumber: number, field: EditableSceneField, value: string) => void;
 }) {
   return (
@@ -1361,10 +1811,56 @@ function SceneCard({
         </div>
         <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
         <p className="mt-2 text-sm text-white/55">{scene.location}</p>
+        <button
+          type="button"
+          onClick={() => onDeleteScene(scene.sceneNumber)}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Remove Scene
+        </button>
       </div>
 
       <div className="grid gap-5 p-6 lg:grid-cols-[1fr_0.9fr]">
         <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <EditableBlock
+              editKey={`scene-${scene.sceneNumber}-genre`}
+              editingKey={editingKey}
+              label="Scene Genre"
+              singleLine
+              text={scene.sceneGenre}
+              onChange={(value) => onSceneFieldChange(scene.sceneNumber, "sceneGenre", value)}
+              onEditingChange={onEditingChange}
+            />
+            <EditableBlock
+              editKey={`scene-${scene.sceneNumber}-tone`}
+              editingKey={editingKey}
+              label="Scene Tone"
+              singleLine
+              text={scene.sceneTone}
+              onChange={(value) => onSceneFieldChange(scene.sceneNumber, "sceneTone", value)}
+              onEditingChange={onEditingChange}
+            />
+            <EditableBlock
+              editKey={`scene-${scene.sceneNumber}-location`}
+              editingKey={editingKey}
+              label="Location"
+              singleLine
+              text={scene.location}
+              onChange={(value) => onSceneFieldChange(scene.sceneNumber, "location", value)}
+              onEditingChange={onEditingChange}
+            />
+            <EditableBlock
+              editKey={`scene-${scene.sceneNumber}-mood`}
+              editingKey={editingKey}
+              label="Mood"
+              singleLine
+              text={scene.mood}
+              onChange={(value) => onSceneFieldChange(scene.sceneNumber, "mood", value)}
+              onEditingChange={onEditingChange}
+            />
+          </div>
           <EditableBlock
             editKey={`scene-${scene.sceneNumber}-narration`}
             editingKey={editingKey}
@@ -1410,9 +1906,17 @@ function SceneCard({
         <DialogueReview
           dialogues={scene.dialogues}
           editingKey={editingKey}
+          generatingDialogueLineId={generatingDialogueLineId}
+          isGenerating={generatingDialogueScene === scene.sceneNumber}
           sceneNumber={scene.sceneNumber}
+          onAddDialogueLine={onAddDialogueLine}
+          onAddSceneCharacter={onAddSceneCharacter}
+          onDeleteDialogueLine={onDeleteDialogueLine}
           onDialogueChange={onDialogueChange}
+          onDialogueMetaChange={onDialogueMetaChange}
           onEditingChange={onEditingChange}
+          onGenerateAdditionalDialogue={onGenerateAdditionalDialogue}
+          onGenerateDialogueForLine={onGenerateDialogueForLine}
         />
       </div>
     </article>
@@ -1422,34 +1926,172 @@ function SceneCard({
 function DialogueReview({
   dialogues,
   editingKey,
+  generatingDialogueLineId,
+  isGenerating,
   sceneNumber,
+  onAddDialogueLine,
+  onAddSceneCharacter,
+  onDeleteDialogueLine,
   onDialogueChange,
-  onEditingChange
+  onDialogueMetaChange,
+  onEditingChange,
+  onGenerateAdditionalDialogue,
+  onGenerateDialogueForLine
 }: {
   dialogues: MovieDialogueLine[];
   editingKey: string | null;
+  generatingDialogueLineId: string | null;
+  isGenerating: boolean;
   sceneNumber: number;
+  onAddDialogueLine: (sceneNumber: number, characterName?: string, line?: string) => void;
+  onAddSceneCharacter: (sceneNumber: number, characterName: string) => void;
+  onDeleteDialogueLine: (sceneNumber: number, dialogueId: string) => void;
   onDialogueChange: (sceneNumber: number, dialogueId: string, value: string) => void;
+  onDialogueMetaChange: (
+    sceneNumber: number,
+    dialogueId: string,
+    partial: Partial<Pick<MovieDialogueLine, "character" | "delivery">> & {
+      voiceProfile?: Partial<MovieDialogueLine["voiceProfile"]>;
+    }
+  ) => void;
   onEditingChange: (key: string | null) => void;
+  onGenerateAdditionalDialogue: (sceneNumber: number) => void;
+  onGenerateDialogueForLine: (sceneNumber: number, dialogueId: string) => void;
 }) {
+  const [newCharacterName, setNewCharacterName] = useState("");
+  const characters = Array.from(new Set(dialogues.map((dialogue) => dialogue.character)));
+  const addCharacter = () => {
+    const cleanName = newCharacterName.trim();
+    if (!cleanName) return;
+    onAddSceneCharacter(sceneNumber, cleanName);
+    setNewCharacterName("");
+  };
+
   return (
     <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <Mic2 className="h-4 w-4 text-gold" />
-        <p className="text-xs uppercase tracking-[0.26em] text-white/45">Dialogue Review</p>
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Mic2 className="h-4 w-4 text-gold" />
+          <p className="text-xs uppercase tracking-[0.26em] text-white/45">Dialogue Review</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onAddDialogueLine(sceneNumber, characters[0])}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70 transition hover:border-gold/25 hover:text-white"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Line
+          </button>
+          <button
+            type="button"
+            disabled={isGenerating}
+            onClick={() => onGenerateAdditionalDialogue(sceneNumber)}
+            className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-60"
+          >
+            {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Generate More Lines
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 rounded-[1rem] border border-white/10 bg-white/5 p-3 sm:flex-row">
+          <input
+            value={newCharacterName}
+            onChange={(event) => setNewCharacterName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addCharacter();
+              }
+            }}
+            placeholder="Add a new character to this scene"
+            className="min-w-0 flex-1 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-white outline-none placeholder:text-white/35"
+          />
+          <button
+            type="button"
+            onClick={addCharacter}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-400"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Character
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
         {dialogues.map((dialogue) => (
           <div key={dialogue.id} className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-white">{dialogue.character}</p>
+              <select
+                value={dialogue.character}
+                onChange={(event) =>
+                  onDialogueMetaChange(sceneNumber, dialogue.id, {
+                    character: event.target.value,
+                    voiceProfile: { character: event.target.value }
+                  })
+                }
+                className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold text-white outline-none"
+              >
+                {characters.map((character) => (
+                  <option key={character} value={character}>{character}</option>
+                ))}
+              </select>
               <span className="rounded-full bg-starlight/10 px-2 py-0.5 text-xs text-starlight">
                 {dialogue.delivery}
               </span>
-              <span className="rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">
-                {dialogue.voiceProfile.voiceName}
-              </span>
+              <select
+                value={dialogue.voiceProfile.deepgramModel}
+                onChange={(event) => {
+                  const selectedVoice = VIDEO_VOICE_OPTIONS.find((voice) => voice.deepgramModel === event.target.value);
+                  if (!selectedVoice) return;
+                  onDialogueMetaChange(sceneNumber, dialogue.id, {
+                    voiceProfile: {
+                      deepgramModel: selectedVoice.deepgramModel,
+                      description: selectedVoice.voiceName,
+                      gender: selectedVoice.gender,
+                      voiceName: selectedVoice.voiceName
+                    }
+                  });
+                }}
+                className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold outline-none"
+              >
+                {VIDEO_VOICE_OPTIONS.map((voice) => (
+                  <option key={voice.deepgramModel} value={voice.deepgramModel}>{voice.voiceName}</option>
+                ))}
+              </select>
+              <input
+                value={dialogue.delivery}
+                onChange={(event) => onDialogueMetaChange(sceneNumber, dialogue.id, { delivery: event.target.value })}
+                placeholder="delivery"
+                className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => onAddDialogueLine(sceneNumber, dialogue.character)}
+                className="ml-auto rounded-full border border-white/10 px-2 py-1 text-[11px] font-semibold text-white/60 transition hover:border-gold/25 hover:text-white"
+              >
+                Add another
+              </button>
+              <button
+                type="button"
+                disabled={generatingDialogueLineId === dialogue.id}
+                onClick={() => onGenerateDialogueForLine(sceneNumber, dialogue.id)}
+                className="inline-flex items-center gap-1 rounded-full border border-gold/20 bg-gold/10 px-2 py-1 text-[11px] font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-60"
+              >
+                {generatingDialogueLineId === dialogue.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                AI Line
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteDialogueLine(sceneNumber, dialogue.id)}
+                className="inline-flex items-center gap-1 rounded-full border border-red-400/20 px-2 py-1 text-[11px] font-semibold text-red-300 transition hover:bg-red-500/10"
+              >
+                <Trash2 className="h-3 w-3" />
+                Remove
+              </button>
             </div>
             <EditableBlock
               editKey={`scene-${sceneNumber}-dialogue-${dialogue.id}`}

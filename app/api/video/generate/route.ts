@@ -578,7 +578,7 @@ function assignCharacterVoices(scenes: MovieScene[]) {
 
 function buildGeminiPrompt(request: Required<Pick<VideoGenerationRequest, "scenario">> & {
   genres: string[];
-  sceneCount: number;
+  sceneCount?: number;
   tones: string[];
 }) {
   return `You are the Omni-Narrative Engine, a cinematic story director for an AI video creation module.
@@ -591,7 +591,7 @@ ${request.scenario}
 Creative constraints:
 - Genre palette: ${request.genres.join(", ")}
 - Tone palette: ${request.tones.join(", ")}
-- Scene count: exactly ${request.sceneCount}
+- Scene count: choose the number of scenes the story naturally needs. Usually 3-5 scenes is enough for an MVP short film, but use fewer or more when the story needs it.
 - The movie may blend multiple genres. Assign each scene a sceneGenre such as "Sci-Fi + Comedy" or "Mystery + Suspense" when useful.
 - The movie may shift tones scene by scene. Assign each scene a sceneTone based on what is happening in that moment.
 - Make it feel like a proper short film, with a clear beginning, escalation, climax, and ending.
@@ -752,7 +752,7 @@ async function generateMovieScript(params: {
   apiKey: string;
   genres: string[];
   model: string;
-  sceneCount: number;
+  sceneCount?: number;
   scenario: string;
   tones: string[];
 }) {
@@ -793,12 +793,12 @@ async function generateMovieScript(params: {
     throw new Error("Gemini returned no scenes.");
   }
 
-  const scenes = rawScenes.slice(0, params.sceneCount).map(normalizeScene);
+  const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
   const voiceResult = assignCharacterVoices(scenes);
 
   return {
     characterVoices: voiceResult.characterVoices,
-    estimatedRuntime: textValue(parsed.estimatedRuntime, `${params.sceneCount * 45} seconds`),
+    estimatedRuntime: textValue(parsed.estimatedRuntime, `${scenes.length * 45} seconds`),
     genre: textValue(parsed.genre, params.genres.join(" + ")),
     logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
     scenes: voiceResult.scenes,
@@ -811,7 +811,7 @@ async function generateMovieScriptWithGroq(params: {
   apiKey: string;
   genres: string[];
   model: string;
-  sceneCount: number;
+  sceneCount?: number;
   scenario: string;
   tones: string[];
 }) {
@@ -855,12 +855,12 @@ async function generateMovieScriptWithGroq(params: {
     throw new Error("Groq fallback returned no scenes.");
   }
 
-  const scenes = rawScenes.slice(0, params.sceneCount).map(normalizeScene);
+  const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
   const voiceResult = assignCharacterVoices(scenes);
 
   return {
     characterVoices: voiceResult.characterVoices,
-    estimatedRuntime: textValue(parsed.estimatedRuntime, `${params.sceneCount * 45} seconds`),
+    estimatedRuntime: textValue(parsed.estimatedRuntime, `${scenes.length * 45} seconds`),
     genre: textValue(parsed.genre, params.genres.join(" + ")),
     logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
     scenes: voiceResult.scenes,
@@ -872,7 +872,7 @@ async function generateMovieScriptWithGroq(params: {
 async function generateMovieScriptWithFallback(params: {
   geminiApiKey: string;
   genres: string[];
-  sceneCount: number;
+  sceneCount?: number;
   scenario: string;
   tones: string[];
 }) {
@@ -1084,14 +1084,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const sceneCount = clampSceneCount(body.sceneCount);
     const genres = listValue(body.genre, ["Cinematic Drama"]);
     const tones = listValue(body.tone, ["Immersive and emotional"]);
     const includeAudio = body.includeAudio !== false;
     const script = await generateMovieScriptWithFallback({
       geminiApiKey,
       genres,
-      sceneCount,
+      sceneCount: undefined,
       scenario,
       tones
     });

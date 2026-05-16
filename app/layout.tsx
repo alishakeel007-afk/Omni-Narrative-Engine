@@ -32,8 +32,7 @@ export default function RootLayout({
       <body className="font-[var(--font-body)]">
         <AuthProvider>
           <StoryProvider>
-            <div className="pointer-events-none fixed inset-0 story-grid opacity-20" />
-            <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.08),transparent_65%)]" />
+            <div className="pointer-events-none fixed inset-0 story-grid opacity-40" />
             <Navbar />
             <main className="relative z-10">{children}</main>
           </StoryProvider>

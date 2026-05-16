@@ -10,12 +10,42 @@ import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { AiStoryStudioStepper } from "@/components/ai-story-studio-stepper";
 import {
-  createEmptyScene, createMockDialogue, loadCreateStoryDraft, saveCreateStoryDraft
+  createEmptyScene, createId, createMockDialogue, loadCreateStoryDraft, saveCreateStoryDraft
 } from "@/lib/create-story-storage";
-import type { CreateStoryDraft, CreateStoryScene } from "@/types/create-story";
+import type { CreateStoryDialogue, CreateStoryDraft, CreateStoryScene } from "@/types/create-story";
 import { logActivity } from "@/lib/log-activity";
 
-const MAX_SCENES = 10;
+const BUILDER_VOICE_OPTIONS = [
+  "Confident hero (male)",
+  "Bold heroine (female)",
+  "Warm young male voice",
+  "Warm young female voice",
+  "Bright teen voice (male)",
+  "Bright teen voice (female)",
+  "Deep commanding villain (male)",
+  "Cold calculating villain (female)",
+  "Quiet mysterious villain",
+  "Wise elder mentor (male)",
+  "Warm nurturing mentor (female)",
+  "Calm elder male voice",
+  "Mature elder female voice",
+  "Soft emotional female voice",
+  "Soft emotional male voice",
+  "Energetic comic voice",
+  "Dry sarcastic voice",
+  "Nervous hesitant voice",
+  "Royal noble voice",
+  "Detective noir voice",
+  "Military commander voice",
+  "Scholar / professor voice",
+  "Child voice",
+  "Narrator voice (male)",
+  "Narrator voice (female)",
+  "Documentary narrator voice",
+  "Creature / monster voice",
+  "Robot / AI voice",
+  "Ghostly whisper voice"
+];
 
 export default function StoryBuilderScreen() {
   const router = useRouter();
@@ -26,6 +56,7 @@ export default function StoryBuilderScreen() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [loadingDialogue, setLoadingDialogue] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [newSceneCharacterName, setNewSceneCharacterName] = useState("");
 
   useEffect(() => {
     const loadedDraft = loadCreateStoryDraft();
@@ -50,6 +81,16 @@ export default function StoryBuilderScreen() {
   }, []);
 
   const activeScene = useMemo(() => draft?.scenes.find((s) => s.id === activeSceneId) ?? draft?.scenes[0] ?? null, [activeSceneId, draft]);
+  const voiceOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(draft?.characters.map((item) => item.voiceStyle).filter(Boolean) ?? []),
+          ...BUILDER_VOICE_OPTIONS
+        ])
+      ),
+    [draft?.characters]
+  );
 
   const isReadyToContinue = useMemo(() => {
     return draft?.scenes && draft.scenes.length > 0 && draft.scenes.every(scene =>
@@ -85,7 +126,7 @@ export default function StoryBuilderScreen() {
 
   const updateScene = (
     sceneId: string,
-    partial: Partial<Pick<CreateStoryScene, "selectedSuggestion" | "storyDescription" | "title">>
+    partial: Partial<Pick<CreateStoryScene, "activeCharacterIds" | "sceneGenre" | "sceneTone" | "selectedSuggestion" | "storyDescription" | "title">>
   ) => {
     if (!draft) return;
     persistDraft({
@@ -95,7 +136,7 @@ export default function StoryBuilderScreen() {
     setError("");
   };
 
-  const updateDialogue = (sceneId: string, characterId: string, text: string) => {
+  const updateDialogue = (sceneId: string, dialogueId: string, text: string) => {
     if (!draft) return;
     persistDraft({
       ...draft,
@@ -104,11 +145,169 @@ export default function StoryBuilderScreen() {
           ? {
               ...s,
               dialogues: s.dialogues.map((d) =>
-                d.characterId === characterId ? { ...d, text } : d
+                d.id === dialogueId ? { ...d, text } : d
               )
             }
           : s
       )
+    });
+  };
+
+  const syncSceneCharacters = (scene: CreateStoryScene, activeCharacterIds: string[]) => {
+    if (!draft) return scene;
+    const activeCharacters = draft.characters.filter((character) => activeCharacterIds.includes(character.id));
+    const existingActiveDialogues = scene.dialogues.filter((dialogue) =>
+      activeCharacterIds.includes(dialogue.characterId)
+    );
+    const missingDialogues = activeCharacters
+      .filter((character) => !existingActiveDialogues.some((dialogue) => dialogue.characterId === character.id))
+      .map((character) => ({
+        characterId: character.id,
+        characterName: character.name || "Unnamed Character",
+        id: createId("dialogue"),
+        text: "",
+        voiceStyle: character.voiceStyle || "Voice style placeholder"
+      }));
+
+    return {
+      ...scene,
+      activeCharacterIds,
+      dialogues: [...existingActiveDialogues, ...missingDialogues]
+    };
+  };
+
+  const toggleSceneCharacter = (sceneId: string, characterId: string) => {
+    if (!draft) return;
+
+    persistDraft({
+      ...draft,
+      scenes: draft.scenes.map((scene) => {
+        if (scene.id !== sceneId) return scene;
+        const nextCharacterIds = scene.activeCharacterIds.includes(characterId)
+          ? scene.activeCharacterIds.length === 1
+            ? scene.activeCharacterIds
+            : scene.activeCharacterIds.filter((id) => id !== characterId)
+          : [...scene.activeCharacterIds, characterId];
+
+        return syncSceneCharacters(scene, nextCharacterIds);
+      })
+    });
+  };
+
+  const addSceneCharacter = (sceneId: string) => {
+    if (!draft) return;
+    const cleanName = newSceneCharacterName.trim();
+    if (!cleanName) return;
+
+    const existingCharacter = draft.characters.find(
+      (character) => character.name.toLowerCase() === cleanName.toLowerCase()
+    );
+    const character = existingCharacter ?? {
+      id: createId("character"),
+      name: cleanName,
+      personalityTone: "Balanced cinematic tone",
+      role: "Supporting Character",
+      voiceStyle: "Narrator voice (male)"
+    };
+    const nextCharacters = existingCharacter ? draft.characters : [...draft.characters, character];
+
+    persistDraft({
+      ...draft,
+      characters: nextCharacters,
+      scenes: draft.scenes.map((scene) => {
+        if (scene.id !== sceneId) return scene;
+        const nextCharacterIds = scene.activeCharacterIds.includes(character.id)
+          ? scene.activeCharacterIds
+          : [...scene.activeCharacterIds, character.id];
+        const activeCharacters = nextCharacters.filter((item) => nextCharacterIds.includes(item.id));
+        const existingActiveDialogues = scene.dialogues.filter((dialogue) =>
+          nextCharacterIds.includes(dialogue.characterId)
+        );
+        const missingDialogues = activeCharacters
+          .filter((item) => !existingActiveDialogues.some((dialogue) => dialogue.characterId === item.id))
+          .map((item) => ({
+            characterId: item.id,
+            characterName: item.name || "Unnamed Character",
+            id: createId("dialogue"),
+            text: "",
+            voiceStyle: item.voiceStyle || "Voice style placeholder"
+          }));
+
+        return {
+          ...scene,
+          activeCharacterIds: nextCharacterIds,
+          dialogues: [...existingActiveDialogues, ...missingDialogues]
+        };
+      })
+    });
+    setNewSceneCharacterName("");
+  };
+
+  const updateDialogueVoice = (sceneId: string, dialogueId: string, voiceStyle: string) => {
+    if (!draft) return;
+
+    persistDraft({
+      ...draft,
+      scenes: draft.scenes.map((scene) =>
+        scene.id === sceneId
+          ? {
+              ...scene,
+              dialogues: scene.dialogues.map((dialogue) =>
+                dialogue.id === dialogueId ? { ...dialogue, voiceStyle } : dialogue
+              )
+            }
+          : scene
+      )
+    });
+  };
+
+  const addDialogueLine = (sceneId: string, characterId: string, text = "") => {
+    if (!draft) return;
+    const character = draft.characters.find((item) => item.id === characterId) ?? draft.characters[0];
+    if (!character) return;
+
+    persistDraft({
+      ...draft,
+      scenes: draft.scenes.map((scene) =>
+        scene.id === sceneId
+          ? {
+              ...scene,
+              dialogues: [
+                ...scene.dialogues,
+                {
+                  characterId: character.id,
+                  characterName: character.name || "Unnamed Character",
+                  id: createId("dialogue"),
+                  text
+                }
+              ]
+            }
+          : scene
+      )
+    });
+  };
+
+  const deleteDialogueLine = (sceneId: string, dialogueId: string) => {
+    if (!draft) return;
+
+    persistDraft({
+      ...draft,
+      scenes: draft.scenes.map((scene) => {
+        if (scene.id !== sceneId) return scene;
+        if (scene.dialogues.length <= 1) {
+          return {
+            ...scene,
+            dialogues: scene.dialogues.map((dialogue) =>
+              dialogue.id === dialogueId ? { ...dialogue, text: "" } : dialogue
+            )
+          };
+        }
+
+        return {
+          ...scene,
+          dialogues: scene.dialogues.filter((dialogue) => dialogue.id !== dialogueId)
+        };
+      })
     });
   };
 
@@ -119,6 +318,10 @@ export default function StoryBuilderScreen() {
   // --- AI Scene Suggestions ---
   const regenerateSuggestions = async (scene: CreateStoryScene) => {
     if (!draft || loadingSuggestions) return;
+    if (!scene.title.trim()) {
+      setError("Write a scene title first so AI can regenerate suggestions around it.");
+      return;
+    }
     setLoadingSuggestions(true);
     setError("");
     try {
@@ -136,11 +339,17 @@ export default function StoryBuilderScreen() {
         body: JSON.stringify({
           storyTitle: draft.storyTitle,
           genres: draft.genres,
-          tones: draft.tones,
-          characters: draft.characters.map((c) => ({
+          tones: [scene.sceneTone || draft.tones[0] || "Dramatic"],
+          characters: draft.characters
+            .filter((character) => scene.activeCharacterIds.includes(character.id))
+            .map((c) => ({
             name: c.name, role: c.role, personalityTone: c.personalityTone
           })),
+          currentSceneDescription: scene.storyDescription || scene.selectedSuggestion,
           sceneNumber: scene.sceneNumber,
+          sceneGenre: scene.sceneGenre,
+          sceneTitle: scene.title,
+          sceneTone: scene.sceneTone,
           previousScenes
         })
       });
@@ -165,7 +374,7 @@ export default function StoryBuilderScreen() {
   };
 
   // --- AI Dialogue Generation ---
-  const generateDialogue = async (scene: CreateStoryScene) => {
+  const generateDialogue = async (scene: CreateStoryScene, mode: "replace" | "append" = "replace") => {
     if (!draft || loadingDialogue) return;
     const sceneText = scene.storyDescription.trim() || scene.selectedSuggestion.trim();
     if (!sceneText) {
@@ -189,11 +398,12 @@ export default function StoryBuilderScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storyTitle: draft.storyTitle,
-          genres: draft.genres,
-          tones: draft.tones,
-          characters: draft.characters,
+          genres: [scene.sceneGenre || draft.genres[0] || "Cinematic"],
+          tones: [scene.sceneTone || draft.tones[0] || "Dramatic"],
+          characters: draft.characters.filter((character) => scene.activeCharacterIds.includes(character.id)),
           sceneDescription: sceneText,
           sceneNumber: scene.sceneNumber,
+          linesPerCharacter: 1,
           previousScenes
         })
       });
@@ -213,18 +423,42 @@ export default function StoryBuilderScreen() {
         return;
       }
 
+      const aiDialogues = data.dialogues as { characterId: string; characterName?: string; text: string }[];
+      const replaceDialogueLines = (existingDialogues: CreateStoryDialogue[]) => {
+        const usedCounts = new Map<string, number>();
+
+        return existingDialogues.map((dialogue) => {
+          const usedCount = usedCounts.get(dialogue.characterId) ?? 0;
+          const characterLines = aiDialogues.filter((aiLine) => aiLine.characterId === dialogue.characterId);
+          const aiLine = characterLines[usedCount] ?? characterLines[0];
+          usedCounts.set(dialogue.characterId, usedCount + 1);
+
+          return aiLine ? { ...dialogue, text: aiLine.text } : dialogue;
+        });
+      };
+
       persistDraft({
         ...draft,
         scenes: draft.scenes.map((s) =>
           s.id === scene.id
             ? {
                 ...s,
-                dialogues: s.dialogues.map((d) => {
-                  const aiLine = data.dialogues.find(
-                    (ai: { characterId: string; text: string }) => ai.characterId === d.characterId
-                  );
-                  return aiLine ? { ...d, text: aiLine.text } : d;
-                })
+                dialogues:
+                  mode === "append"
+                    ? [
+                        ...s.dialogues,
+                        ...aiDialogues.map((aiLine) => {
+                          const character = draft.characters.find((item) => item.id === aiLine.characterId);
+                          return {
+                            characterId: aiLine.characterId,
+                            characterName: character?.name || aiLine.characterName || "Unnamed Character",
+                            id: createId("dialogue"),
+                            text: aiLine.text,
+                            voiceStyle: character?.voiceStyle || "Voice style placeholder"
+                          } satisfies CreateStoryDialogue;
+                        })
+                      ]
+                    : replaceDialogueLines(s.dialogues)
               }
             : s
         )
@@ -252,11 +486,8 @@ export default function StoryBuilderScreen() {
   // --- Add Scene ---
   const addNextScene = async () => {
     if (!draft) return;
-    if (draft.scenes.length >= MAX_SCENES) {
-      setError(`Maximum ${MAX_SCENES} scenes allowed.`);
-      return;
-    }
     const sceneNumber = draft.scenes.length + 1;
+    const previousScene = draft.scenes[draft.scenes.length - 1];
     const nextScene = createEmptyScene({
       characters: draft.characters,
       genres: draft.genres,
@@ -264,13 +495,21 @@ export default function StoryBuilderScreen() {
       storyTitle: draft.storyTitle,
       tones: draft.tones
     });
+    const flexibleScene = previousScene
+      ? {
+          ...nextScene,
+          activeCharacterIds: previousScene.activeCharacterIds,
+          sceneGenre: previousScene.sceneGenre,
+          sceneTone: previousScene.sceneTone
+        }
+      : nextScene;
     const nextDraft = {
       ...draft,
       numberOfScenes: Math.max(draft.numberOfScenes, sceneNumber),
-      scenes: [...draft.scenes, nextScene]
+      scenes: [...draft.scenes, flexibleScene]
     };
     persistDraft(nextDraft);
-    setActiveSceneId(nextScene.id);
+    setActiveSceneId(flexibleScene.id);
     setError("");
     await logActivity("scene_added", { sceneNumber, storyTitle: draft.storyTitle });
   };
@@ -313,12 +552,6 @@ export default function StoryBuilderScreen() {
       setError(`Scene ${firstIncomplete.sceneNumber} needs story text before audio generation.`);
       return;
     }
-    if (draft.scenes.length < draft.numberOfScenes) {
-      const proceed = window.confirm(
-        `You selected ${draft.numberOfScenes} scenes but only completed ${draft.scenes.length}. Proceed?`
-      );
-      if (!proceed) return;
-    }
     const hasEmptyDialogues = draft.scenes.some((s) => s.dialogues.some((d) => !d.text.trim()));
     if (hasEmptyDialogues) {
       const proceed = window.confirm(
@@ -359,7 +592,7 @@ export default function StoryBuilderScreen() {
             <p className="text-xs uppercase tracking-[0.26em] text-starlight/70">Current Film</p>
             <h2 className="mt-2 font-[var(--font-heading)] text-2xl text-white">{draft.storyTitle}</h2>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[...draft.genres, ...draft.tones, `${draft.scenes.length}/${MAX_SCENES} scenes`].map((item) => (
+              {[...draft.genres, ...draft.tones, `${draft.scenes.length} scene${draft.scenes.length === 1 ? "" : "s"}`].map((item) => (
                 <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/72">
                   {item}
                 </span>
@@ -434,7 +667,6 @@ export default function StoryBuilderScreen() {
               ))}
             </div>
 
-            {draft.scenes.length < MAX_SCENES ? (
               <button
                 type="button"
                 onClick={addNextScene}
@@ -443,11 +675,6 @@ export default function StoryBuilderScreen() {
                 <Plus className="h-4 w-4" />
                 Add Next Scene
               </button>
-            ) : (
-              <p className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-3 text-center text-xs text-white/50">
-                Max {MAX_SCENES} scenes reached
-              </p>
-            )}
           </aside>
 
           {/* Main Editor */}
@@ -459,15 +686,6 @@ export default function StoryBuilderScreen() {
                   <p className="text-xs uppercase tracking-[0.28em] text-gold">Step 1: Define Scene</p>
                   <h2 className="mt-2 text-2xl font-semibold text-white">Scene Planning</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => generateDialogue(activeScene)}
-                  disabled={loadingDialogue}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
-                >
-                  {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                  Generate Dialogue with AI
-                </button>
               </div>
 
               <div className="space-y-5">
@@ -506,7 +724,7 @@ export default function StoryBuilderScreen() {
                       {loadingSuggestions
                         ? <Loader2 className="h-3 w-3 animate-spin" />
                         : <RefreshCw className="h-3 w-3" />}
-                      {loadingSuggestions ? "Generating..." : "Regenerate with AI"}
+                      {loadingSuggestions ? "Generating..." : "Regenerate from Title"}
                     </button>
                   </div>
                   <div className="grid gap-3 lg:grid-cols-3">
@@ -545,13 +763,117 @@ export default function StoryBuilderScreen() {
                     <h2 className="text-xl font-semibold text-white">Character-wise Dialogues</h2>
                   </div>
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-3 block text-sm font-semibold text-white">Scene genre</label>
+                    <select
+                      value={activeScene.sceneGenre}
+                      onChange={(e) => updateScene(activeScene.id, { sceneGenre: e.target.value })}
+                      className="input"
+                    >
+                      {draft.genres.map((genre) => (
+                        <option key={genre} value={genre}>{genre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-3 block text-sm font-semibold text-white">Scene tone</label>
+                    <select
+                      value={activeScene.sceneTone}
+                      onChange={(e) => updateScene(activeScene.id, { sceneTone: e.target.value })}
+                      className="input"
+                    >
+                      {draft.tones.map((tone) => (
+                        <option key={tone} value={tone}>{tone}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-3 block text-sm font-semibold text-white">Characters in this scene</label>
+                  <div className="flex flex-wrap gap-2">
+                    {draft.characters.map((character) => (
+                      <button
+                        key={character.id}
+                        type="button"
+                        onClick={() => toggleSceneCharacter(activeScene.id, character.id)}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          activeScene.activeCharacterIds.includes(character.id)
+                            ? "border-gold/35 bg-gold/10 text-gold"
+                            : "border-white/10 bg-white/5 text-white/60 hover:border-starlight/25"
+                        }`}
+                      >
+                        {character.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => generateDialogue(activeScene)}
+                    disabled={loadingDialogue}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-semibold text-white transition hover:bg-gold/90 disabled:opacity-60"
+                  >
+                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                    Generate with AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => generateDialogue(activeScene, "append")}
+                    disabled={loadingDialogue}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-60"
+                  >
+                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Generate More Lines
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(true)}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-gold/25 hover:text-white"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Preview Scene
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                {draft.characters.filter((character) => activeScene.activeCharacterIds.includes(character.id)).map((character) => (
+                  <button
+                    key={character.id}
+                    type="button"
+                    onClick={() => addDialogueLine(activeScene.id, character.id)}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70 transition hover:border-gold/25 hover:text-white"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add {character.name} Line
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-5 flex flex-col gap-2 rounded-[1rem] border border-white/10 bg-white/5 p-3 sm:flex-row">
+                <input
+                  value={newSceneCharacterName}
+                  onChange={(event) => setNewSceneCharacterName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addSceneCharacter(activeScene.id);
+                    }
+                  }}
+                  placeholder="Add a new character to this scene"
+                  className="input min-w-0 flex-1"
+                />
                 <button
                   type="button"
-                  onClick={() => setShowPreview(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-gold/25 hover:text-white"
+                  onClick={() => addSceneCharacter(activeScene.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-semibold text-white transition hover:bg-gold/90"
                 >
-                  <Eye className="h-4 w-4" />
-                  Preview Scene
+                  <Plus className="h-4 w-4" />
+                  Add Character
                 </button>
               </div>
 
@@ -559,7 +881,7 @@ export default function StoryBuilderScreen() {
                 {activeScene.dialogues.map((dialogue) => {
                   const character = draft.characters.find((c) => c.id === dialogue.characterId);
                   return (
-                    <div key={dialogue.characterId} className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
+                    <div key={dialogue.id} className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-white">{dialogue.characterName}</p>
                         {character && (
@@ -568,13 +890,37 @@ export default function StoryBuilderScreen() {
                             <span className="rounded-full bg-gold/10 px-2 py-0.5 text-xs text-gold">{character.voiceStyle}</span>
                           </>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => addDialogueLine(activeScene.id, dialogue.characterId)}
+                          className="ml-auto rounded-full border border-white/10 px-2 py-1 text-[11px] font-semibold text-white/60 transition hover:border-gold/25 hover:text-white"
+                        >
+                          Add another
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteDialogueLine(activeScene.id, dialogue.id)}
+                          className="rounded-full border border-red-400/20 px-2 py-1 text-[11px] font-semibold text-red-300 transition hover:bg-red-500/10"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      <textarea
+                        <textarea
                         value={dialogue.text}
-                        onChange={(e) => updateDialogue(activeScene.id, dialogue.characterId, e.target.value)}
+                        onChange={(e) => updateDialogue(activeScene.id, dialogue.id, e.target.value)}
                         placeholder={`Write ${dialogue.characterName}'s dialogue for this scene`}
                         className="textarea min-h-28"
                       />
+                      <select
+                        value={dialogue.voiceStyle || character?.voiceStyle || ""}
+                        onChange={(e) => updateDialogueVoice(activeScene.id, dialogue.id, e.target.value)}
+                        className="input mt-3"
+                      >
+                        <option value="">Select voice for this line...</option>
+                        {voiceOptions.map((voiceStyle) => (
+                          <option key={voiceStyle} value={voiceStyle}>{voiceStyle}</option>
+                        ))}
+                      </select>
                     </div>
                   );
                 })}
@@ -591,7 +937,6 @@ export default function StoryBuilderScreen() {
             <div>
               <p className="mb-3 text-xs uppercase tracking-[0.28em] text-gold">Step 3: Continue or End Story</p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                {draft.scenes.length < MAX_SCENES && (
                   <button
                     type="button"
                     onClick={addNextScene}
@@ -600,13 +945,12 @@ export default function StoryBuilderScreen() {
                     <Plus className="h-4 w-4" />
                     Add Next Scene
                   </button>
-                )}
                 <div className="flex flex-col gap-1 flex-1">
                   <button
                     type="button"
                     onClick={endStory}
                     disabled={!isReadyToContinue}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-sm font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
                   >
                     <Check className="h-4 w-4" />
                     Complete Story & Continue
@@ -632,7 +976,7 @@ export default function StoryBuilderScreen() {
               </p>
               <div className="mt-6 space-y-3">
                 {activeScene.dialogues.map((d) => (
-                  <div key={d.characterId} className="rounded-xl border border-white/5 bg-white/5 p-4">
+                  <div key={d.id} className="rounded-xl border border-white/5 bg-white/5 p-4">
                     <p className="text-sm font-semibold text-white">{d.characterName}</p>
                     <p className="mt-2 text-sm leading-6 text-white/70">{d.text || "No dialogue written."}</p>
                   </div>

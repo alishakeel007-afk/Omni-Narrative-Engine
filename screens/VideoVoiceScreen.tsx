@@ -131,7 +131,7 @@ export default function VideoVoiceScreen() {
                 </p>
                 <Link
                   href="/video"
-                  className="mt-6 inline-flex rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-6 py-3 text-sm font-bold text-slate-950"
+                  className="mt-6 inline-flex rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-6 py-3 text-sm font-bold text-white"
                 >
                   Open Video Studio
                 </Link>

@@ -312,10 +312,10 @@ export default function DashboardScreen() {
           <section className="mt-8 glass-panel rounded-[1.75rem] p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Database Draft Versions</p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">Multi-Draft System</h2>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Saved Story Versions</p>
+                <h2 className="mt-3 text-2xl font-semibold text-white">Story Versions</h2>
                 <p className="mt-2 text-sm leading-7 text-white/65">
-                  Each database story project can keep several draft versions, with one active draft at a time.
+                  Save different versions of the same story, so you can edit freely without losing earlier work.
                 </p>
               </div>
             </div>
@@ -328,7 +328,7 @@ export default function DashboardScreen() {
                       <div>
                         <h3 className="text-lg font-semibold text-white">{project.title}</h3>
                         <p className="mt-1 text-sm text-white/55">
-                          {project.drafts.length} draft version{project.drafts.length === 1 ? "" : "s"} saved in Supabase.
+                          {project.drafts.length} saved version{project.drafts.length === 1 ? "" : "s"} of this story.
                         </p>
                       </div>
                       <button
@@ -336,7 +336,7 @@ export default function DashboardScreen() {
                         onClick={() => createNewDraftVersion(project.id)}
                         className="rounded-full border border-gold/25 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15"
                       >
-                        Create New Draft Version
+                        Save as New Version
                       </button>
                     </div>
 
@@ -350,7 +350,7 @@ export default function DashboardScreen() {
                               : "border-white/10 bg-white/5 text-white/60"
                           }`}
                         >
-                          v{draft.versionNumber} {draft.isActive ? "Active" : draft.status.toLowerCase()}
+                          Version {draft.versionNumber} {draft.isActive ? "Current" : draft.status.toLowerCase()}
                         </span>
                       ))}
                     </div>
@@ -358,7 +358,7 @@ export default function DashboardScreen() {
                 ))
               ) : (
                 <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-sm leading-7 text-white/60">
-                  No Supabase story projects yet. New database-backed projects created through the story API will appear here with all draft versions.
+                  No saved story versions yet. When you save or edit a story, its versions will appear here.
                 </div>
               )}
             </div>

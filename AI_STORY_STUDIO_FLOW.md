@@ -17,12 +17,14 @@ Unlike Guided Mode (which steps the user through a pre-defined cinematic path us
 The entire flow is tied together with a global Stepper:
 
 ### 1. Setup (`/setup`)
-- Users define the foundation of their story: title, multiple genres, tones, total number of scenes, and the character cast.
+- Users define the foundation of their story: title, multiple genres, tones, and the character cast. The story no longer asks for a fixed scene count.
 - For each character, the user specifies a name, role, personality/tone, and a **voice style placeholder** (e.g., "Deep villain voice").
 - When the setup is complete, the app creates a `CreateStoryDraft` object in `localStorage` and transitions to the Story Builder.
 
 ### 2. Story Builder (`/story-builder`)
 - **Scene-by-Scene Authoring**: Users write the action and description for the current scene.
+- **Dynamic Story Length**: Users keep adding scenes until they decide the story is complete.
+- **Scene Flexibility**: Each scene can have its own genre, tone, selected cast, dialogue lines, and voice style choices.
 - **AI Scene Suggestions**: The app provides AI-generated suggestions for the current scene based on previous context. The user can select a suggestion to auto-fill or guide the scene description.
 - **Character-wise Dialogues**: A dedicated section dynamically creates a dialogue textarea for every character present.
 - **Preview Scene**: An interactive modal to preview the scene's title, description, and dialogue lines before moving on.

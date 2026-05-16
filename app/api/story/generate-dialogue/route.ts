@@ -28,6 +28,7 @@ function getGroqFallbackKey() {
 function buildDialoguePrompt(params: {
   characters: { id: string; name: string; role: string; personalityTone: string; voiceStyle: string }[];
   genres: string[];
+  linesPerCharacter: number;
   previousScenes: { sceneNumber: number; title: string; description: string; dialogues?: { characterName: string; text: string }[] }[];
   sceneDescription: string;
   sceneNumber: number;
@@ -66,7 +67,7 @@ ${prevContext}
 Current scene ${params.sceneNumber} description:
 ${params.sceneDescription}
 
-Write one dialogue line for EACH character, relevant to this scene. Each line should:
+Write ${params.linesPerCharacter} dialogue line${params.linesPerCharacter === 1 ? "" : "s"} for EACH character, relevant to this scene. Each line should:
 - Match the character's personality and role
 - Be consistent with previous scenes and dialogues
 - Be suitable for text-to-speech (no stage directions in the text)
@@ -229,6 +230,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { storyTitle, genres, tones, characters, sceneDescription, sceneNumber, previousScenes } = body;
+    const linesPerCharacter = Math.max(1, Math.min(5, Number(body.linesPerCharacter) || 1));
 
     if (!characters || !Array.isArray(characters) || characters.length === 0) {
       return NextResponse.json({ error: "No characters provided." }, { status: 400 });
@@ -253,6 +255,7 @@ export async function POST(request: Request) {
     const prompt = buildDialoguePrompt({
       characters: characters || [],
       genres: genres || ["Cinematic"],
+      linesPerCharacter,
       previousScenes: previousScenes || [],
       sceneDescription: String(sceneDescription).trim(),
       sceneNumber: sceneNumber || 1,

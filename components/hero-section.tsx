@@ -5,7 +5,7 @@ export function HeroSection() {
     <section className="relative overflow-hidden px-2 pb-20 pt-14 sm:px-4 lg:px-6 lg:pb-24 lg:pt-24">
       <div className="mx-auto grid max-w-[1500px] items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
-          <div className="mb-6 inline-flex items-center rounded-full border border-purple-300/20 bg-purple-300/10 px-4 py-2 text-xs uppercase tracking-[0.32em] text-gold">
+          <div className="mb-6 inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs uppercase tracking-[0.32em] text-gold shadow-sm">
             Cinematic AI Studio
           </div>
           <h1 className="max-w-4xl font-[var(--font-heading)] text-4xl leading-tight text-white sm:text-5xl lg:text-7xl">
@@ -32,52 +32,50 @@ export function HeroSection() {
           </div>
         </div>
 
-        <div className="glass-panel gold-ring animate-float rounded-[2rem] p-5 sm:p-6">
-          <div className="rounded-[1.6rem] border border-white/10 bg-[linear-gradient(160deg,rgba(169,92,247,0.24),rgba(7,9,23,0.82))] p-5">
+        <div className="glass-panel gold-ring rounded-[2rem] p-5 sm:p-6">
+          <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">
-                  Cinematic Preview
+                <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
+                  Story Preview
                 </p>
-                <h2 className="mt-2 font-[var(--font-heading)] text-2xl text-white">
+                <h2 className="mt-2 font-[var(--font-heading)] text-2xl text-slate-950">
                   The Whispering Gate
                 </h2>
               </div>
-              <span className="rounded-full border border-gold/20 bg-gold/20 px-3 py-1 text-xs text-gold">
+              <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
                 Scene 1
               </span>
             </div>
 
-            <div className="relative h-72 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(141,183,255,0.3),transparent_30%),linear-gradient(160deg,#111633,#070b1d)]">
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(5,8,22,0.8))]" />
-              <div className="absolute left-6 right-6 top-6 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/70">
+            <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
                   Guided Story
                 </span>
-                <span className="rounded-full border border-starlight/20 bg-starlight/10 px-3 py-1 text-xs text-starlight">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
                   Suspenseful
                 </span>
-                <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">
+                <span className="rounded-full border border-gold/20 bg-white px-3 py-1 text-xs font-semibold text-gold">
                   Memory Active
                 </span>
               </div>
-              <div className="absolute bottom-6 left-6 right-6 space-y-3">
-                <div className="h-2 w-24 rounded-full bg-gradient-to-r from-starlight to-gold" />
-                <p className="max-w-md text-sm leading-7 text-white/82">
-                  The ancient gate trembles as blue light leaks through broken symbols. Your next decision will shape the story.
+              <div className="mt-8 space-y-4">
+                <div className="h-2 w-28 rounded-full bg-blue-600" />
+                <p className="max-w-md text-sm leading-7 text-slate-700">
+                  The ancient gate trembles as blue light leaks through broken symbols. Your next decision will shape the story path.
                 </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              {["AI Choices", "Custom Input", "Memory Sync"].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/72"
-                >
-                  {item}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {["AI Choices", "Custom Input", "Memory Sync"].map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+                    >
+                      {item}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </div>
