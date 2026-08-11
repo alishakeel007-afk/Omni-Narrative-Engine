@@ -98,7 +98,7 @@ export default function SignupScreen() {
           <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
             Create Your Account
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/68">
+          <p className="mt-4 text-sm leading-7 text-white/90">
             Register with email and password to save your story progress and access the protected Omni-Narrative Engine experience.
           </p>
 
@@ -140,7 +140,7 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/68">
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
               <p className="font-semibold text-white">Password Rules</p>
               <ul className="mt-3 space-y-2">
                 {[
@@ -150,7 +150,7 @@ export default function SignupScreen() {
                   ["At least 1 number", passwordRules.hasNumber],
                   ["At least 1 special character", passwordRules.hasSpecialCharacter]
                 ].map(([label, passed]) => (
-                  <li key={String(label)} className={passed ? "text-starlight" : "text-white/58"}>
+                  <li key={String(label)} className={passed ? "text-starlight" : "text-white/85"}>
                     {passed ? "Passed:" : "Required:"} {label}
                   </li>
                 ))}
@@ -172,7 +172,7 @@ export default function SignupScreen() {
             </button>
           </form>
 
-          <div className="mt-6 text-sm text-white/68">
+          <div className="mt-6 text-sm text-white/90">
             Already have an account?{' '}
             <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
               Login here
@@ -220,7 +220,7 @@ function PasswordInput({
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
         aria-label="Toggle password visibility"
       >
         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

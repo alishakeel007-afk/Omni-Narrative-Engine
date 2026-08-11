@@ -6,6 +6,7 @@ import type {
   MovieScene,
   VideoGenerationResponse
 } from "@/types/video";
+import { getEnvValue } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -13,51 +14,7 @@ const DEEPGRAM_TTS_ENDPOINT = "https://api.deepgram.com/v1/speak";
 const DEFAULT_DEEPGRAM_TTS_MODEL = "aura-2-thalia-en";
 const MAX_AUDIO_LINES = 18;
 
-type EnvMap = Record<string, string>;
 
-function loadLooseEnvFile(filename: string): EnvMap {
-  try {
-    const content = readFileSync(join(process.cwd(), filename), "utf8");
-    return content.split(/\r?\n/).reduce<EnvMap>((accumulator, line) => {
-      const trimmed = line.trim();
-
-      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
-        return accumulator;
-      }
-
-      const [rawKey, ...valueParts] = trimmed.split("=");
-      const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
-      accumulator[rawKey.trim().toLowerCase()] = value;
-      return accumulator;
-    }, {});
-  } catch {
-    return {};
-  }
-}
-
-const looseEnv = {
-  ...loadLooseEnvFile(".env.example"),
-  ...loadLooseEnvFile(".env"),
-  ...loadLooseEnvFile(".env.local")
-};
-
-function getEnvValue(names: string[]) {
-  for (const name of names) {
-    const runtimeValue = process.env[name];
-
-    if (runtimeValue) {
-      return runtimeValue;
-    }
-
-    const looseValue = looseEnv[name.toLowerCase()];
-
-    if (looseValue) {
-      return looseValue;
-    }
-  }
-
-  return "";
-}
 
 function getSubmittedScript(value: unknown): VideoGenerationResponse | null {
   if (!value || typeof value !== "object") {

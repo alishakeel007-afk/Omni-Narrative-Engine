@@ -3,7 +3,7 @@ import type { HealthStatus, StorySetupData } from "@/types/story";
 export type {
   ChoiceType,
   DummySceneTemplate,
-  GeneratedMediaMock,
+  GeneratedMedia,
   HealthStatus,
   MemoryItem,
   PersistedStoryState,

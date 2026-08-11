@@ -31,7 +31,7 @@ export default function ScreenLayout({
             ) : null}
 
             {description ? (
-              <p className="mt-4 text-sm leading-7 text-white/68">{description}</p>
+              <p className="mt-4 text-sm leading-7 text-white/90">{description}</p>
             ) : null}
           </div>
         )}

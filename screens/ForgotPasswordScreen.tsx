@@ -49,7 +49,7 @@ export default function ForgotPasswordScreen() {
           <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
             Reset Your Password
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/68">
+          <p className="mt-4 text-sm leading-7 text-white/90">
             Enter your email address and we will send a password reset link to your inbox.
           </p>
 
@@ -86,7 +86,7 @@ export default function ForgotPasswordScreen() {
             </button>
           </form>
 
-          <div className="mt-6 text-sm text-white/68">
+          <div className="mt-6 text-sm text-white/90">
             <Link href="/auth" className="text-starlight transition hover:text-gold">
               Back to Login
             </Link>

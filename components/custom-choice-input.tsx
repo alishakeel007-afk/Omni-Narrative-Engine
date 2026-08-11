@@ -33,7 +33,7 @@ export function CustomChoiceInput({ value, onChange, onSelect }: CustomChoiceInp
         Use My Choice
       </button>
       {!value.trim() ? (
-        <p className="mt-3 text-xs leading-6 text-white/52">
+        <p className="mt-3 text-xs leading-6 text-white/85">
           Enter a custom action to replace the AI suggested choice.
         </p>
       ) : null}

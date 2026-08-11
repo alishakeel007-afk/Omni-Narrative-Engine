@@ -15,7 +15,7 @@ export function DashboardCard({
         accent === "gold" ? "gold-ring" : ""
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.28em] text-white/45">{title}</p>
+      <p className="text-xs uppercase tracking-[0.28em] text-white/75">{title}</p>
       <h3
         className={`mt-4 text-2xl font-semibold ${
           accent === "gold" ? "text-gold" : "text-white"

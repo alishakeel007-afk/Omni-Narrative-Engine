@@ -39,7 +39,7 @@ export default function StoryHistoryScreen() {
                     {scene.chapter} - Scene {scene.sceneNumber}
                   </p>
                   <h2 className="mt-2 text-xl font-semibold text-white">{scene.title}</h2>
-                  <p className="mt-1 text-sm text-white/52">{scene.location}</p>
+                  <p className="mt-1 text-sm text-white/85">{scene.location}</p>
                 </div>
                 {isCurrent ? (
                   <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">

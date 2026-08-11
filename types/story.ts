@@ -54,7 +54,7 @@ export type StoryCharacter = {
   visualAppearance: string;
 };
 
-export type GeneratedMediaMock = {
+export type GeneratedMedia = {
   audioMoodPrompt: string;
   backgroundMusicMood: string;
   imageLabel: string;
@@ -68,7 +68,7 @@ export type StoryScene = {
   cast: StoryCharacter[];
   chapter: string;
   location: string;
-  media: GeneratedMediaMock;
+  media: GeneratedMedia;
   mood: string;
   options: string[];
   sceneNumber: number;
@@ -91,7 +91,7 @@ export type PersistedStoryState = {
   currentScene: StoryScene;
   currentSceneIndex: number;
   customChoiceInput: string;
-  generatedMedia: GeneratedMediaMock;
+  generatedMedia: GeneratedMedia;
   healthStatus: HealthStatus;
   inventory: string[];
   isLoading: boolean;
@@ -107,7 +107,7 @@ export type DummySceneTemplate = {
   chapter: string;
   inventoryHint?: string;
   location: string;
-  media: Omit<GeneratedMediaMock, "imageLabel" | "imagePrompt" | "audioMoodPrompt"> & {
+  media: Omit<GeneratedMedia, "imageLabel" | "imagePrompt" | "audioMoodPrompt"> & {
     baseAudioMoodPrompt: string;
     baseImagePrompt: string;
   };

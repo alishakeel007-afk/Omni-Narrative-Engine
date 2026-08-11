@@ -10,8 +10,9 @@ import {
 import { createMemoryItem } from "@/services/memoryService";
 import {
   createInitialStoryState,
-  generateMoreOptions,
-  generateNextScene
+  generateNextSceneFromAI,
+  generateAlternativeOptionsFromAI,
+  generateInitialSceneFromAI
 } from "@/services/storyService";
 import {
   DEFAULT_STORY_SETUP,
@@ -261,10 +262,27 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const beginStoryFromSetup = () => {
-    const nextState = createInitialStoryState(setup);
-    setState(nextState);
-    window.localStorage.setItem(STORY_PROGRESS_STORAGE_KEY, JSON.stringify(nextState));
+  const beginStoryFromSetup = async () => {
+    setState((current) => ({
+      ...current,
+      isLoading: true
+    }));
+
+    try {
+      const initialScene = await generateInitialSceneFromAI(setup);
+      const nextState = createInitialStoryState(setup);
+      nextState.currentScene = initialScene;
+      nextState.generatedMedia = initialScene.media;
+      
+      setState(nextState);
+      saveSetupOnly();
+    } catch (error) {
+      console.error(error);
+      // Fallback
+      const nextState = createInitialStoryState(setup);
+      setState(nextState);
+      saveSetupOnly();
+    }
   };
 
   const selectSuggestedChoice = (choice: string) => {
@@ -297,19 +315,32 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
-  const generateAlternativeOptions = () => {
+  const generateAlternativeOptions = async () => {
     setState((current) => ({
       ...current,
-      currentScene: {
-        ...current.currentScene,
-        options: generateMoreOptions(current.currentScene, setup)
-      },
-      selectedChoice: "",
-      selectedChoiceType: null
+      isLoading: true
     }));
+    try {
+      const newOptions = await generateAlternativeOptionsFromAI(state.currentScene, setup);
+      setState((current) => ({
+        ...current,
+        currentScene: {
+          ...current.currentScene,
+          options: newOptions
+        },
+        isLoading: false,
+        selectedChoice: "",
+        selectedChoiceType: null
+      }));
+    } catch (e) {
+      setState((current) => ({
+        ...current,
+        isLoading: false,
+      }));
+    }
   };
 
-  const continueStory = () => {
+  const continueStory = async () => {
     if (!state.selectedChoice || !state.selectedChoiceType) return;
 
     setState((current) => ({
@@ -317,41 +348,48 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       isLoading: true
     }));
 
-    window.setTimeout(() => {
-      setState((current) => {
-        const nextSceneResult = generateNextScene({
-          choice: current.selectedChoice,
-          choiceType: current.selectedChoiceType as ChoiceType,
-          currentSceneIndex: current.currentSceneIndex,
-          healthStatus: current.healthStatus,
-          inventory: current.inventory,
-          setup
-        });
-
-        const memoryItem = createMemoryItem({
-          choiceType: current.selectedChoiceType as ChoiceType,
-          result: nextSceneResult.resultSummary,
-          scene: current.currentScene,
-          update: nextSceneResult.updateSummary,
-          userChoice: current.selectedChoice
-        });
-
-        return {
-          ...current,
-          currentScene: nextSceneResult.currentScene,
-          currentSceneIndex: nextSceneResult.currentSceneIndex,
-          customChoiceInput: setup.mode === "custom" ? setup.startingIdea : "",
-          generatedMedia: nextSceneResult.generatedMedia,
-          healthStatus: nextSceneResult.healthStatus,
-          inventory: nextSceneResult.inventory,
-          isLoading: false,
-          memoryTimeline: [...current.memoryTimeline, memoryItem],
-          pastScenes: [...current.pastScenes, current.currentScene],
-          selectedChoice: "",
-          selectedChoiceType: null
-        };
+    try {
+      const nextSceneResult = await generateNextSceneFromAI({
+        choice: state.selectedChoice,
+        choiceType: state.selectedChoiceType as ChoiceType,
+        currentSceneIndex: state.currentSceneIndex,
+        healthStatus: state.healthStatus,
+        inventory: state.inventory,
+        setup,
+        memoryTimeline: state.memoryTimeline,
+        currentScene: state.currentScene,
+        pastScenes: state.pastScenes
       });
-    }, 1400);
+
+      const memoryItem = createMemoryItem({
+        choiceType: state.selectedChoiceType as ChoiceType,
+        result: nextSceneResult.resultSummary,
+        scene: state.currentScene,
+        update: nextSceneResult.updateSummary,
+        userChoice: state.selectedChoice
+      });
+
+      setState((current) => ({
+        ...current,
+        currentScene: nextSceneResult.currentScene,
+        currentSceneIndex: nextSceneResult.currentSceneIndex,
+        customChoiceInput: setup.mode === "custom" ? setup.startingIdea : "",
+        generatedMedia: nextSceneResult.generatedMedia,
+        healthStatus: nextSceneResult.healthStatus,
+        inventory: nextSceneResult.inventory,
+        isLoading: false,
+        memoryTimeline: [...current.memoryTimeline, memoryItem],
+        pastScenes: [...current.pastScenes, current.currentScene],
+        selectedChoice: "",
+        selectedChoiceType: null
+      }));
+    } catch (error) {
+      console.error(error);
+      setState((current) => ({
+        ...current,
+        isLoading: false
+      }));
+    }
   };
 
   const restartStory = () => {

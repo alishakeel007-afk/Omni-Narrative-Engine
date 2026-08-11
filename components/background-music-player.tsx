@@ -53,7 +53,7 @@ export default function BackgroundMusicPlayer({ sceneMood, sceneTitle, audioProm
               <audio ref={audioRef} src={trackUrl} controls className="w-48" />
             </div>
           ) : (
-            <span className="text-sm text-white/50">No track</span>
+            <span className="text-sm text-white/85">No track</span>
           )}
         </div>
       </div>

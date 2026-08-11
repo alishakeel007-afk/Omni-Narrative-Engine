@@ -72,7 +72,7 @@ export default function AuthScreen() {
           <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
             Return to Your Story
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/68">
+          <p className="mt-4 text-sm leading-7 text-white/90">
             Log in to access your dashboard, continue your saved story, and manage your AI-driven narrative sessions.
           </p>
 
@@ -99,7 +99,7 @@ export default function AuthScreen() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
                   aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -122,7 +122,7 @@ export default function AuthScreen() {
             </button>
           </form>
 
-          <div className="mt-6 flex flex-col gap-3 text-sm text-white/68 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-3 text-sm text-white/90 sm:flex-row sm:items-center sm:justify-between">
             <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
               Create an account
             </Link>

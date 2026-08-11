@@ -34,7 +34,7 @@ export default function StoryStateScreen() {
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-starlight/75">Identity</p>
               <h2 className="mt-3 text-2xl font-semibold text-white">{setup.characterName}</h2>
-              <p className="mt-2 text-sm text-white/64">{setup.characterRole}</p>
+              <p className="mt-2 text-sm text-white/90">{setup.characterRole}</p>
             </div>
             <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">
               {setup.difficulty}
@@ -117,7 +117,7 @@ export default function StoryStateScreen() {
 function StateField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1rem] border border-white/10 bg-white/5 p-4">
-      <p className="text-xs uppercase tracking-[0.22em] text-white/45">{label}</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-white/75">{label}</p>
       <p className="mt-2 text-sm font-medium capitalize text-white/82">{value}</p>
     </div>
   );

@@ -20,7 +20,7 @@ export default function HomeScreen() {
                 Core Features of Omni-Narrative Engine
               </h2>
             </div>
-            <p className="max-w-2xl text-sm leading-7 text-white/65">
+            <p className="max-w-2xl text-sm leading-7 text-white/90">
               Everything needed to create interactive, consistent, and multimedia AI stories.
             </p>
           </div>
@@ -42,7 +42,7 @@ export default function HomeScreen() {
                 <h2 className="mt-3 font-[var(--font-heading)] text-3xl text-white sm:text-4xl">
                   The user is never locked into one path.
                 </h2>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-white/68">
+                <p className="mt-5 max-w-2xl text-base leading-8 text-white/90">
                   Users can follow AI-guided choices, write their own story direction, or build a complete cinematic story through AI Story Studio. This makes the system flexible for both beginners and creative users.
                 </p>
               </div>
@@ -59,7 +59,7 @@ export default function HomeScreen() {
                     className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5"
                   >
                     <h3 className="text-lg font-semibold text-white">{title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-white/64">{description}</p>
+                    <p className="mt-3 text-sm leading-7 text-white/90">{description}</p>
                   </div>
                 ))}
               </div>

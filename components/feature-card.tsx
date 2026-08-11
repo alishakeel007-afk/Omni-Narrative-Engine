@@ -13,7 +13,7 @@ export function FeatureCard({ title, description, icon: Icon }: FeatureCardProps
         <Icon className="h-5 w-5" />
       </div>
       <h3 className="text-lg font-semibold text-white">{title}</h3>
-      <p className="mt-3 text-sm leading-7 text-white/65">{description}</p>
+      <p className="mt-3 text-sm leading-7 text-white/90">{description}</p>
     </article>
   );
 }

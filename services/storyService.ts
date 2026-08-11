@@ -8,8 +8,9 @@ import {
 import type {
   ChoiceType,
   DummySceneTemplate,
-  GeneratedMediaMock,
+  GeneratedMedia,
   HealthStatus,
+  MemoryItem,
   PersistedStoryState,
   StoryScene,
   StorySetupData
@@ -43,7 +44,7 @@ export function buildGeneratedMedia(
   template: DummySceneTemplate,
   setup: StorySetupData,
   decisionHint?: string
-): GeneratedMediaMock {
+): GeneratedMedia {
   const suffix = decisionHint ? ` Decision influence: ${decisionHint}.` : "";
 
   return {
@@ -201,4 +202,109 @@ export function generateNextScene(params: {
     resultSummary,
     updateSummary: `Choice type: ${params.choiceType}. Mood shifts to ${nextScene.mood}, location updates to ${nextScene.location}, and inventory now includes ${addedItem}.`
   };
+}
+
+export async function generateInitialSceneFromAI(setup: StorySetupData): Promise<StoryScene> {
+  const response = await fetch("/api/story/generate-scene", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      setup,
+      choice: "Start the story.",
+      memoryTimeline: [],
+      currentScene: null,
+      sceneNumber: 1
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to generate initial scene from AI.");
+  }
+
+  const { scene } = await response.json();
+  return scene as StoryScene;
+}
+
+export async function generateNextSceneFromAI(params: {
+  choice: string;
+  choiceType: ChoiceType;
+  currentSceneIndex: number;
+  healthStatus: HealthStatus;
+  inventory: string[];
+  setup: StorySetupData;
+  memoryTimeline: MemoryItem[];
+  currentScene: StoryScene;
+  pastScenes: StoryScene[];
+}) {
+  const nextIndex = params.currentSceneIndex + 1;
+
+  const response = await fetch("/api/story/generate-scene", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      setup: params.setup,
+      choice: params.choice,
+      memoryTimeline: params.memoryTimeline,
+      currentScene: params.currentScene,
+      sceneNumber: nextIndex + 1
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to generate next scene from AI.");
+  }
+
+  const { scene } = await response.json();
+  const nextScene = scene as StoryScene;
+
+  const resultSummary = `${titleCase(params.choice)} changes the tension of the scene and pushes the story toward ${nextScene.location}.`;
+  const nextHealthStatus = applyStatusDelta(params.healthStatus, params.choice);
+  const nextInventory = applyInventoryUpdate(params.inventory, params.choice, nextIndex);
+  const addedItem = nextInventory[nextInventory.length - 1];
+
+  return {
+    addedItem,
+    currentScene: nextScene,
+    currentSceneIndex: nextIndex,
+    generatedMedia: nextScene.media,
+    healthStatus: nextHealthStatus,
+    inventory: nextInventory,
+    resultSummary,
+    updateSummary: `Choice type: ${params.choiceType}. Mood shifts to ${nextScene.mood}, location updates to ${nextScene.location}, and inventory now includes ${addedItem}.`
+  };
+}
+
+export async function generateAlternativeOptionsFromAI(scene: StoryScene, setup: StorySetupData): Promise<string[]> {
+  // We can reuse the generate-scene endpoint by asking for choices only, but since we are replacing options,
+  // we can also hit generate-scene and just grab the options. To save time, we will just prompt generate-scene 
+  // with a small choice like "Think of 3 different options."
+  // Wait, a better way is to create a small specific prompt for options, but for now we can fallback to the standard one 
+  // if we don't have a specific endpoint. 
+  // Actually, we already have suggest-scene API we could use for options!
+  
+  const response = await fetch("/api/story/suggest-scene", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      characters: setup.characters,
+      currentSceneDescription: scene.text,
+      genres: setup.genres,
+      previousScenes: [], 
+      sceneGenre: setup.genre,
+      sceneNumber: scene.sceneNumber,
+      sceneTitle: scene.title,
+      sceneTone: scene.mood,
+      storyTitle: setup.storyTitle,
+      tones: setup.moods
+    }),
+  });
+
+  if (response.ok) {
+    const { suggestions } = await response.json();
+    if (suggestions && suggestions.length > 0) {
+      return suggestions;
+    }
+  }
+
+  return generateMoreOptions(scene, setup);
 }

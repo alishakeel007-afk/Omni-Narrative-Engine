@@ -126,7 +126,7 @@ export default function VideoVoiceScreen() {
               <div>
                 <Sparkles className="mx-auto h-10 w-10 text-gold" />
                 <h2 className="mt-5 text-2xl font-semibold text-white">No confirmed film sequence found</h2>
-                <p className="mt-3 text-sm text-white/60">
+                <p className="mt-3 text-sm text-white/90">
                   Generate and confirm a script in Video Studio before creating voices.
                 </p>
                 <Link
@@ -191,7 +191,7 @@ export default function VideoVoiceScreen() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-28 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-white/42">{label}</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/75">{label}</p>
       <p className="mt-2 text-sm font-semibold text-white">{value}</p>
     </div>
   );
@@ -208,12 +208,12 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
           <span className="rounded-full border border-starlight/20 bg-starlight/10 px-3 py-1 text-xs text-starlight">
             {scene.mood}
           </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/65">
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/90">
             {scene.sceneTone}
           </span>
         </div>
         <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
-        <p className="mt-2 text-sm text-white/55">{scene.location}</p>
+        <p className="mt-2 text-sm text-white/85">{scene.location}</p>
       </div>
 
       <div className="grid gap-5 p-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -225,7 +225,7 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
         <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
           <div className="mb-4 flex items-center gap-2">
             <Mic2 className="h-4 w-4 text-gold" />
-            <p className="text-xs uppercase tracking-[0.26em] text-white/45">Generated Voice Clips</p>
+            <p className="text-xs uppercase tracking-[0.26em] text-white/75">Generated Voice Clips</p>
           </div>
 
           <div className="space-y-3">
@@ -244,7 +244,7 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
                 {dialogue.audioUrl ? (
                   <audio controls src={dialogue.audioUrl} className="mt-3 w-full" />
                 ) : (
-                  <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/48">
+                  <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/75">
                     {dialogue.audioError ?? "Waiting for voice generation."}
                   </p>
                 )}
@@ -260,7 +260,7 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
 function ReadOnlyBlock({ label, text }: { label: string; text: string }) {
   return (
     <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
-      <p className="text-xs uppercase tracking-[0.24em] text-white/42">{label}</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-white/75">{label}</p>
       <p className="mt-3 text-sm leading-7 text-white/72">{text}</p>
     </div>
   );

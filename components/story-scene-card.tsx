@@ -25,7 +25,7 @@ export function StorySceneCard({
             Generated Scene Art
           </div>
           <div className="absolute bottom-5 left-5 right-5">
-            <p className="max-w-xl text-sm text-white/68">{imageLabel}</p>
+            <p className="max-w-xl text-sm text-white/90">{imageLabel}</p>
           </div>
         </div>
       </div>

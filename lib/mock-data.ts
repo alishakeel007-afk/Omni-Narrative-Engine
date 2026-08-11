@@ -168,10 +168,4 @@ export const starterMemory = [
   }
 ];
 
-export const dashboardStats = [
-  { label: "Saved Stories", value: "12" },
-  { label: "Favorite Genres", value: "Fantasy, Mystery" },
-  { label: "Recent Sessions", value: "4 this week" },
-  { label: "Total Scenes Generated", value: "148" },
-  { label: "Total Custom Choices Made", value: "57" }
-];
+

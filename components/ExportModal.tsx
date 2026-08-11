@@ -113,7 +113,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
             <h3 className="text-lg font-[var(--font-heading)] text-white">Export & End Story</h3>
             <p className="mt-1 text-sm text-white/70">Finalize this run and export as text or play TTS audio.</p>
           </div>
-          <button onClick={onClose} className="text-white/60">Close</button>
+          <button onClick={onClose} className="text-white/90">Close</button>
         </div>
 
         <div className="mt-4 grid gap-3">

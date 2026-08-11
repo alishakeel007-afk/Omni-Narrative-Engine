@@ -82,7 +82,7 @@ export default function StoryExports() {
               <div className="rounded-md border border-white/8 bg-black/15 p-4">
                 <p className="text-sm text-white/70">Title</p>
                 <h4 className="mt-1 text-lg text-white">{record.title}</h4>
-                <p className="mt-2 text-xs text-white/60">Finalized: {new Date(record.endedAt).toLocaleString()}</p>
+                <p className="mt-2 text-xs text-white/90">Finalized: {new Date(record.endedAt).toLocaleString()}</p>
               </div>
 
               <div className="rounded-md border border-white/8 bg-black/12 p-4">

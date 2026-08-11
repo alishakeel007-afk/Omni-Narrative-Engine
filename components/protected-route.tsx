@@ -33,7 +33,7 @@ export function ProtectedRoute({
             <h1 className="mt-3 font-[var(--font-heading)] text-3xl text-white">
               Checking access...
             </h1>
-            <p className="mt-4 text-sm leading-7 text-white/68">
+            <p className="mt-4 text-sm leading-7 text-white/90">
               Securing your story session and validating account access.
             </p>
           </div>

@@ -88,7 +88,7 @@ export default function ResetPasswordScreen() {
           <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
             Reset Password
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/68">
+          <p className="mt-4 text-sm leading-7 text-white/90">
             Please enter your new password below.
           </p>
 
@@ -117,7 +117,7 @@ export default function ResetPasswordScreen() {
                 />
               </Field>
 
-              <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/68">
+              <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
                 <p className="font-semibold text-white">Password Rules</p>
                 <ul className="mt-3 space-y-2">
                   {[
@@ -127,7 +127,7 @@ export default function ResetPasswordScreen() {
                     ["At least 1 number", passwordRules.hasNumber],
                     ["At least 1 special character", passwordRules.hasSpecialCharacter]
                   ].map(([label, passed]) => (
-                    <li key={String(label)} className={passed ? "text-starlight" : "text-white/58"}>
+                    <li key={String(label)} className={passed ? "text-starlight" : "text-white/85"}>
                       {passed ? "Passed:" : "Required:"} {label}
                     </li>
                   ))}
@@ -150,7 +150,7 @@ export default function ResetPasswordScreen() {
             </form>
           )}
 
-          <div className="mt-6 text-center text-sm text-white/68">
+          <div className="mt-6 text-center text-sm text-white/90">
             <Link href="/auth" className="text-starlight transition hover:text-gold">
               Back to Login
             </Link>
@@ -197,7 +197,7 @@ function PasswordInput({
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
         aria-label="Toggle password visibility"
       >
         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

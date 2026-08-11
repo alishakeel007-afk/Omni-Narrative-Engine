@@ -238,7 +238,7 @@ export default function DashboardScreen() {
             >
               <p className="text-xs uppercase tracking-[0.28em] text-gold">{activeResumeTarget.label}</p>
               <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">{activeResumeTarget.description}</p>
+              <p className="mt-3 text-sm leading-7 text-white/90">{activeResumeTarget.description}</p>
             </Link>
 
             <Link
@@ -247,7 +247,7 @@ export default function DashboardScreen() {
             >
               <p className="text-xs uppercase tracking-[0.28em] text-starlight/78">Start New Story</p>
               <h2 className="mt-4 text-2xl font-semibold text-white">Create Fresh Setup</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">
+              <p className="mt-3 text-sm leading-7 text-white/90">
                 Pick a genre, define a protagonist, and choose guided or custom story mode.
               </p>
             </Link>
@@ -259,7 +259,7 @@ export default function DashboardScreen() {
             >
               <p className="text-xs uppercase tracking-[0.28em] text-gold">Create Your Own Story</p>
               <h2 className="mt-4 text-2xl font-semibold text-white">Custom Scene Builder</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">
+              <p className="mt-3 text-sm leading-7 text-white/90">
                 Write scenes and character dialogue yourself, then generate voices, music, and a preview placeholder.
               </p>
             </button>
@@ -270,7 +270,7 @@ export default function DashboardScreen() {
             >
               <p className="text-xs uppercase tracking-[0.28em] text-gold">Video Studio</p>
               <h2 className="mt-4 text-2xl font-semibold text-white">Build Movie Scenes</h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">
+              <p className="mt-3 text-sm leading-7 text-white/90">
                 Turn one scenario into scene-by-scene script, dialogue, prompts, and voice audio.
               </p>
             </Link>
@@ -278,9 +278,9 @@ export default function DashboardScreen() {
             <div className="glass-panel rounded-[1.75rem] p-6">
               <div className="flex items-start justify-between gap-3">
                 <Link href={activeResumeTarget.href} className="min-w-0 flex-1">
-                  <p className="text-xs uppercase tracking-[0.28em] text-white/45">Saved Stories</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-white/75">Saved Stories</p>
                   <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
-                  <p className="mt-3 text-sm leading-7 text-white/65">{activeResumeTarget.description}</p>
+                  <p className="mt-3 text-sm leading-7 text-white/90">{activeResumeTarget.description}</p>
                 </Link>
                 {activeResumeTarget.canDelete ? (
                   <button
@@ -295,11 +295,11 @@ export default function DashboardScreen() {
             </div>
 
             <div className="glass-panel rounded-[1.75rem] p-6">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Recent Sessions</p>
+              <p className="text-xs uppercase tracking-[0.28em] text-white/75">Recent Sessions</p>
               <h2 className="mt-4 text-2xl font-semibold text-white">
                 {hasProgress ? `Scene ${currentScene}` : "Waiting to Begin"}
               </h2>
-              <p className="mt-3 text-sm leading-7 text-white/65">{recentSessionLabel}</p>
+              <p className="mt-3 text-sm leading-7 text-white/90">{recentSessionLabel}</p>
             </div>
           </div>
 
@@ -312,9 +312,9 @@ export default function DashboardScreen() {
           <section className="mt-8 glass-panel rounded-[1.75rem] p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Saved Story Versions</p>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/75">Saved Story Versions</p>
                 <h2 className="mt-3 text-2xl font-semibold text-white">Story Versions</h2>
-                <p className="mt-2 text-sm leading-7 text-white/65">
+                <p className="mt-2 text-sm leading-7 text-white/90">
                   Save different versions of the same story, so you can edit freely without losing earlier work.
                 </p>
               </div>
@@ -327,7 +327,7 @@ export default function DashboardScreen() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-white">{project.title}</h3>
-                        <p className="mt-1 text-sm text-white/55">
+                        <p className="mt-1 text-sm text-white/85">
                           {project.drafts.length} saved version{project.drafts.length === 1 ? "" : "s"} of this story.
                         </p>
                       </div>
@@ -347,7 +347,7 @@ export default function DashboardScreen() {
                           className={`rounded-full border px-3 py-1 text-xs ${
                             draft.isActive
                               ? "border-gold/30 bg-gold/10 text-gold"
-                              : "border-white/10 bg-white/5 text-white/60"
+                              : "border-white/10 bg-white/5 text-white/90"
                           }`}
                         >
                           Version {draft.versionNumber} {draft.isActive ? "Current" : draft.status.toLowerCase()}
@@ -357,7 +357,7 @@ export default function DashboardScreen() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-sm leading-7 text-white/60">
+                <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-sm leading-7 text-white/90">
                   No saved story versions yet. When you save or edit a story, its versions will appear here.
                 </div>
               )}

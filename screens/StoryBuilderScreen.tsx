@@ -612,7 +612,7 @@ export default function StoryBuilderScreen() {
         <div className="grid gap-6 xl:grid-cols-[0.28fr_1fr]">
           {/* Scene List Sidebar */}
           <aside className="glass-panel h-fit rounded-[1.5rem] p-5">
-            <p className="text-xs uppercase tracking-[0.28em] text-white/45">Scenes</p>
+            <p className="text-xs uppercase tracking-[0.28em] text-white/75">Scenes</p>
             <div className="mt-4 space-y-2">
               {draft.scenes.map((scene) => (
                 <div key={scene.id} className="relative group">
@@ -622,7 +622,7 @@ export default function StoryBuilderScreen() {
                     className={`w-full rounded-[1rem] border px-4 py-3 text-left transition ${
                       activeScene.id === scene.id
                         ? "border-gold/35 bg-gold/10 text-white"
-                        : "border-white/10 bg-black/20 text-white/65 hover:border-starlight/25"
+                        : "border-white/10 bg-black/20 text-white/90 hover:border-starlight/25"
                     }`}
                   >
                     <span className="block text-xs uppercase tracking-[0.2em] text-starlight/70">
@@ -648,7 +648,7 @@ export default function StoryBuilderScreen() {
                             onClick={() => setDeleteConfirmId(null)}
                             className="rounded-full bg-white/10 p-1"
                           >
-                            <X className="h-3 w-3 text-white/60" />
+                            <X className="h-3 w-3 text-white/90" />
                           </button>
                         </div>
                       ) : (
@@ -736,7 +736,7 @@ export default function StoryBuilderScreen() {
                         className={`rounded-[1.2rem] border p-4 text-left text-sm leading-7 transition ${
                           activeScene.selectedSuggestion === suggestion
                             ? "border-gold/35 bg-gold/10 text-white"
-                            : "border-white/10 bg-black/20 text-white/66 hover:border-starlight/25"
+                            : "border-white/10 bg-black/20 text-white/90 hover:border-starlight/25"
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between">
@@ -802,7 +802,7 @@ export default function StoryBuilderScreen() {
                         className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
                           activeScene.activeCharacterIds.includes(character.id)
                             ? "border-gold/35 bg-gold/10 text-gold"
-                            : "border-white/10 bg-white/5 text-white/60 hover:border-starlight/25"
+                            : "border-white/10 bg-white/5 text-white/90 hover:border-starlight/25"
                         }`}
                       >
                         {character.name}
@@ -893,7 +893,7 @@ export default function StoryBuilderScreen() {
                         <button
                           type="button"
                           onClick={() => addDialogueLine(activeScene.id, dialogue.characterId)}
-                          className="ml-auto rounded-full border border-white/10 px-2 py-1 text-[11px] font-semibold text-white/60 transition hover:border-gold/25 hover:text-white"
+                          className="ml-auto rounded-full border border-white/10 px-2 py-1 text-[11px] font-semibold text-white/90 transition hover:border-gold/25 hover:text-white"
                         >
                           Add another
                         </button>
@@ -956,7 +956,7 @@ export default function StoryBuilderScreen() {
                     Complete Story & Continue
                   </button>
                   {!isReadyToContinue && (
-                    <p className="mt-2 text-xs text-white/40 italic">
+                    <p className="mt-2 text-xs text-white/75 italic">
                       Please ensure each scene has a title and description to continue.
                     </p>
                   )}

@@ -274,7 +274,7 @@ export default function AudioGenerationScreen() {
               <h2 className="mt-2 font-[var(--font-heading)] text-3xl text-white">
                 {draft.storyTitle}
               </h2>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/68">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/90">
                 {draft.scenes.length} scene{draft.scenes.length === 1 ? "" : "s"} prepared with {totalDialogueLines} dialogue line{totalDialogueLines === 1 ? "" : "s"}.
               </p>
             </div>
@@ -302,7 +302,7 @@ export default function AudioGenerationScreen() {
                 {draft.audio.voiceStatus === "ready" ? "Regenerate Voices" : "Generate Voices"}
               </button>
               {draft.audio.voiceStatus === "idle" && (
-                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter">Required for music</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter">Required for music</p>
               )}
             </div>
 
@@ -321,7 +321,7 @@ export default function AudioGenerationScreen() {
                 {draft.audio.backgroundMusicStatus === "ready" ? "Regenerate Music" : "Generate Music"}
               </button>
               {draft.audio.voiceStatus !== "ready" && (
-                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Generate voices first</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Generate voices first</p>
               )}
             </div>
 
@@ -342,7 +342,7 @@ export default function AudioGenerationScreen() {
                 voiceAudioUrls={draft.scenes.flatMap(scene => scene.dialogues.map(d => (d as any).audioUrl))}
               />
               {draft.audio.backgroundMusicStatus !== "ready" && (
-                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Music required</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Music required</p>
               )}
             </div>
 
@@ -357,7 +357,7 @@ export default function AudioGenerationScreen() {
                 Generate Video
               </button>
               {!canGenerateVideo && (
-                <p className="mt-1 text-center text-[10px] text-white/40 uppercase tracking-tighter italic">Complete all audio</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio</p>
               )}
             </div>
           </div>
@@ -420,7 +420,7 @@ export default function AudioGenerationScreen() {
                     {(dialogue as any).audioUrl ? (
                       <audio controls src={(dialogue as any).audioUrl} className="mt-3 w-full" />
                     ) : (
-                      <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/48">
+                      <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/75">
                         Waiting for voice generation.
                       </p>
                     )}
@@ -438,7 +438,7 @@ export default function AudioGenerationScreen() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-28 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-white/42">{label}</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/75">{label}</p>
       <p className="mt-2 text-sm font-semibold capitalize text-white">{value}</p>
     </div>
   );
@@ -469,7 +469,7 @@ function StatusPanel({
         )}
         <p className="text-sm font-semibold capitalize text-white">{status}</p>
       </div>
-      <p className="mt-2 text-sm leading-6 text-white/62">{message}</p>
+      <p className="mt-2 text-sm leading-6 text-white/90">{message}</p>
     </div>
   );
 }

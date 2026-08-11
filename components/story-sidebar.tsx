@@ -50,7 +50,7 @@ export function StorySidebar({
           {inventory.map((item) => (
             <span
               key={item}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/65"
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/90"
             >
               {item}
             </span>
@@ -87,13 +87,13 @@ export function StorySidebar({
           <RefreshCcw className="h-4 w-4" />
           Restart Story
         </button>
-        <div className="rounded-[1.35rem] border border-white/10 bg-black/20 p-4 text-xs leading-6 text-white/56">
+        <div className="rounded-[1.35rem] border border-white/10 bg-black/20 p-4 text-xs leading-6 text-white/85">
           Local Save:
           <span className="ml-2 text-white/78">
             {lastSavedAt ? lastSavedAt : "Not synced yet"}
           </span>
         </div>
-        <div className="rounded-[1.35rem] border border-gold/15 bg-gold/5 p-4 text-xs leading-6 text-white/62">
+        <div className="rounded-[1.35rem] border border-gold/15 bg-gold/5 p-4 text-xs leading-6 text-white/90">
           The hybrid flow keeps guided options visible while always allowing your own custom action.
         </div>
       </div>
@@ -104,7 +104,7 @@ export function StorySidebar({
 function SidebarField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1.2rem] border border-white/10 bg-white/5 p-4">
-      <p className="text-xs uppercase tracking-[0.24em] text-white/45">{label}</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-white/75">{label}</p>
       <p className="mt-2 text-sm font-medium text-white">{value}</p>
     </div>
   );
@@ -123,7 +123,7 @@ function StatusBar({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-xs text-white/55">
+      <div className="mb-2 flex items-center justify-between text-xs text-white/85">
         <span>{label}</span>
         <span>{width}</span>
       </div>

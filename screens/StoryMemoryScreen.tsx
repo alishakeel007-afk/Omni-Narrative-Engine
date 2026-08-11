@@ -56,7 +56,7 @@ export default function StoryMemoryScreen() {
               <article key={`${item.timestamp}-${item.sceneNumber}`} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
                 <p className="text-xs uppercase tracking-[0.22em] text-gold">Scene {item.sceneNumber}</p>
                 <p className="mt-2 text-sm leading-7 text-white/72">{item.result}</p>
-                <p className="mt-2 text-xs text-white/48">Choice: {item.choiceType} - {item.userChoice}</p>
+                <p className="mt-2 text-xs text-white/75">Choice: {item.choiceType} - {item.userChoice}</p>
               </article>
             ))
           )}
@@ -67,7 +67,7 @@ export default function StoryMemoryScreen() {
             <article key={character.name} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
               <p className="font-semibold text-white">{character.name}</p>
               <p className="mt-1 text-sm text-starlight">{character.role}</p>
-              <p className="mt-2 text-xs text-white/52">{character.emotionalState}</p>
+              <p className="mt-2 text-xs text-white/85">{character.emotionalState}</p>
             </article>
           ))}
         </MemoryPanel>
@@ -76,7 +76,7 @@ export default function StoryMemoryScreen() {
           {locations.map((location) => (
             <article key={location} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
               <p className="text-sm font-semibold text-white">{location}</p>
-              <p className="mt-2 text-xs text-white/52">Visited</p>
+              <p className="mt-2 text-xs text-white/85">Visited</p>
             </article>
           ))}
         </MemoryPanel>
@@ -110,7 +110,7 @@ function MemoryPanel({
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="rounded-[1rem] border border-white/10 bg-black/20 p-4 text-sm text-white/60">
+    <div className="rounded-[1rem] border border-white/10 bg-black/20 p-4 text-sm text-white/90">
       {text}
     </div>
   );

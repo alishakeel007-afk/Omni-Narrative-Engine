@@ -19,11 +19,11 @@ export function MemoryTimeline({ items }: MemoryTimelineProps) {
             {item.choiceType} • {item.mood} • {item.location}
           </p>
           <p className="mt-3 text-sm font-semibold text-white">Choice: {item.userChoice}</p>
-          <p className="mt-2 text-sm leading-7 text-white/68">Result: {item.result}</p>
+          <p className="mt-2 text-sm leading-7 text-white/90">Result: {item.result}</p>
           <p className="mt-2 rounded-2xl border border-starlight/15 bg-starlight/5 px-4 py-3 text-sm leading-7 text-starlight/90">
             Story Update: {item.update}
           </p>
-          <p className="mt-3 text-xs text-white/45">{item.timestamp}</p>
+          <p className="mt-3 text-xs text-white/75">{item.timestamp}</p>
         </div>
       ))}
     </div>

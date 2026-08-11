@@ -330,7 +330,7 @@ function GuidedStorySetupForm() {
               }`}
             >
               <p className="text-lg font-semibold text-white">{mode.title}</p>
-              <p className="mt-3 text-sm leading-7 text-white/64">{mode.description}</p>
+              <p className="mt-3 text-sm leading-7 text-white/90">{mode.description}</p>
             </button>
           ))}
         </div>
@@ -374,14 +374,14 @@ function GuidedStorySetupForm() {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-base font-semibold text-white">{scenario.title}</p>
-                    <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-white/60">
+                    <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-white/90">
                       {scenario.theme}
                     </span>
                     <span className="rounded-full bg-starlight/10 px-2 py-0.5 text-xs text-starlight">
                       {scenario.difficulty}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-white/66">{scenario.description}</p>
+                  <p className="mt-3 text-sm leading-7 text-white/90">{scenario.description}</p>
                 </button>
               ))}
             </div>
@@ -457,10 +457,10 @@ function GuidedStorySetupForm() {
             <div key={`character-${index}`} className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-white/45">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/75">
                     {index === 0 ? "Primary Character" : `Character ${index + 1}`}
                   </p>
-                  <p className="mt-1 text-sm text-white/66">
+                  <p className="mt-1 text-sm text-white/90">
                     {character.name || "Unnamed character"}
                   </p>
                 </div>
@@ -507,7 +507,7 @@ function GuidedStorySetupForm() {
                       className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
                         character.traits.includes(trait)
                           ? "border-gold/30 bg-gold/10 text-gold"
-                          : "border-white/10 bg-white/5 text-white/66 hover:border-starlight/25"
+                          : "border-white/10 bg-white/5 text-white/90 hover:border-starlight/25"
                       }`}
                     >
                       {trait}
@@ -569,7 +569,7 @@ function GuidedStorySetupForm() {
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
           <div className="rounded-[1.2rem] border border-white/10 bg-black/20 p-5">
-            <p className="text-xs uppercase tracking-[0.26em] text-white/45">Run Summary</p>
+            <p className="text-xs uppercase tracking-[0.26em] text-white/75">Run Summary</p>
             <h2 className="mt-3 font-[var(--font-heading)] text-2xl text-white">
               {setup.storyTitle || DEFAULT_STORY_SETUP.storyTitle}
             </h2>
@@ -641,7 +641,7 @@ function GuidedStorySetupForm() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-starlight">Ready to Begin</p>
-                <p className="text-[10px] text-white/60">Story foundation is complete.</p>
+                <p className="text-[10px] text-white/90">Story foundation is complete.</p>
               </div>
             </div>
             <button
@@ -675,7 +675,7 @@ function WorkflowPanel({
           {number}
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-white/45">{subtitle}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-white/75">{subtitle}</p>
           <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
         </div>
       </div>

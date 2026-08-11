@@ -346,7 +346,7 @@ export function CreateStorySetupForm() {
                             className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                               activeTraits.includes(chip)
                                 ? "border-gold/40 bg-gold/15 text-gold"
-                                : "border-white/10 bg-white/5 text-white/60 hover:border-starlight/30 hover:text-white"
+                                : "border-white/10 bg-white/5 text-white/90 hover:border-starlight/30 hover:text-white"
                             }`}
                           >
                             {chip}
@@ -425,7 +425,7 @@ export function CreateStorySetupForm() {
       <WorkflowPanel number="4" subtitle="Save setup" title="Start Scene Builder">
         <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
           <div className="rounded-[1.2rem] border border-white/10 bg-black/20 p-5">
-            <p className="text-xs uppercase tracking-[0.26em] text-white/45">Setup Summary</p>
+            <p className="text-xs uppercase tracking-[0.26em] text-white/75">Setup Summary</p>
             <h2 className="mt-3 font-[var(--font-heading)] text-2xl text-white">
               {setup.storyTitle || "Untitled Cinematic Story"}
             </h2>

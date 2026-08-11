@@ -33,7 +33,7 @@ export default function VerifyEmailScreen() {
           <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
             Email Verification Is Not Required
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/68">
+          <p className="mt-4 text-sm leading-7 text-white/90">
             This simplified prototype uses direct signup and login without an email verification step.
           </p>
 

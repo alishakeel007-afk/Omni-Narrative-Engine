@@ -137,7 +137,7 @@ export default function StoryPlay() {
               <h1 className="mt-2 font-[var(--font-heading)] text-3xl text-white">
                 {scene.title}
               </h1>
-              <p className="mt-2 text-sm text-white/66">{scene.location}</p>
+              <p className="mt-2 text-sm text-white/90">{scene.location}</p>
             </div>
             <button
               type="button"
@@ -161,7 +161,7 @@ export default function StoryPlay() {
             <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6">
               <p className="text-xs uppercase tracking-[0.28em] text-starlight/80">Custom Mode</p>
               <h2 className="mt-2 text-xl font-semibold text-white">Write the next scene yourself</h2>
-              <p className="mt-3 text-sm leading-7 text-white/66">
+              <p className="mt-3 text-sm leading-7 text-white/90">
                 AI suggested choices are disabled here. Use this box to write the next action, scene beat, or dialogue direction in your own words.
               </p>
 
@@ -199,7 +199,7 @@ export default function StoryPlay() {
           <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Interactive Story</p>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/75">Interactive Story</p>
                 <h2 className="mt-2 text-xl font-semibold text-white">Choose the next action</h2>
               </div>
               <button
@@ -286,7 +286,7 @@ export default function StoryPlay() {
                       <p className="font-semibold text-white">{character.name}</p>
                       <p className="mt-1 text-xs text-starlight">{character.role}</p>
                     </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/90">
                       {character.emotionalState}
                     </span>
                   </div>
@@ -299,7 +299,7 @@ export default function StoryPlay() {
             <p className="text-xs uppercase tracking-[0.26em] text-starlight/75">Continuity</p>
             <div className="mt-4 space-y-3">
               {recentMemory.length === 0 ? (
-                <p className="rounded-[1rem] border border-white/10 bg-black/20 p-4 text-sm leading-7 text-white/62">
+                <p className="rounded-[1rem] border border-white/10 bg-black/20 p-4 text-sm leading-7 text-white/90">
                   The first decision will create the opening memory record.
                 </p>
               ) : (
@@ -332,7 +332,7 @@ export default function StoryPlay() {
 function MiniField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-white/42">{label}</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/75">{label}</p>
       <p className="mt-1 text-sm font-medium text-white/80">{value}</p>
     </div>
   );
@@ -341,7 +341,7 @@ function MiniField({ label, value }: { label: string; value: string }) {
 function AttributeMeter({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-xs text-white/55">
+      <div className="mb-2 flex items-center justify-between text-xs text-white/85">
         <span>{label}</span>
         <span>{value}</span>
       </div>
@@ -358,8 +358,8 @@ function AttributeMeter({ label, value }: { label: string; value: number }) {
 function PromptPreview({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-white/42">{label}</p>
-      <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/68">{value}</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/75">{label}</p>
+      <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/90">{value}</p>
     </div>
   );
 }

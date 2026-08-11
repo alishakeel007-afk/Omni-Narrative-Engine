@@ -137,7 +137,7 @@ export default function StoryScreen() {
                   <p className="text-xs uppercase tracking-[0.26em] text-starlight/75">Scene Cast</p>
                   <h3 className="mt-1 font-[var(--font-heading)] text-lg text-white">Other Characters In This Scene</h3>
                 </div>
-                <span className="text-sm text-white/65">{(activeSceneCharacters ?? []).length} tracked</span>
+                <span className="text-sm text-white/90">{(activeSceneCharacters ?? []).length} tracked</span>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

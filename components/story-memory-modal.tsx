@@ -32,7 +32,7 @@ export function StoryMemoryModal({ open, onClose, items }: StoryMemoryModalProps
         {items.length > 0 ? (
           <MemoryTimeline items={items} />
         ) : (
-          <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-white/65">
+          <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-white/90">
             No memory items yet. Continue the story once and your decisions will appear here.
           </div>
         )}

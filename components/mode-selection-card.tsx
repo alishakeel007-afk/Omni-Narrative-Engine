@@ -22,7 +22,7 @@ export function ModeSelectionCard({
       }`}
     >
       <h3 className="text-lg font-semibold text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-7 text-white/68">{description}</p>
+      <p className="mt-2 text-sm leading-7 text-white/90">{description}</p>
     </button>
   );
 }

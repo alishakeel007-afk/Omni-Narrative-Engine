@@ -111,7 +111,7 @@ export default function VideoPreviewScreen() {
                 onClick={() =>
                   setNotice("Video download will be available after backend integration.")
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/55"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/85"
               >
                 <Download className="h-4 w-4" />
                 Download Video
@@ -159,7 +159,7 @@ export default function VideoPreviewScreen() {
                   </span>
                 </div>
                 <h3 className="text-lg font-semibold text-white">{scene.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-white/64">{scene.narration}</p>
+                <p className="mt-3 text-sm leading-7 text-white/90">{scene.narration}</p>
               </article>
             ))}
           </section>
@@ -278,7 +278,7 @@ function CreateStoryPreview({
                 </p>
               </div>
               <h3 className="text-lg font-semibold text-white">{scene.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-white/64">
+              <p className="mt-3 text-sm leading-7 text-white/90">
                 {scene.storyDescription || scene.selectedSuggestion}
               </p>
             </article>
@@ -299,7 +299,7 @@ function VideoFrame() {
         <h2 className="mt-6 font-[var(--font-heading)] text-3xl text-white">
           Generated video preview will appear here
         </h2>
-        <p className="mt-4 max-w-xl text-sm leading-7 text-white/64">
+        <p className="mt-4 max-w-xl text-sm leading-7 text-white/90">
           The final render will be connected after backend video generation is ready.
         </p>
       </div>
@@ -310,7 +310,7 @@ function VideoFrame() {
 function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1.2rem] border border-white/10 bg-black/20 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-white/42">{label}</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/75">{label}</p>
       <p className="mt-2 text-sm font-semibold leading-6 text-white">{value}</p>
     </div>
   );

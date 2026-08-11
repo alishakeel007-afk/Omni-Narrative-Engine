@@ -58,7 +58,7 @@ function ProfileDropdown({
         <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-white/10 bg-[rgba(15,10,25,0.95)] p-2 shadow-2xl backdrop-blur-xl">
           <div className="mb-2 border-b border-white/10 px-3 pb-3 pt-2">
             <p className="truncate text-sm font-semibold text-white">{userName || "User"}</p>
-            <p className="truncate text-xs text-white/60">{userEmail}</p>
+            <p className="truncate text-xs text-white/90">{userEmail}</p>
           </div>
           
           <div className="flex flex-col gap-1">
@@ -247,7 +247,7 @@ export function Navbar() {
                   </div>
                   <div className="overflow-hidden">
                     <p className="truncate text-sm font-semibold text-white">{currentUser.name || "User"}</p>
-                    <p className="truncate text-xs text-white/60">{currentUser.email}</p>
+                    <p className="truncate text-xs text-white/90">{currentUser.email}</p>
                   </div>
                 </div>
                 
