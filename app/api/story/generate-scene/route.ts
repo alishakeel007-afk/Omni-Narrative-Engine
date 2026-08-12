@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { getEnvValue } from "@/lib/env";
 import type { StorySetupData, MemoryItem, StoryScene } from "@/types/story";
 
@@ -195,7 +195,9 @@ async function requestGroqScene(params: { apiKey: string; prompt: string }) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
+    const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const session = user ? { userId: user.id } : null;
     if (!session?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

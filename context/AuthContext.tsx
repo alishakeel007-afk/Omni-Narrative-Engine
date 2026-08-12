@@ -7,6 +7,7 @@ import {
   useMemo,
   useState
 } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export type AuthUser = {
   id: string;
@@ -17,50 +18,35 @@ export type AuthUser = {
 type AuthContextValue = {
   currentUser: AuthUser | null;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (token: string, userId: string, newPassword: string, confirmPassword: string) => Promise<void>;
+  resetPassword: (newPassword: string) => Promise<void>;
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
-  signup: (fullName: string, email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
+  signup: (fullName: string, email: string, password: string) => Promise<AuthUser>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function readJsonResponse(response: Response) {
-  const text = await response.text();
-
-  if (!text) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(text) as { error?: string; user?: AuthUser };
-  } catch {
-    throw new Error(
-      response.ok
-        ? "Authentication server returned an invalid response."
-        : `Authentication route returned ${response.status}. Please rebuild and restart the app.`
-    );
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
   const refreshUser = async () => {
     try {
-      const response = await fetch("/api/auth/me");
-      const data = await readJsonResponse(response);
-
-      if (response.ok) {
-        setCurrentUser(data.user ?? null);
-        return data.user ?? null;
-      } else {
-        setCurrentUser(null);
-        return null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const authUser: AuthUser = {
+          id: user.id,
+          name: user.user_metadata?.full_name || "User",
+          email: user.email || ""
+        };
+        setCurrentUser(authUser);
+        return authUser;
       }
+      setCurrentUser(null);
+      return null;
     } catch (error) {
       setCurrentUser(null);
       return null;
@@ -71,76 +57,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshUser();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      refreshUser();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signup = async (name: string, email: string, password: string, confirmPassword: string) => {
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, confirmPassword })
+  const signup = async (name: string, email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        }
+      }
     });
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.error || "Signup failed");
-    }
 
-    if (!data.user) {
-      throw new Error("Signup response did not include a user.");
-    }
+    if (error) throw error;
+    if (!data.user) throw new Error("Signup failed");
 
-    setCurrentUser(data.user);
-    return data.user;
+    const authUser: AuthUser = {
+      id: data.user.id,
+      name: data.user.user_metadata?.full_name || name,
+      email: data.user.email || email
+    };
+    
+    setCurrentUser(authUser);
+    return authUser;
   };
 
   const login = async (email: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.error || "Login failed");
-    }
+    if (error) throw error;
+    if (!data.user) throw new Error("Login failed");
 
-    if (!data.user) {
-      throw new Error("Login response did not include a user.");
-    }
-
-    setCurrentUser(data.user);
-    return data.user;
+    const authUser: AuthUser = {
+      id: data.user.id,
+      name: data.user.user_metadata?.full_name || "User",
+      email: data.user.email || email
+    };
+    
+    setCurrentUser(authUser);
+    return authUser;
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await supabase.auth.signOut();
     setCurrentUser(null);
   };
 
   const forgotPassword = async (email: string) => {
-    const response = await fetch("/api/auth/request-password-reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${appUrl}/reset-password`,
     });
-
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to request password reset");
-    }
+    if (error) throw error;
   };
 
-  const resetPassword = async (token: string, userId: string, newPassword: string, confirmPassword: string) => {
-    const response = await fetch("/api/auth/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, userId, newPassword, confirmPassword })
-    });
-
-    const data = await readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to reset password");
-    }
+  const resetPassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
   };
 
   const value = useMemo<AuthContextValue>(

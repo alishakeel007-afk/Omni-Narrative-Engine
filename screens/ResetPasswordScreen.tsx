@@ -21,9 +21,6 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { resetPassword } = useAuth();
-  
-  const token = searchParams.get("token");
-  const userId = searchParams.get("id");
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -35,20 +32,12 @@ export default function ResetPasswordScreen() {
 
   const passwordRules = useMemo(() => validatePassword(password), [password]);
 
-  useEffect(() => {
-    if (!token || !userId) {
-      setError("Invalid or missing reset token.");
-    }
-  }, [token, userId]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
-    if (!token || !userId) {
-      setError("Invalid or missing reset token.");
-      return;
-    }
+
 
     const allRulesPassed = Object.values(passwordRules).every(Boolean);
 
@@ -64,7 +53,7 @@ export default function ResetPasswordScreen() {
 
     try {
       setIsSubmitting(true);
-      await resetPassword(token, userId, password, confirmPassword);
+      await resetPassword(password);
       setSuccess(true);
       setTimeout(() => {
         router.push("/auth");
@@ -93,8 +82,8 @@ export default function ResetPasswordScreen() {
           </p>
 
           {success ? (
-            <div className="mt-8 rounded-[1.2rem] border border-green-400/20 bg-green-400/10 px-4 py-6 text-center text-sm text-green-200">
-              <p className="font-semibold text-green-100 mb-2">Password Reset Successfully</p>
+            <div className="mt-8 rounded-[1.2rem] border border-green-200 bg-green-50 px-4 py-6 text-center text-sm text-green-700">
+              <p className="font-semibold text-green-800 mb-2">Password Reset Successfully</p>
               <p>You can now log in with your new password. Redirecting to login...</p>
             </div>
           ) : (
@@ -135,14 +124,14 @@ export default function ResetPasswordScreen() {
               </div>
 
               {error ? (
-                <div className="rounded-[1.2rem] border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-[1.2rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                   {error}
                 </div>
               ) : null}
 
               <button
                 type="submit"
-                disabled={isSubmitting || !token || !userId}
+                disabled={isSubmitting}
                 className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
               >
                 {isSubmitting ? "Resetting..." : "Reset Password"}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
@@ -73,7 +73,9 @@ Example: ["Suggestion one.", "Suggestion two.", "Suggestion three."]`;
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
+    const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const session = user ? { userId: user.id } : null;
     if (!session?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
