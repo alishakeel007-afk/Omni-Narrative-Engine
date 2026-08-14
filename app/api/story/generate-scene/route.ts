@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEnvValue } from "@/lib/env";
-import type { StorySetupData, MemoryItem, StoryScene } from "@/types/story";
+import type { StorySetupData, MemoryItem, StoryScene, PlayerPerformance } from "@/types/story";
+import { validateAndFixSceneCoherence } from "@/lib/coherence/validator";
+import { detectSceneEmotion } from "@/lib/emotion-engine";
+import { getDifficultyModifier } from "@/lib/difficulty-engine";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -24,8 +27,9 @@ function buildPrompt(params: {
   memoryTimeline: MemoryItem[];
   currentScene: StoryScene | null;
   sceneNumber: number;
+  difficultyModifier?: string | null;
 }) {
-  const { setup, choice, memoryTimeline, currentScene, sceneNumber } = params;
+  const { setup, choice, memoryTimeline, currentScene, sceneNumber, difficultyModifier } = params;
   
   const charList = setup.characters
     .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Traits: ${c.traits.join(", ")})`)
@@ -56,13 +60,16 @@ ${currentSceneContext}
 The user has made the following choice to continue the story:
 "${choice}"
 
+${difficultyModifier ? `\n${difficultyModifier}\n` : ""}
 Generate the next scene (Scene ${sceneNumber}). It must logically follow the previous events, respect the user's choice, and maintain narrative coherence.
 Keep character personalities consistent.
 If the choice involves risk or danger, reflect that in the text and mood.
+You MUST explicitly evaluate if the user's choice succeeded or failed based on their character's stats and the scenario.
 
 Return ONLY a JSON object. No markdown, no extra text.
 Use this exact shape:
 {
+  "choiceOutcome": "Success" | "Failure" | "Neutral",
   "title": "A compelling title for the scene",
   "chapter": "Current chapter name",
   "location": "Specific location of this scene",
@@ -203,7 +210,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { setup, choice, memoryTimeline, currentScene, sceneNumber } = body;
+    const { setup, choice, memoryTimeline, currentScene, sceneNumber, playerPerformance } = body as {
+      setup: StorySetupData;
+      choice: string;
+      memoryTimeline: MemoryItem[];
+      currentScene: any;
+      sceneNumber: number;
+      playerPerformance?: PlayerPerformance;
+    };
 
     if (!setup || !choice) {
       return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
@@ -219,12 +233,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const difficultyModifier = playerPerformance
+      ? getDifficultyModifier(setup.difficulty, playerPerformance.consecutiveSuccesses, playerPerformance.consecutiveFailures)
+      : null;
+
     const prompt = buildPrompt({
       setup,
       choice,
       memoryTimeline: memoryTimeline || [],
       currentScene: currentScene || null,
       sceneNumber: sceneNumber || 1,
+      difficultyModifier,
     });
 
     let sceneData;
@@ -258,6 +277,17 @@ export async function POST(request: Request) {
 
     // Ensure sceneNumber is injected back
     sceneData.sceneNumber = sceneNumber || 1;
+
+    // Validate coherence and detect emotion in parallel for speed
+    const [validatedScene, emotionDirectives] = await Promise.all([
+      validateAndFixSceneCoherence(sceneData, memoryTimeline || []),
+      detectSceneEmotion(sceneData.text, choice)
+    ]);
+
+    sceneData = validatedScene;
+    if (emotionDirectives) {
+      sceneData.emotionDirectives = emotionDirectives;
+    }
 
     return NextResponse.json({ scene: sceneData, provider });
   } catch (error) {

@@ -358,8 +358,27 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
         setup,
         memoryTimeline: state.memoryTimeline,
         currentScene: state.currentScene,
-        pastScenes: state.pastScenes
+        pastScenes: state.pastScenes,
+        playerPerformance: state.playerPerformance
       });
+
+      let newPerformance = { ...state.playerPerformance };
+      const outcome = nextSceneResult.currentScene.choiceOutcome;
+      if (outcome === "Success") {
+        newPerformance.consecutiveSuccesses += 1;
+        newPerformance.consecutiveFailures = 0;
+      } else if (outcome === "Failure") {
+        newPerformance.consecutiveFailures += 1;
+        newPerformance.consecutiveSuccesses = 0;
+      }
+
+      // Reset streaks if threshold is met (curveball/lucky break was injected and played out in this scene)
+      if (
+        (setup.difficulty === "Adaptive" || setup.difficulty === "Hard") &&
+        (state.playerPerformance.consecutiveSuccesses >= 3 || state.playerPerformance.consecutiveFailures >= 2)
+      ) {
+        newPerformance = { consecutiveSuccesses: 0, consecutiveFailures: 0 };
+      }
 
       const memoryItem = createMemoryItem({
         choiceType: state.selectedChoiceType as ChoiceType,
@@ -371,6 +390,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
       setState((current) => ({
         ...current,
+        playerPerformance: newPerformance,
         currentScene: nextSceneResult.currentScene,
         currentSceneIndex: nextSceneResult.currentSceneIndex,
         customChoiceInput: setup.mode === "custom" ? setup.startingIdea : "",

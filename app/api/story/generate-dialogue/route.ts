@@ -67,6 +67,11 @@ ${prevContext}
 Current scene ${params.sceneNumber} description:
 ${params.sceneDescription}
 
+CRITICAL COHERENCE CONSTRAINTS:
+- Each character must strictly adhere to their defined Personality, Voice style, and Role.
+- Ensure dialogue maintains strict narrative continuity with the "Previous scenes context".
+- Do not allow characters to break character or contradict past events.
+
 Write ${params.linesPerCharacter} dialogue line${params.linesPerCharacter === 1 ? "" : "s"} for EACH character, relevant to this scene. Each line should:
 - Match the character's personality and role
 - Be consistent with previous scenes and dialogues

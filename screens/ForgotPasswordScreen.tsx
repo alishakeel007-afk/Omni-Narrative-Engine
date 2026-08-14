@@ -45,22 +45,22 @@ export default function ForgotPasswordScreen() {
       maxWidth="max-w-md"
     >
       <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">Recovery</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
+          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Recovery</p>
+          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
             Reset Your Password
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/90">
+          <p className="mt-4 text-sm leading-7 text-slate-600">
             Enter your email address and we will send a password reset link to your inbox.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <label className="block">
-              <span className="mb-3 block text-sm font-semibold text-white">Email</span>
+              <span className="mb-3 block text-sm font-semibold text-slate-900">Email</span>
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-gold/30"
+                className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-gold/30"
                 placeholder="you@example.com"
               />
             </label>
@@ -80,14 +80,14 @@ export default function ForgotPasswordScreen() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
+              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
             >
               {isSubmitting ? "Saving request..." : "Send Reset Link"}
             </button>
           </form>
 
-          <div className="mt-6 text-sm text-white/90">
-            <Link href="/auth" className="text-starlight transition hover:text-gold">
+          <div className="mt-6 text-sm text-slate-600">
+            <Link href="/auth" className="text-slate-600 transition hover:text-gold">
               Back to Login
             </Link>
           </div>

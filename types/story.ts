@@ -64,7 +64,17 @@ export type GeneratedMedia = {
   playerState: "ready" | "generating";
 };
 
+export interface EmotionDirectives {
+  primaryEmotion: string;
+  intensity: number;
+  videoAtmosphere: string;
+  musicStyle: string;
+  voiceStyle: string;
+}
+
 export type StoryScene = {
+  choiceOutcome?: "Success" | "Failure" | "Neutral";
+  emotionDirectives?: EmotionDirectives;
   cast: StoryCharacter[];
   chapter: string;
   location: string;
@@ -87,7 +97,13 @@ export type MemoryItem = {
   userChoice: string;
 };
 
+export type PlayerPerformance = {
+  consecutiveSuccesses: number;
+  consecutiveFailures: number;
+};
+
 export type PersistedStoryState = {
+  playerPerformance: PlayerPerformance;
   currentScene: StoryScene;
   currentSceneIndex: number;
   customChoiceInput: string;

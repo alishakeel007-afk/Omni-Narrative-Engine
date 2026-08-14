@@ -68,11 +68,11 @@ export default function AuthScreen() {
       maxWidth="max-w-md"
     >
       <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">Login</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
+          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Login</p>
+          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
             Return to Your Story
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/90">
+          <p className="mt-4 text-sm leading-7 text-slate-600">
             Log in to access your dashboard, continue your saved story, and manage your AI-driven narrative sessions.
           </p>
 
@@ -82,7 +82,7 @@ export default function AuthScreen() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-gold/30"
+                className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-gold/30"
                 placeholder="you@example.com"
               />
             </Field>
@@ -93,13 +93,13 @@ export default function AuthScreen() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 pr-12 text-sm text-white outline-none focus:border-gold/30"
+                  className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none focus:border-gold/30"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
                   aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -116,17 +116,17 @@ export default function AuthScreen() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
+              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
             >
               {isSubmitting ? "Logging in..." : "Login"}
             </button>
           </form>
 
-          <div className="mt-6 flex flex-col gap-3 text-sm text-white/90 sm:flex-row sm:items-center sm:justify-between">
-            <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
+          <div className="mt-6 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route} className="text-slate-600 transition hover:text-gold">
               Create an account
             </Link>
-            <Link href="/forgot-password" className="text-starlight transition hover:text-gold">
+            <Link href="/forgot-password" className="text-slate-600 transition hover:text-gold">
               Forgot Password?
             </Link>
           </div>
@@ -144,7 +144,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-3 block text-sm font-semibold text-white">{label}</span>
+      <span className="mb-3 block text-sm font-semibold text-slate-900">{label}</span>
       {children}
     </label>
   );

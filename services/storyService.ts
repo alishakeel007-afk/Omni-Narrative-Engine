@@ -15,6 +15,8 @@ import type {
   StoryScene,
   StorySetupData
 } from "@/types/story";
+import { runPipeline } from "@/lib/orchestration/pipeline";
+import { GUIDED_STORY_SCENE_PIPELINE, GENERATE_OPTIONS_PIPELINE } from "@/lib/orchestration/pipelines/story-pipelines";
 
 const RISK_KEYWORDS = ["attack", "run", "rush", "jump", "fight", "activate"];
 const CAREFUL_KEYWORDS = ["careful", "inspect", "study", "listen", "hide", "observe"];
@@ -96,6 +98,7 @@ export function createInitialStoryState(setup: StorySetupData = DEFAULT_STORY_SE
   const initialScene = getInitialScene(setup);
 
   return {
+    playerPerformance: { consecutiveSuccesses: 0, consecutiveFailures: 0 },
     currentScene: initialScene,
     currentSceneIndex: 0,
     customChoiceInput: setup.mode === "custom" ? setup.startingIdea : "",
@@ -205,24 +208,19 @@ export function generateNextScene(params: {
 }
 
 export async function generateInitialSceneFromAI(setup: StorySetupData): Promise<StoryScene> {
-  const response = await fetch("/api/story/generate-scene", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      setup,
-      choice: "Start the story.",
-      memoryTimeline: [],
-      currentScene: null,
-      sceneNumber: 1
-    }),
+  const result = await runPipeline<StoryScene>(GUIDED_STORY_SCENE_PIPELINE, {
+    setup,
+    choice: "Start the story.",
+    memoryTimeline: [],
+    currentScene: null,
+    sceneNumber: 1
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to generate initial scene from AI.");
+  if (!result.success || !result.finalResult) {
+    throw new Error(`Failed to generate initial scene: ${result.error}`);
   }
 
-  const { scene } = await response.json();
-  return scene as StoryScene;
+  return result.finalResult;
 }
 
 export async function generateNextSceneFromAI(params: {
@@ -235,27 +233,24 @@ export async function generateNextSceneFromAI(params: {
   memoryTimeline: MemoryItem[];
   currentScene: StoryScene;
   pastScenes: StoryScene[];
+  playerPerformance: any;
 }) {
   const nextIndex = params.currentSceneIndex + 1;
 
-  const response = await fetch("/api/story/generate-scene", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      setup: params.setup,
-      choice: params.choice,
-      memoryTimeline: params.memoryTimeline,
-      currentScene: params.currentScene,
-      sceneNumber: nextIndex + 1
-    }),
+  const result = await runPipeline<StoryScene>(GUIDED_STORY_SCENE_PIPELINE, {
+    setup: params.setup,
+    choice: params.choice,
+    memoryTimeline: params.memoryTimeline,
+    currentScene: params.currentScene,
+    sceneNumber: nextIndex + 1,
+    playerPerformance: params.playerPerformance
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to generate next scene from AI.");
+  if (!result.success || !result.finalResult) {
+    throw new Error(`Failed to generate next scene: ${result.error}`);
   }
 
-  const { scene } = await response.json();
-  const nextScene = scene as StoryScene;
+  const nextScene = result.finalResult;
 
   const resultSummary = `${titleCase(params.choice)} changes the tension of the scene and pushes the story toward ${nextScene.location}.`;
   const nextHealthStatus = applyStatusDelta(params.healthStatus, params.choice);
@@ -275,35 +270,13 @@ export async function generateNextSceneFromAI(params: {
 }
 
 export async function generateAlternativeOptionsFromAI(scene: StoryScene, setup: StorySetupData): Promise<string[]> {
-  // We can reuse the generate-scene endpoint by asking for choices only, but since we are replacing options,
-  // we can also hit generate-scene and just grab the options. To save time, we will just prompt generate-scene 
-  // with a small choice like "Think of 3 different options."
-  // Wait, a better way is to create a small specific prompt for options, but for now we can fallback to the standard one 
-  // if we don't have a specific endpoint. 
-  // Actually, we already have suggest-scene API we could use for options!
-  
-  const response = await fetch("/api/story/suggest-scene", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      characters: setup.characters,
-      currentSceneDescription: scene.text,
-      genres: setup.genres,
-      previousScenes: [], 
-      sceneGenre: setup.genre,
-      sceneNumber: scene.sceneNumber,
-      sceneTitle: scene.title,
-      sceneTone: scene.mood,
-      storyTitle: setup.storyTitle,
-      tones: setup.moods
-    }),
+  const result = await runPipeline<string[]>(GENERATE_OPTIONS_PIPELINE, {
+    scene,
+    setup,
   });
 
-  if (response.ok) {
-    const { suggestions } = await response.json();
-    if (suggestions && suggestions.length > 0) {
-      return suggestions;
-    }
+  if (result.success && result.finalResult && result.finalResult.length > 0) {
+    return result.finalResult;
   }
 
   return generateMoreOptions(scene, setup);

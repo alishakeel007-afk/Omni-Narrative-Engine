@@ -56,8 +56,16 @@ Current scene being regenerated:
 - Scene tone: ${params.sceneTone || params.tones.join(", ")}
 - Existing scene idea, if any: ${params.currentSceneDescription?.trim() || "None yet"}
 
+CRITICAL COHERENCE CONSTRAINTS:
+- Your suggestions must NOT contradict any events established in the "Previous scenes".
+- Do not suggest actions involving characters or items that are no longer available or dead.
+- Maintain logical continuity.
+
 Generate exactly 3 distinct, creative scene suggestions for this current scene.
 Each suggestion should:
+- Logically follow the previous scenes without breaking coherence.
+- Drive the story forward.
+- Keep to the established genre and tone.
 - Follow the current scene title closely, as if the user renamed the scene and expects the AI to immediately adapt
 - Treat any name, place, object, or event mentioned in the scene title as intentional, even if it is not in the character list
 - Do not force existing character names into the scene unless the title, prior context, or story logic naturally calls for them

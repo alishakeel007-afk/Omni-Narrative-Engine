@@ -29,24 +29,24 @@ export default function VerifyEmailScreen() {
       maxWidth="max-w-lg"
     >
       <div className="glass-panel rounded-[2rem] p-8 text-center">
-          <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">Account Status</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
+          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Account Status</p>
+          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
             Email Verification Is Not Required
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/90">
+          <p className="mt-4 text-sm leading-7 text-slate-600">
             This simplified prototype uses direct signup and login without an email verification step.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/auth"
-              className="rounded-full border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white/82 transition hover:border-gold/25 hover:bg-white/10"
+              className="rounded-full border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 transition hover:border-gold/30 hover:bg-slate-100"
             >
               Back to Login
             </Link>
             <Link
               href="/signup"
-              className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
+              className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02]"
             >
               Create Account
             </Link>

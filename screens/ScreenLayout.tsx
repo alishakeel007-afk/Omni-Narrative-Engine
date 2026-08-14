@@ -21,17 +21,17 @@ export default function ScreenLayout({
         {(eyebrow || title || description) && (
           <div className="mb-10">
             {eyebrow ? (
-              <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">{eyebrow}</p>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-500">{eyebrow}</p>
             ) : null}
 
             {title ? (
-              <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white sm:text-5xl">
+              <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900 sm:text-5xl">
                 {title}
               </h1>
             ) : null}
 
             {description ? (
-              <p className="mt-4 text-sm leading-7 text-white/90">{description}</p>
+              <p className="mt-4 text-sm leading-7 text-slate-600">{description}</p>
             ) : null}
           </div>
         )}

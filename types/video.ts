@@ -1,3 +1,5 @@
+import type { EmotionDirectives } from "@/types/story";
+
 export type MovieCharacterVoice = {
   archetype: string;
   character: string;
@@ -20,6 +22,7 @@ export type MovieDialogueLine = {
 };
 
 export type MovieScene = {
+  emotionDirectives?: EmotionDirectives;
   directorNotes: string;
   dialogues: MovieDialogueLine[];
   estimatedDuration: string;

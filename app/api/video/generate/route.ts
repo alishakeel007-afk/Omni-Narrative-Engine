@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import type {
   MovieCharacterVoice,
   MovieDialogueLine,
@@ -9,6 +10,7 @@ import type {
   VideoGenerationResponse
 } from "@/types/video";
 import { getEnvValue } from "@/lib/env";
+import { detectSceneEmotion } from "@/lib/emotion-engine";
 
 export const runtime = "nodejs";
 
@@ -1051,6 +1053,16 @@ export async function POST(request: Request) {
       scenario,
       tones
     });
+
+    // Extract emotion directives for all generated scenes in parallel
+    const emotionPromises = script.scenes.map(async (scene) => {
+      const sceneText = scene.narration + " " + scene.dialogues.map(d => d.line).join(" ");
+      const emotion = await detectSceneEmotion(sceneText, scenario);
+      if (emotion) {
+        scene.emotionDirectives = emotion;
+      }
+    });
+    await Promise.all(emotionPromises);
     const deepgramTtsApiKey = getEnvValue([
       "DEEPGRAM_TTS_API_KEY",
       "DEEPGRAM_API_KEY",

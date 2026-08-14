@@ -18,6 +18,13 @@ import {
   Wand2,
   X
 } from "lucide-react";
+import { usePipeline } from "@/hooks/usePipeline";
+import { TaskProgressBar } from "@/components/TaskProgressBar";
+import { 
+  VIDEO_STUDIO_FULL_PIPELINE, 
+  VIDEO_VOICE_ONLY_PIPELINE, 
+  VIDEO_MUSIC_ONLY_PIPELINE 
+} from "@/lib/orchestration";
 import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
 import { PreviewFinalAudioButton } from "@/components/preview-final-audio-button";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -62,13 +69,15 @@ export default function VideoStudioScreen() {
   const [flow, setFlow] = useState<VideoStudioFlowState | null>(null);
   const [error, setError] = useState("");
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
-  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
-  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
   const [generatingDialogueScene, setGeneratingDialogueScene] = useState<number | null>(null);
   const [generatingDialogueLineId, setGeneratingDialogueLineId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [customGenreInput, setCustomGenreInput] = useState("");
   const [customToneInput, setCustomToneInput] = useState("");
+
+  const fullPipeline = usePipeline<VideoGenerationResponse>(VIDEO_STUDIO_FULL_PIPELINE);
+  const voicePipeline = usePipeline<VideoGenerationResponse>(VIDEO_VOICE_ONLY_PIPELINE);
+  const musicPipeline = usePipeline<VideoGenerationResponse>(VIDEO_MUSIC_ONLY_PIPELINE);
 
   useEffect(() => {
     setFlow(loadVideoStudioFlow());
@@ -746,45 +755,31 @@ export default function VideoStudioScreen() {
   };
 
   const generateVoice = async () => {
-    if (!flow?.script || isGeneratingVoice) return;
+    if (!flow?.script || voicePipeline.status === "running" || fullPipeline.status === "running") return;
 
-    setIsGeneratingVoice(true);
     setError("");
+    
+    // We can run the voice only pipeline here
+    const result = await voicePipeline.run({ script: flow.script });
 
-    try {
-      const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script: flow.script }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST"
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Voice generation failed.");
-      }
-
-      const voiceResult = payload as VideoGenerationResponse;
-      persistFlow({
-        ...flow,
-        script: voiceResult,
-        videoOutdated: true,
-        voiceNeedsRegeneration: false,
-        voiceResult
-      });
-    } catch (voiceError) {
-      setError(voiceError instanceof Error ? voiceError.message : "Voice generation failed.");
-    } finally {
-      setIsGeneratingVoice(false);
+    if (result.success && result.finalResult) {
+       const voiceResult = result.finalResult;
+       persistFlow({
+         ...flow,
+         script: voiceResult,
+         videoOutdated: true,
+         voiceNeedsRegeneration: false,
+         voiceResult
+       });
+    } else if (result.error) {
+       setError(result.error);
     }
   };
 
   const generateBackgroundMusic = async () => {
-    if (!flow?.script || isGeneratingMusic) return;
+    if (!flow?.script || musicPipeline.status === "running" || fullPipeline.status === "running") return;
 
     const primaryScene = flow.script.scenes[0];
-    setIsGeneratingMusic(true);
     setError("");
     persistFlow({
       ...flow,
@@ -795,49 +790,30 @@ export default function VideoStudioScreen() {
       }
     });
 
-    try {
-      const response = await fetch("/api/background-music", {
-        body: JSON.stringify({
-          audioPrompt: flow.script.scenes.map((scene) => scene.soundDesign).join("\n"),
-          sceneMood: primaryScene?.mood ?? flow.tones.join(", "),
-          sceneTitle: flow.script.title
-        }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST"
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Background music generation failed.");
-      }
-
+    const result = await musicPipeline.run({ script: flow.script });
+    
+    if (result.success && result.finalResult) {
       persistFlow({
         ...flow,
         music: {
           message: "Background music is ready.",
-          mood: payload.mood ?? primaryScene?.mood ?? "ambient",
+          mood: primaryScene?.mood ?? flow.tones.join(", "),
           status: "ready",
-          title: payload.title ?? "Generated Background Score",
-          trackUrl: payload.trackUrl ?? ""
+          title: "Generated Background Score", // Ideally we'd get this from the updated scenes, but this is a simplification
+          trackUrl: result.finalResult.scenes.find(s => s.backgroundMusicUrl)?.backgroundMusicUrl || ""
         },
+        script: result.finalResult,
         videoOutdated: true
       });
-    } catch (musicError) {
+    } else if (result.error) {
       persistFlow({
         ...flow,
         music: {
           ...flow.music,
-          message:
-            musicError instanceof Error
-              ? musicError.message
-              : "Background music generation failed.",
+          message: result.error,
           status: "error"
         }
       });
-    } finally {
-      setIsGeneratingMusic(false);
     }
   };
 
@@ -902,6 +878,53 @@ export default function VideoStudioScreen() {
               </div>
 
               <StageIndicator currentStage={flow.stage} />
+
+              {(fullPipeline.status !== "idle" && fullPipeline.status !== "cancelled") && (
+                 <div className="mb-6">
+                    <TaskProgressBar 
+                      status={fullPipeline.status}
+                      currentStep={fullPipeline.currentStep}
+                      overallProgress={fullPipeline.overallProgress}
+                      error={fullPipeline.error}
+                      onCancel={() => fullPipeline.cancel()}
+                      stepLabels={{
+                        "generate-script": "Drafting Scenes & Dialogue",
+                        "generate-voice": "Synthesizing Voices",
+                        "generate-music": "Composing Soundtrack"
+                      }}
+                    />
+                 </div>
+              )}
+              
+              {(voicePipeline.status !== "idle" && voicePipeline.status !== "cancelled") && (
+                 <div className="mb-6">
+                    <TaskProgressBar 
+                      status={voicePipeline.status}
+                      currentStep={voicePipeline.currentStep}
+                      overallProgress={voicePipeline.overallProgress}
+                      error={voicePipeline.error}
+                      onCancel={() => voicePipeline.cancel()}
+                      stepLabels={{
+                        "generate-voice": "Synthesizing Voices"
+                      }}
+                    />
+                 </div>
+              )}
+              
+              {(musicPipeline.status !== "idle" && musicPipeline.status !== "cancelled") && (
+                 <div className="mb-6">
+                    <TaskProgressBar 
+                      status={musicPipeline.status}
+                      currentStep={musicPipeline.currentStep}
+                      overallProgress={musicPipeline.overallProgress}
+                      error={musicPipeline.error}
+                      onCancel={() => musicPipeline.cancel()}
+                      stepLabels={{
+                        "generate-music": "Composing Soundtrack"
+                      }}
+                    />
+                 </div>
+              )}
 
               {error ? (
                 <div className="mb-6 flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-200 backdrop-blur-sm">
@@ -977,7 +1000,7 @@ export default function VideoStudioScreen() {
               {flow.stage === "voice" ? (
                 <VoiceStage
                   flow={flow}
-                  isGenerating={isGeneratingVoice}
+                  isGenerating={voicePipeline.status === "running" || fullPipeline.status === "running"}
                   script={visibleScript}
                   totalDialogueLines={totalDialogueLines}
                   onBack={() => setStage("scenes")}
@@ -989,7 +1012,7 @@ export default function VideoStudioScreen() {
               {flow.stage === "music" ? (
                 <MusicStage
                   flow={flow}
-                  isGenerating={isGeneratingMusic}
+                  isGenerating={musicPipeline.status === "running" || fullPipeline.status === "running"}
                   onBack={() => setStage("voice")}
                   onGenerate={generateBackgroundMusic}
                   onPreview={openPreview}
@@ -1008,7 +1031,6 @@ export default function VideoStudioScreen() {
           </section>
         </div>
       </div>
-      {/* Floating Action Bar */}
       {(() => {
         let isReady = false;
         let label = "";

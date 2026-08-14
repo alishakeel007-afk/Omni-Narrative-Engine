@@ -73,11 +73,11 @@ export default function ResetPasswordScreen() {
       maxWidth="max-w-lg"
     >
       <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">Security</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
+          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Security</p>
+          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
             Reset Password
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/90">
+          <p className="mt-4 text-sm leading-7 text-slate-600">
             Please enter your new password below.
           </p>
 
@@ -106,8 +106,8 @@ export default function ResetPasswordScreen() {
                 />
               </Field>
 
-              <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
-                <p className="font-semibold text-white">Password Rules</p>
+              <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Password Rules</p>
                 <ul className="mt-3 space-y-2">
                   {[
                     ["At least 8 characters", passwordRules.hasMinimumLength],
@@ -116,7 +116,7 @@ export default function ResetPasswordScreen() {
                     ["At least 1 number", passwordRules.hasNumber],
                     ["At least 1 special character", passwordRules.hasSpecialCharacter]
                   ].map(([label, passed]) => (
-                    <li key={String(label)} className={passed ? "text-starlight" : "text-white/85"}>
+                    <li key={String(label)} className={passed ? "text-green-600" : "text-slate-500"}>
                       {passed ? "Passed:" : "Required:"} {label}
                     </li>
                   ))}
@@ -132,15 +132,15 @@ export default function ResetPasswordScreen() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
+                className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
               >
                 {isSubmitting ? "Resetting..." : "Reset Password"}
               </button>
             </form>
           )}
 
-          <div className="mt-6 text-center text-sm text-white/90">
-            <Link href="/auth" className="text-starlight transition hover:text-gold">
+          <div className="mt-6 text-center text-sm text-slate-600">
+            <Link href="/auth" className="text-slate-600 transition hover:text-gold">
               Back to Login
             </Link>
           </div>
@@ -158,7 +158,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-3 block text-sm font-semibold text-white">{label}</span>
+      <span className="mb-3 block text-sm font-semibold text-slate-900">{label}</span>
       {children}
     </label>
   );
@@ -181,12 +181,12 @@ function PasswordInput({
         type={showPassword ? "text" : "password"}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 pr-12 text-sm text-white outline-none focus:border-gold/30"
+        className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none focus:border-gold/30"
       />
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
         aria-label="Toggle password visibility"
       >
         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

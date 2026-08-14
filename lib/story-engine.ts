@@ -44,14 +44,7 @@ const genreDescriptors: Record<string, { atmosphere: string; motif: string; loca
   }
 };
 
-const moodEmotionMap: Record<string, string> = {
-  Calm: "Centered and deliberate",
-  Dark: "Guarded and emotionally tense",
-  Emotional: "Open-hearted and vulnerable",
-  Suspenseful: "Focused and alert",
-  Epic: "Bold and ready for destiny",
-  Funny: "Playful despite the danger"
-};
+
 
 const traitMap: Record<StorySetupData["mode"], string[]> = {
   guided: ["Strategic", "Adaptive", "Curious", "Decisive"],
@@ -173,7 +166,7 @@ export function buildPrimaryCharacterProfile(
     genreDescriptors[storySetup.genre] ?? genreDescriptors[DEFAULT_STORY_SETUP.genre];
 
   return {
-    emotionalState: moodEmotionMap[storySetup.mood] ?? characterProfile.emotionalState,
+    emotionalState: storySetup.mood || characterProfile.emotionalState,
     imageLabel: `${storySetup.characterName} portrait placeholder in a ${storySetup.genre.toLowerCase()} cinematic style`,
     name: storySetup.characterName,
     relationships: [
@@ -202,7 +195,7 @@ export function buildSceneCharacters(
 
     return [
       {
-        emotionalState: moodEmotionMap[storySetup.mood] ?? characterProfile.emotionalState,
+        emotionalState: storySetup.mood || characterProfile.emotionalState,
         imageLabel: `${storySetup.characterName} close-up portrait placeholder`,
         name: storySetup.characterName,
         relationships: [
