@@ -5,13 +5,15 @@ export function createMemoryItem({
   result,
   scene,
   update,
-  userChoice
+  userChoice,
+  embedding
 }: {
   choiceType: ChoiceType;
   result: string;
   scene: StoryScene;
   update: string;
   userChoice: string;
+  embedding?: number[];
 }): MemoryItem {
   return {
     choiceType,
@@ -21,6 +23,7 @@ export function createMemoryItem({
     sceneNumber: scene.sceneNumber,
     timestamp: new Date().toLocaleString(),
     update,
-    userChoice
+    userChoice,
+    embedding
   };
 }

@@ -385,8 +385,34 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
         result: nextSceneResult.resultSummary,
         scene: state.currentScene,
         update: nextSceneResult.updateSummary,
-        userChoice: state.selectedChoice
+        userChoice: state.selectedChoice,
+        embedding: nextSceneResult.currentScene.embedding
       });
+
+      const characterUpdates = nextSceneResult.currentScene.characterUpdates || [];
+      if (characterUpdates.length > 0) {
+        setSetup((curr) => {
+          const updatedCharacters = curr.characters.map((char) => {
+            const match = characterUpdates.find(
+              (u) => u.name.toLowerCase() === char.name.toLowerCase()
+            );
+            if (match) {
+              const currentScore = char.relationshipScore ?? 50;
+              const newScore = Math.max(0, Math.min(100, currentScore + (match.affinityChange || 0)));
+              return {
+                ...char,
+                relationshipScore: newScore,
+                statusState: match.statusUpdate || char.statusState || "Normal"
+              };
+            }
+            return char;
+          });
+          return {
+            ...curr,
+            characters: updatedCharacters
+          };
+        });
+      }
 
       setState((current) => ({
         ...current,

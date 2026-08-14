@@ -8,6 +8,8 @@ export type StorySetupCharacter = {
   role: string;
   traits: string[];
   voiceStyle: string;
+  relationshipScore?: number;
+  statusState?: string;
 };
 
 export type StorySetupData = {
@@ -52,6 +54,8 @@ export type StoryCharacter = {
   role: string;
   traits: string[];
   visualAppearance: string;
+  relationshipScore?: number;
+  statusState?: string;
 };
 
 export type GeneratedMedia = {
@@ -75,6 +79,7 @@ export interface EmotionDirectives {
 export type StoryScene = {
   choiceOutcome?: "Success" | "Failure" | "Neutral";
   emotionDirectives?: EmotionDirectives;
+  embedding?: number[];
   cast: StoryCharacter[];
   chapter: string;
   location: string;
@@ -84,6 +89,13 @@ export type StoryScene = {
   sceneNumber: number;
   text: string;
   title: string;
+  characterUpdates?: CharacterUpdate[];
+};
+
+export type CharacterUpdate = {
+  name: string;
+  affinityChange: number;
+  statusUpdate: string;
 };
 
 export type MemoryItem = {
@@ -95,6 +107,7 @@ export type MemoryItem = {
   timestamp: string;
   update: string;
   userChoice: string;
+  embedding?: number[];
 };
 
 export type PlayerPerformance = {

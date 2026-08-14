@@ -5,6 +5,8 @@ import type { StorySetupData, MemoryItem, StoryScene, PlayerPerformance } from "
 import { validateAndFixSceneCoherence } from "@/lib/coherence/validator";
 import { detectSceneEmotion } from "@/lib/emotion-engine";
 import { getDifficultyModifier } from "@/lib/difficulty-engine";
+import { retrieveRelevantMemories } from "@/lib/memory/rag-engine";
+import { getEmbedding } from "@/lib/memory/embeddings";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -28,15 +30,25 @@ function buildPrompt(params: {
   currentScene: StoryScene | null;
   sceneNumber: number;
   difficultyModifier?: string | null;
+  relevantMemories?: MemoryItem[];
 }) {
-  const { setup, choice, memoryTimeline, currentScene, sceneNumber, difficultyModifier } = params;
+  const { setup, choice, memoryTimeline, currentScene, sceneNumber, difficultyModifier, relevantMemories } = params;
   
   const charList = setup.characters
-    .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Traits: ${c.traits.join(", ")})`)
+    .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Traits: ${c.traits.join(", ")}, Affinity: ${c.relationshipScore ?? 50}, Status: ${c.statusState ?? "Normal"})`)
     .join("\n");
 
   const recentMemories = memoryTimeline.slice(-3).map((m) => `Scene ${m.sceneNumber} (${m.choiceType}): ${m.result}`).join("\n");
-  const memoryContext = recentMemories ? `Recent events:\n${recentMemories}` : "This is the beginning of the story.";
+  const semanticMemories = (relevantMemories || [])
+    .map((m) => `Semantically Relevant Memory (Scene ${m.sceneNumber}): Choice was "${m.userChoice}" -> consequence was "${m.result}".`)
+    .join("\n");
+
+  const memoryContext = `
+[RELEVANT MEMORIES (RAG)]
+${semanticMemories || "No previous semantic matches."}
+
+[RECENT TIMELINE]
+${recentMemories || "Beginning of the adventure."}`;
 
   const currentSceneContext = currentScene 
     ? `The story was just at: ${currentScene.location}. Mood was: ${currentScene.mood}. \nLast scene text: ${currentScene.text}`
@@ -99,7 +111,14 @@ Use this exact shape:
     "narrationDuration": "Estimated seconds, e.g., '30s'",
     "narrationLabel": "Short voice direction",
     "playerState": "ready"
-  }
+  },
+  "characterUpdates": [
+    {
+      "name": "Character Name",
+      "affinityChange": 5, // positive/negative integer to alter the affinity score
+      "statusUpdate": "Describe any relationship or state shift, e.g., 'Injured' or 'Grateful'"
+    }
+  ]
 }
 
 Important Constraints:
@@ -237,6 +256,9 @@ export async function POST(request: Request) {
       ? getDifficultyModifier(setup.difficulty, playerPerformance.consecutiveSuccesses, playerPerformance.consecutiveFailures)
       : null;
 
+    // Perform RAG retrieval over memoryTimeline based on player choice
+    const relevantMemories = await retrieveRelevantMemories(choice, memoryTimeline || [], 3);
+
     const prompt = buildPrompt({
       setup,
       choice,
@@ -244,6 +266,7 @@ export async function POST(request: Request) {
       currentScene: currentScene || null,
       sceneNumber: sceneNumber || 1,
       difficultyModifier,
+      relevantMemories,
     });
 
     let sceneData;
@@ -278,15 +301,20 @@ export async function POST(request: Request) {
     // Ensure sceneNumber is injected back
     sceneData.sceneNumber = sceneNumber || 1;
 
-    // Validate coherence and detect emotion in parallel for speed
-    const [validatedScene, emotionDirectives] = await Promise.all([
+    // Validate coherence, detect emotion, and generate embedding in parallel for speed
+    const memoryText = `Choice: ${choice} -> Consequence: ${sceneData.text}`;
+    const [validatedScene, emotionDirectives, memoryEmbedding] = await Promise.all([
       validateAndFixSceneCoherence(sceneData, memoryTimeline || []),
-      detectSceneEmotion(sceneData.text, choice)
+      detectSceneEmotion(sceneData.text, choice),
+      getEmbedding(memoryText)
     ]);
 
     sceneData = validatedScene;
     if (emotionDirectives) {
       sceneData.emotionDirectives = emotionDirectives;
+    }
+    if (memoryEmbedding && memoryEmbedding.length > 0) {
+      sceneData.embedding = memoryEmbedding;
     }
 
     return NextResponse.json({ scene: sceneData, provider });

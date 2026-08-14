@@ -59,6 +59,8 @@ model Character {
   referenceImageUrl String?
   voiceSampleUrl    String?
   sourceType        CharacterSource @default(TEXT)
+  relationshipScore Int             @default(50)
+  statusState       String          @default("Normal")
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -130,6 +132,7 @@ model StoryMemory {
   memoryType       String
   content          String
   importanceScore  Int      @default(1)
+  embedding        Json?
   createdAt        DateTime @default(now())
 
   draft            StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
