@@ -840,6 +840,11 @@ export default function VideoStudioScreen() {
         scene.generatedImageStatus = "generating";
 
         try {
+          const sceneCharacterNames = Array.from(new Set(scene.dialogues.map((d) => d.character).filter(Boolean)));
+          const sceneCharacterAppearances = sceneCharacterNames
+            .map((name) => flow.script?.characterVoices.find((v) => v.character.toLowerCase() === name.toLowerCase())?.appearance)
+            .filter((appearance): appearance is string => Boolean(appearance));
+
           const response = await fetch("/api/video/image", {
             body: JSON.stringify({
               sceneId: `scene-${scene.sceneNumber}`,
@@ -850,7 +855,8 @@ export default function VideoStudioScreen() {
               mood: scene.mood,
               genres: flow.genres,
               existingHash: scene.generatedImageHash,
-              characterNames: Array.from(new Set(scene.dialogues.map((d) => d.character).filter(Boolean))),
+              characterNames: sceneCharacterNames,
+              characterAppearances: sceneCharacterAppearances,
             }),
             headers: {
               "Content-Type": "application/json"

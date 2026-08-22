@@ -6,6 +6,8 @@ export type MovieCharacterVoice = {
   gender: string;
   tone: string;
   voiceName: string;
+  /** Fixed visual description used to keep this character's appearance consistent across generated images */
+  appearance?: string;
 };
 
 export type MovieDialogueLine = {

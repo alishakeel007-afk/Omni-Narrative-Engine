@@ -20,6 +20,7 @@ export async function generateSceneImage(params: {
   existingHash?: string;
   projectId?: string;
   characterNames?: string[];
+  characterAppearances?: string[];
 }): Promise<{ url: string; prompt: string; hash: string; provider: string }> {
   const request: ImageGenerationRequest = {
     sceneId: params.sceneId,
@@ -30,6 +31,7 @@ export async function generateSceneImage(params: {
     mood: params.mood,
     genres: params.genres,
     characterNames: params.characterNames,
+    characterAppearances: params.characterAppearances,
   };
 
   const hash = buildImageHash(request);

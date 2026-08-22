@@ -21,7 +21,9 @@ export function buildImagePrompt(request: ImageGenerationRequest): string {
     qualifiers.push(`setting: ${request.location}`);
   }
 
-  if (request.characterNames && request.characterNames.length > 0) {
+  if (request.characterAppearances && request.characterAppearances.length > 0) {
+    qualifiers.push(`character appearance (must stay exactly consistent): ${request.characterAppearances.join("; ")}`);
+  } else if (request.characterNames && request.characterNames.length > 0) {
     qualifiers.push(`featuring the same characters throughout: ${request.characterNames.join(", ")}`);
   }
 

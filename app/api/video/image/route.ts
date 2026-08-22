@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       existingHash,
       projectId,
       characterNames,
+      characterAppearances,
     } = body;
 
     if (!imagePrompt && !visualPrompt && !sceneTitle) {
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
         existingHash,
         projectId,
         characterNames,
+        characterAppearances,
       });
 
       return NextResponse.json({

@@ -528,9 +528,16 @@ async function ensureVideoCharacter(draftId: string, name: string) {
 
 export async function upsertVideoCharacterVoice(draftId: string, name: string, voiceProfile: unknown) {
   const id = await ensureVideoCharacter(draftId, name);
+  const appearance = typeof voiceProfile === "object" && voiceProfile && "appearance" in voiceProfile
+    ? (voiceProfile as { appearance?: unknown }).appearance
+    : undefined;
+
   return prisma.character.update({
     where: { id },
-    data: { voiceProfile: voiceProfile as Prisma.InputJsonValue },
+    data: {
+      voiceProfile: voiceProfile as Prisma.InputJsonValue,
+      ...(typeof appearance === "string" && appearance ? { appearancePrompt: appearance } : {}),
+    },
   });
 }
 
