@@ -3,7 +3,7 @@
  * Tests: load, scene ordering, health/inventory restoration, access control, empty draft.
  */
 import { PrismaClient, StoryMode, ChoiceType as PChoiceType } from "@prisma/client";
-import { loadFullDraftState } from "../lib/story-database.ts";
+import { loadFullDraftState } from "../lib/story-database";
 
 const prisma = new PrismaClient();
 

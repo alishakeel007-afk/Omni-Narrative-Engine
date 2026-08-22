@@ -142,7 +142,7 @@ async function runPhase7Tests() {
 
   // ── Test 4: Load custom story (simulate Phase 6 Continue) ────────────────────
   console.log("\n--- Test 4: Load custom story from DB ---");
-  const { loadFullDraftState } = await import("../lib/story-database.ts");
+  const { loadFullDraftState } = await import("../lib/story-database");
   const loaded = await loadFullDraftState(customProject.id, userId);
 
   if (!loaded) throw new Error("❌ Test 4 Failed: loadFullDraftState returned null.");
@@ -174,7 +174,7 @@ async function runPhase7Tests() {
 
   // ── Test 6: Cross-user access denied ─────────────────────────────────────────
   console.log("\n--- Test 6: Cross-user access control ---");
-  const { loadFullDraftState: load2 } = await import("../lib/story-database.ts");
+  const { loadFullDraftState: load2 } = await import("../lib/story-database");
   const crossResult = await load2(customProject.id, otherUserId);
   if (crossResult !== null) throw new Error("❌ Test 6 Failed: Cross-user access was allowed!");
   console.log("✅ Test 6 Passed. Other user cannot access custom story.");

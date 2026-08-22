@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { processAndIndexSceneMemories, retrieveRelevantMemories } from "../lib/memory/memory-service.ts";
-import { generateEmbedding } from "../lib/memory/embedding-service.ts";
+import { processAndIndexSceneMemories, retrieveRelevantMemories } from "../lib/memory/memory-service";
+import { generateEmbedding } from "../lib/memory/embedding-service";
 
 const prisma = new PrismaClient();
 

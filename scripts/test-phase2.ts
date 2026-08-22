@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { processAndIndexSceneMemories } from "../lib/memory/memory-service.ts";
+import { processAndIndexSceneMemories } from "../lib/memory/memory-service";
 
 const prisma = new PrismaClient();
 
@@ -87,7 +87,7 @@ async function runPhase2Test() {
 
   console.log("\n3. Verifying First Run...");
   const memories1 = await prisma.storyMemory.findMany({ where: { draftId: draft.id } });
-  const embeddings1 = await prisma.$queryRawUnsafe(`SELECT id, "draftId", "sceneId", "memoryId", "userId", content, "memoryType", "memoryHash", embedding::text FROM "StoryMemoryEmbedding" WHERE "draftId" = '${draft.id}'`);
+  const embeddings1 = await prisma.$queryRawUnsafe<unknown[]>(`SELECT id, "draftId", "sceneId", "memoryId", "userId", content, "memoryType", "memoryHash", embedding::text FROM "StoryMemoryEmbedding" WHERE "draftId" = '${draft.id}'`);
   
   console.log(`- StoryMemory records created: ${memories1.length}`);
   // @ts-ignore
@@ -103,7 +103,7 @@ async function runPhase2Test() {
 
   console.log("\n5. Verifying Duplicate Protection...");
   const memories2 = await prisma.storyMemory.findMany({ where: { draftId: draft.id } });
-  const embeddings2 = await prisma.$queryRawUnsafe(`SELECT id, "draftId", "sceneId", "memoryId", "userId", content, "memoryType", "memoryHash", embedding::text FROM "StoryMemoryEmbedding" WHERE "draftId" = '${draft.id}'`);
+  const embeddings2 = await prisma.$queryRawUnsafe<unknown[]>(`SELECT id, "draftId", "sceneId", "memoryId", "userId", content, "memoryType", "memoryHash", embedding::text FROM "StoryMemoryEmbedding" WHERE "draftId" = '${draft.id}'`);
   
   console.log(`- StoryMemory records after second run: ${memories2.length}`);
   // @ts-ignore

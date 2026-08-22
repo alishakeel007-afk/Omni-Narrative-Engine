@@ -1,4 +1,4 @@
-import { getEnvValue } from "../lib/env.ts";
+import { getEnvValue } from "../lib/env";
 import * as fs from "fs";
 
 async function testStabilityAudio() {

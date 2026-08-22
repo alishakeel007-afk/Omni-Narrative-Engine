@@ -1,8 +1,8 @@
 // Test utilities for story engine systems
 
-import { HealthStatus } from "@/lib/story-storage";
+import { HealthStatus, StorySetupData } from "@/lib/story-storage";
 import { checkGameOverCondition } from "@/lib/game-over";
-import { analyzeChoiceStyle, calculateChoiceImpact } from "@/lib/choice-impact";
+import { analyzeChoiceStyle, calculateChoiceImpact, applyStatModifiers } from "@/lib/choice-impact";
 import { validateChoiceInput, validateStoryTitle } from "@/lib/validation";
 import { InventoryManager, createDefaultItems } from "@/lib/inventory";
 import {
@@ -21,13 +21,23 @@ export function createMockHealthStatus(
     health: 100,
     mana: 100,
     resolve: 100,
-    attributes: {
-      strength: 50,
-      intelligence: 50,
-      wisdom: 50,
-      charisma: 50,
-      dexterity: 50
-    },
+    ...overrides
+  };
+}
+
+/**
+ * Mock character attributes for testing
+ */
+export function createMockCharacterAttributes(
+  overrides?: Partial<StorySetupData["characterAttributes"]>
+): StorySetupData["characterAttributes"] {
+  return {
+    agility: 50,
+    charisma: 50,
+    endurance: 50,
+    intelligence: 50,
+    strength: 50,
+    wisdom: 50,
     ...overrides
   };
 }
@@ -246,6 +256,7 @@ export function simulateGameSession() {
   console.log("🎮 Simulating game session...\n");
 
   let health = createMockHealthStatus();
+  let attributes = createMockCharacterAttributes();
   let sceneIndex = 0;
   let memory: string[] = [];
 
@@ -269,13 +280,14 @@ export function simulateGameSession() {
     const impact = calculateChoiceImpact(style, health);
 
     // Apply modifiers
-    const { updatedHealth, appliedModifiers } = applyStatModifiers(
+    const { updatedHealth, updatedAttributes, appliedModifiers } = applyStatModifiers(
       health,
-      health.attributes,
+      attributes,
       impact.modifiers
     );
 
     health = updatedHealth;
+    attributes = updatedAttributes;
 
     // Log changes
     appliedModifiers.forEach(mod => {
@@ -294,12 +306,4 @@ export function simulateGameSession() {
 
   console.log(`\n✅ Simulation complete. Final health: ${health.health}`);
   return health;
-}
-
-// Import helper
-function applyStatModifiers(health: any, attributes: any, modifiers: any[]) {
-  return {
-    updatedHealth: health,
-    appliedModifiers: modifiers.map(m => ({ ...m, notification: m.reason }))
-  };
 }

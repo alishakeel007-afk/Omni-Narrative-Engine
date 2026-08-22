@@ -1,7 +1,7 @@
-import { buildPrompt } from "../app/api/story/generate-scene/route.ts";
-import { processAndIndexSceneMemories, retrieveRelevantMemories, buildMemoryContextBlock } from "../lib/memory/memory-service.ts";
+import { buildPrompt } from "../lib/story-prompt";
+import { processAndIndexSceneMemories, retrieveRelevantMemories, buildMemoryContextBlock } from "../lib/memory/memory-service";
 import { PrismaClient } from "@prisma/client";
-import type { StorySetupData, StoryScene } from "../types/story.ts";
+import type { StorySetupData, StoryScene } from "../types/story";
 
 const prisma = new PrismaClient();
 
@@ -11,6 +11,7 @@ async function runPhase4Test() {
   const tempUser = "test-user-phase4-" + Date.now();
   const mockSetup: StorySetupData = {
     storyTitle: "The Fall of Lyra",
+    genre: "Fantasy",
     genres: ["Fantasy"],
     moods: ["Dark"],
     difficulty: "Normal",
@@ -42,7 +43,7 @@ async function runPhase4Test() {
   const mockScene1: StoryScene = {
     sceneNumber: 1, title: "Northern Mines", location: "Northern Mines", mood: "Sad", 
     text: "Lyra tells the player: 'I lost my brother in the northern mines.' She looks away in sorrow.",
-    cast: [{ name: "Lyra", role: "Guide", emotionalState: "Sorrowful", traits: ["Loyal"], relationships: ["Lost her brother"], imageLabel: "Lyra" }],
+    cast: [{ name: "Lyra", role: "Guide", emotionalState: "Sorrowful", traits: ["Loyal"], relationships: ["Lost her brother"], imageLabel: "Lyra", visualAppearance: "Weathered traveler's cloak, tired eyes" }],
     inventoryUpdate: null,
     options: [], media: { audioMoodPrompt: "", backgroundMusicMood: "", imageLabel: "", imagePrompt: "", narrationDuration: "", narrationLabel: "", playerState: "ready" },
     chapter: "Chapter 1"

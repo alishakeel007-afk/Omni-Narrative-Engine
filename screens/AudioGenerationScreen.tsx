@@ -338,8 +338,11 @@ export default function AudioGenerationScreen() {
 
             <div className="flex flex-col gap-1">
               <PreviewFinalAudioButton
-                backgroundMusicUrl={draft.audio.backgroundMusicUrl}
-                voiceAudioUrls={draft.scenes.flatMap(scene => scene.dialogues.map(d => (d as any).audioUrl))}
+                scenes={draft.scenes.map(scene => ({
+                  sceneNumber: scene.sceneNumber,
+                  backgroundMusicUrl: draft.audio.backgroundMusicUrl,
+                  dialogues: scene.dialogues
+                }))}
               />
               {draft.audio.backgroundMusicStatus !== "ready" && (
                 <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Music required</p>

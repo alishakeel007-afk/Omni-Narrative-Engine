@@ -18,8 +18,8 @@
  */
 
 import { PrismaClient, StoryMode } from "@prisma/client";
-import { processAndIndexSceneMemories, retrieveRelevantMemories, buildMemoryContextBlock } from "../lib/memory/memory-service.ts";
-import { loadFullDraftState } from "../lib/story-database.ts";
+import { processAndIndexSceneMemories, retrieveRelevantMemories, buildMemoryContextBlock } from "../lib/memory/memory-service";
+import { loadFullDraftState } from "../lib/story-database";
 
 const prisma = new PrismaClient();
 

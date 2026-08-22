@@ -31,7 +31,7 @@ import {
   getCharacterContextBlock,
   getCharactersForDraft,
 } from "../lib/story-database";
-import { buildPrompt } from "../app/api/story/generate-scene/route";
+import { buildPrompt } from "../lib/story-prompt";
 import {
   processAndIndexSceneMemories,
   retrieveRelevantMemories,

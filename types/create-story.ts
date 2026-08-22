@@ -9,6 +9,7 @@ export type CreateStoryCharacter = {
 };
 
 export type CreateStoryDialogue = {
+  audioUrl?: string;
   characterId: string;
   characterName: string;
   id: string;

@@ -1,11 +1,20 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Square } from "lucide-react";
-import type { MovieScene } from "@/types/video";
+
+type PreviewDialogueLine = {
+  audioUrl?: string;
+};
+
+type PreviewScene = {
+  sceneNumber: number;
+  backgroundMusicUrl?: string;
+  dialogues: PreviewDialogueLine[];
+};
 
 export function PreviewFinalAudioButton({
   scenes
 }: {
-  scenes: MovieScene[];
+  scenes: PreviewScene[];
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -22,7 +31,7 @@ export function PreviewFinalAudioButton({
 
   // Flatten dialogues into a sequence, tracking their parent scene
   const dialogueSequence = useMemo(() => {
-    const seq: { scene: MovieScene; audioUrl: string }[] = [];
+    const seq: { scene: PreviewScene; audioUrl: string }[] = [];
     for (const scene of scenes) {
       for (const dialogue of scene.dialogues) {
         if (dialogue.audioUrl) {
@@ -66,7 +75,7 @@ export function PreviewFinalAudioButton({
     });
   };
 
-  const playBackgroundMusicForScene = (scene: MovieScene) => {
+  const playBackgroundMusicForScene = (scene: PreviewScene) => {
     // If the scene hasn't changed, don't change the music
     if (currentSceneNumber.current === scene.sceneNumber) return;
     currentSceneNumber.current = scene.sceneNumber;

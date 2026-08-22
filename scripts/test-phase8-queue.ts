@@ -10,7 +10,7 @@
  * - Recovery logic falls back correctly.
  */
 
-import { getLocalQueue, saveLocalQueue, enqueueLocalSave, syncPendingSavesForDraft, type SavePayload, type QueuedSave } from "../lib/save-queue.ts";
+import { getLocalQueue, saveLocalQueue, enqueueLocalSave, syncPendingSavesForDraft, type SavePayload, type QueuedSave } from "../lib/save-queue";
 
 // Mock localStorage for the NodeJS test environment
 const mockStorage: Record<string, string> = {};
@@ -22,9 +22,10 @@ global.window = {
   }
 } as any;
 
-let fetchMock: jest.Mock | null = null;
+const fetchMockHolder: { current: ((...args: unknown[]) => unknown) | null } = { current: null };
 global.fetch = async (...args) => {
-  if (fetchMock) return fetchMock(...args);
+  const mock = fetchMockHolder.current;
+  if (mock) return mock(...args) as any;
   return { ok: true } as any;
 };
 
