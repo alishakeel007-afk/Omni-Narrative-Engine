@@ -1,4 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+// ============================================================
+// lib/audio/music-storage.ts
+// Uploads generated background music buffers to Supabase Storage
+// using the service-role client. No base64 fallback: if the upload
+// fails, the caller must surface a real error, not inline data.
+// ============================================================
+
+import { uploadToSupabaseStorage } from "@/lib/supabase-storage";
 
 export async function uploadMusicToStorage(params: {
   audioBuffer: ArrayBuffer;
@@ -6,37 +13,14 @@ export async function uploadMusicToStorage(params: {
   projectId?: string;
   sceneId: string;
 }): Promise<string> {
-  const supabase = await createClient();
-  
-  try {
-    const path = `music/${params.projectId || 'default'}/${params.sceneId}-${Date.now()}.mp3`;
-    
-    const { data, error } = await supabase
-      .storage
-      .from('audio')
-      .upload(path, params.audioBuffer, {
-        contentType: params.contentType,
-        upsert: false,
-      });
-      
-    if (error) {
-      console.warn("Supabase upload failed, falling back to base64", error);
-      return bufferToBase64DataUrl(params.audioBuffer, params.contentType);
-    }
-    
-    const { data: publicData } = supabase
-      .storage
-      .from('audio')
-      .getPublicUrl(path);
-      
-    return publicData.publicUrl;
-  } catch (error) {
-    console.warn("Storage upload exception, falling back to base64", error);
-    return bufferToBase64DataUrl(params.audioBuffer, params.contentType);
-  }
-}
+  const path = `music/${params.projectId || "default"}/${params.sceneId}-${Date.now()}.mp3`;
 
-function bufferToBase64DataUrl(buffer: ArrayBuffer, contentType: string): string {
-  const base64 = Buffer.from(buffer).toString('base64');
-  return `data:${contentType};base64,${base64}`;
+  const { publicUrl } = await uploadToSupabaseStorage({
+    bucket: "audio",
+    path,
+    body: params.audioBuffer,
+    contentType: params.contentType,
+  });
+
+  return publicUrl;
 }

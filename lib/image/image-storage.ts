@@ -1,10 +1,11 @@
 // ============================================================
 // lib/image/image-storage.ts
-// Handles uploading generated image buffers to Supabase Storage,
-// with safe fallback to Base64 Data URLs.
+// Uploads generated image buffers to Supabase Storage using the
+// service-role client. No base64 fallback: if the upload fails,
+// the caller must surface a real error, not inline data.
 // ============================================================
 
-import { createClient } from "@/lib/supabase/server";
+import { uploadToSupabaseStorage } from "@/lib/supabase-storage";
 
 export async function uploadImageToStorage(params: {
   imageBuffer: ArrayBuffer;
@@ -12,34 +13,14 @@ export async function uploadImageToStorage(params: {
   projectId?: string;
   sceneId: string;
 }): Promise<string> {
-  try {
-    const supabase = await createClient();
-    const path = `images/${params.projectId || "default"}/${params.sceneId}-${Date.now()}.png`;
+  const path = `${params.projectId || "default"}/${params.sceneId}-${Date.now()}.png`;
 
-    const { data, error } = await supabase.storage
-      .from("images")
-      .upload(path, params.imageBuffer, {
-        contentType: params.contentType,
-        upsert: false,
-      });
+  const { publicUrl } = await uploadToSupabaseStorage({
+    bucket: "images",
+    path,
+    body: params.imageBuffer,
+    contentType: params.contentType,
+  });
 
-    if (error) {
-      console.warn("Supabase image bucket upload skipped or failed, using base64 fallback:", error.message);
-      return bufferToBase64DataUrl(params.imageBuffer, params.contentType);
-    }
-
-    const { data: publicData } = supabase.storage
-      .from("images")
-      .getPublicUrl(path);
-
-    return publicData.publicUrl;
-  } catch (error) {
-    console.warn("Storage upload exception, using base64 fallback");
-    return bufferToBase64DataUrl(params.imageBuffer, params.contentType);
-  }
-}
-
-function bufferToBase64DataUrl(buffer: ArrayBuffer, contentType: string): string {
-  const base64 = Buffer.from(buffer).toString("base64");
-  return `data:${contentType};base64,${base64}`;
+  return publicUrl;
 }
