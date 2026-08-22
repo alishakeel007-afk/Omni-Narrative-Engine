@@ -558,6 +558,10 @@ function buildGeminiPrompt(request: Required<Pick<VideoGenerationRequest, "scena
   sceneCount?: number;
   tones: string[];
 }) {
+  const sceneCountInstruction = request.sceneCount
+    ? `Generate EXACTLY ${request.sceneCount} scenes. The "scenes" array in your JSON response must contain exactly ${request.sceneCount} entries, no more and no fewer, even if you would otherwise prefer a different count.`
+    : "Choose the number of scenes the story naturally needs. Usually 3-5 scenes is enough for an MVP short film, but use fewer or more when the story needs it.";
+
   return `You are the Omni-Narrative Engine, a cinematic story director for an AI video creation module.
 
 Create a scene-by-scene short movie script from the user's scenario.
@@ -568,7 +572,7 @@ ${request.scenario}
 Creative constraints:
 - Genre palette: ${request.genres.join(", ")}
 - Tone palette: ${request.tones.join(", ")}
-- Scene count: choose the number of scenes the story naturally needs. Usually 3-5 scenes is enough for an MVP short film, but use fewer or more when the story needs it.
+- Scene count: ${sceneCountInstruction}
 - The movie may blend multiple genres. Assign each scene a sceneGenre such as "Sci-Fi + Comedy" or "Mystery + Suspense" when useful.
 - The movie may shift tones scene by scene. Assign each scene a sceneTone based on what is happening in that moment.
 - Make it feel like a proper short film, with a clear beginning, escalation, climax, and ending.
@@ -777,7 +781,8 @@ async function generateMovieScript(params: {
     throw new Error("Gemini returned no scenes.");
   }
 
-  const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
+  const sceneLimit = params.sceneCount ? Math.min(params.sceneCount, MAX_SCENES) : MAX_SCENES;
+  const scenes = rawScenes.slice(0, sceneLimit).map(normalizeScene);
   const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
 
   return {
@@ -839,7 +844,8 @@ async function generateMovieScriptWithGroq(params: {
     throw new Error("Groq fallback returned no scenes.");
   }
 
-  const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
+  const sceneLimit = params.sceneCount ? Math.min(params.sceneCount, MAX_SCENES) : MAX_SCENES;
+  const scenes = rawScenes.slice(0, sceneLimit).map(normalizeScene);
   const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
 
   return {
@@ -1081,10 +1087,11 @@ export async function POST(request: Request) {
     const genres = listValue(body.genre, ["Cinematic Drama"]);
     const tones = listValue(body.tone, ["Immersive and emotional"]);
     const includeAudio = body.includeAudio !== false;
+    const sceneCount = body.sceneCount !== undefined ? clampSceneCount(body.sceneCount) : undefined;
     const script = await generateMovieScriptWithFallback({
       geminiApiKey,
       genres,
-      sceneCount: undefined,
+      sceneCount,
       scenario,
       tones
     });

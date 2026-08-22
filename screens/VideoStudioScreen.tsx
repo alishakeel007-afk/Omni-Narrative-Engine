@@ -286,6 +286,21 @@ export default function VideoStudioScreen() {
       return;
     }
 
+    const currentSceneCount = flow.script?.scenes.length ?? flow.sceneCount;
+    const hasGeneratedImages = Boolean(flow.script?.scenes.some((scene) => scene.generatedImageUrl));
+    const hasGeneratedMusic = Boolean(flow.script?.scenes.some((scene) => scene.backgroundMusicUrl));
+    const hasGeneratedVoice = Boolean(flow.voiceResult);
+    const lost = [
+      hasGeneratedVoice && "voice audio",
+      hasGeneratedImages && "generated scene images",
+      hasGeneratedMusic && "background music"
+    ].filter(Boolean).join(", ");
+    const confirmMessage = lost
+      ? `Regenerating scenes and dialogues will replace all ${currentSceneCount} current scenes, along with any edits you made to them, and discard their ${lost}. This cannot be undone. Continue?`
+      : `Regenerating scenes and dialogues will replace all ${currentSceneCount} current scenes, along with any edits you made to them. This cannot be undone. Continue?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
     setIsGeneratingStory(true);
     setError("");
     setEditingKey(null);
@@ -296,6 +311,7 @@ export default function VideoStudioScreen() {
           genre: flow.genres,
           includeAudio: false,
           scenario,
+          sceneCount: currentSceneCount,
           tone: flow.tones
         }),
         headers: {
