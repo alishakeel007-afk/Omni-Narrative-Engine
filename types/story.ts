@@ -36,6 +36,9 @@ export type StorySetupData = {
   selectedTemplate: string;
   startingIdea: string;
   storyTitle: string;
+  // Phase 7: DB project/draft linkage
+  projectId?: string;
+  draftId?: string;
 };
 
 export type HealthStatus = {
@@ -43,6 +46,12 @@ export type HealthStatus = {
   mana: number;
   resolve: number;
 };
+
+export type InventoryUpdate = {
+  action: "add" | "remove";
+  item: string;
+  reason?: string;
+} | null;
 
 export type StoryCharacter = {
   emotionalState: string;
@@ -62,6 +71,9 @@ export type GeneratedMedia = {
   narrationDuration: string;
   narrationLabel: string;
   playerState: "ready" | "generating";
+  imageUrl?: string;
+  narrationAudioUrl?: string;
+  musicUrl?: string;
 };
 
 export type StoryScene = {
@@ -74,6 +86,8 @@ export type StoryScene = {
   sceneNumber: number;
   text: string;
   title: string;
+  resultSummary?: string;
+  inventoryUpdate?: InventoryUpdate;
 };
 
 export type MemoryItem = {
@@ -101,19 +115,7 @@ export type PersistedStoryState = {
   selectedChoice: string;
   selectedChoiceType: ChoiceType | null;
   setup: StorySetupData;
+  dynamicCast: StoryCharacter[];
 };
 
-export type DummySceneTemplate = {
-  chapter: string;
-  inventoryHint?: string;
-  location: string;
-  media: Omit<GeneratedMedia, "imageLabel" | "imagePrompt" | "audioMoodPrompt"> & {
-    baseAudioMoodPrompt: string;
-    baseImagePrompt: string;
-  };
-  mood: string;
-  optionSeeds: string[];
-  sceneNumber: number;
-  text: string;
-  title: string;
-};
+

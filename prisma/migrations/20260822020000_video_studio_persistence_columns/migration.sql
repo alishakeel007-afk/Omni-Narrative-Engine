@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "StoryDraft" ADD COLUMN IF NOT EXISTS "videoStudioState" JSONB;
+
+-- AlterTable
+ALTER TABLE "Character" ADD COLUMN IF NOT EXISTS "voiceProfile" JSONB;
+
+-- AlterTable
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "directorNotes" TEXT;
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "sceneGenre" TEXT;
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "sceneTone" TEXT;
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "soundDesign" TEXT;
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "visualPrompt" TEXT;
+ALTER TABLE "Scene" ADD COLUMN IF NOT EXISTS "estimatedDuration" TEXT;

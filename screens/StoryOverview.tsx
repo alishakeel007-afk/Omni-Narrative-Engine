@@ -9,7 +9,7 @@ import { MediaPanel } from "@/components/media-panel";
 import { useStory } from "@/context/StoryContext";
 
 export default function StoryOverview() {
-  const { setup, state, restartStory } = useStory();
+  const { setup, state, restartStory, updateCurrentSceneMedia } = useStory();
   const router = useRouter();
   const scene = state.currentScene;
 
@@ -68,6 +68,17 @@ export default function StoryOverview() {
             sceneMood={`${setup.mood} + ${scene?.mood ?? ""}`}
             imagePrompt={state.generatedMedia?.imagePrompt}
             audioPrompt={state.generatedMedia?.audioMoodPrompt}
+            narrationText={scene?.text ?? ""}
+            location={scene?.location}
+            sceneNumber={scene?.sceneNumber ?? state.currentSceneIndex}
+            draftId={setup.draftId}
+            projectId={setup.projectId}
+            characterNames={(scene?.cast ?? []).map((c) => c.name).filter(Boolean)}
+            characterAppearances={(scene?.cast ?? []).map((c) => c.visualAppearance).filter(Boolean)}
+            existingImageUrl={state.generatedMedia?.imageUrl}
+            existingNarrationUrl={state.generatedMedia?.narrationAudioUrl}
+            existingMusicUrl={state.generatedMedia?.musicUrl}
+            onMediaUpdate={updateCurrentSceneMedia}
           />
         </div>
       </div>

@@ -8,6 +8,7 @@ import {
   Check,
   Clapperboard,
   Edit3,
+  Image as ImageIcon,
   Loader2,
   Mic2,
   Music2,
@@ -31,6 +32,11 @@ import {
   type VideoStudioFlowState,
   type VideoStudioStage
 } from "@/lib/video-storage";
+import {
+  createVideoStudioProject,
+  loadVideoStudioFromDatabase,
+  saveVideoStudioToDatabase
+} from "@/lib/video-studio-db";
 import type { MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/types/video";
 
 type EditableSceneField =
@@ -63,6 +69,7 @@ export default function VideoStudioScreen() {
   const [error, setError] = useState("");
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
   const [generatingDialogueScene, setGeneratingDialogueScene] = useState<number | null>(null);
   const [generatingDialogueLineId, setGeneratingDialogueLineId] = useState<string | null>(null);
@@ -71,7 +78,17 @@ export default function VideoStudioScreen() {
   const [customToneInput, setCustomToneInput] = useState("");
 
   useEffect(() => {
-    setFlow(loadVideoStudioFlow());
+    const localFlow = loadVideoStudioFlow();
+    setFlow(localFlow);
+
+    if (localFlow.projectId) {
+      loadVideoStudioFromDatabase(localFlow.projectId).then((dbFlow) => {
+        if (dbFlow) {
+          setFlow(dbFlow);
+          saveVideoStudioFlow(dbFlow);
+        }
+      });
+    }
   }, []);
 
   const visibleScript = flow?.voiceResult ?? flow?.script ?? null;
@@ -83,6 +100,10 @@ export default function VideoStudioScreen() {
   const persistFlow = (nextFlow: VideoStudioFlowState) => {
     setFlow(nextFlow);
     saveVideoStudioFlow(nextFlow);
+
+    if (nextFlow.projectId && nextFlow.draftId && (nextFlow.script || nextFlow.voiceResult)) {
+      saveVideoStudioToDatabase(nextFlow);
+    }
   };
 
   const updateFlow = (partial: Partial<VideoStudioFlowState>) => {
@@ -220,6 +241,17 @@ export default function VideoStudioScreen() {
 
       const script = payload as VideoGenerationResponse;
       const storyText = createStoryTextFromScript(script);
+
+      let projectId = flow.projectId;
+      let draftId = flow.draftId;
+      if (!projectId || !draftId) {
+        const created = await createVideoStudioProject({ ...flow, script });
+        if (created) {
+          projectId = created.projectId;
+          draftId = created.draftId;
+        }
+      }
+
       persistFlow({
         ...flow,
         acceptedStory: storyText,
@@ -230,7 +262,9 @@ export default function VideoStudioScreen() {
         stage: "storyReview",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
-        voiceResult: null
+        voiceResult: null,
+        projectId,
+        draftId
       });
     } catch (generationError) {
       setError(
@@ -276,6 +310,17 @@ export default function VideoStudioScreen() {
       }
 
       const script = payload as VideoGenerationResponse;
+
+      let projectId = flow.projectId;
+      let draftId = flow.draftId;
+      if (!projectId || !draftId) {
+        const created = await createVideoStudioProject({ ...flow, script });
+        if (created) {
+          projectId = created.projectId;
+          draftId = created.draftId;
+        }
+      }
+
       persistFlow({
         ...flow,
         generatedStory: flow.generatedStory || createStoryTextFromScript(script),
@@ -284,7 +329,9 @@ export default function VideoStudioScreen() {
         stage: "scenes",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
-        voiceResult: null
+        voiceResult: null,
+        projectId,
+        draftId
       });
     } catch (generationError) {
       setError(
@@ -753,7 +800,7 @@ export default function VideoStudioScreen() {
 
     try {
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script: flow.script }),
+        body: JSON.stringify({ script: flow.script, projectId: flow.projectId }),
         headers: {
           "Content-Type": "application/json"
         },
@@ -780,47 +827,269 @@ export default function VideoStudioScreen() {
     }
   };
 
-  const generateBackgroundMusic = async () => {
+  const generateSceneImages = async (forceRegenerateAll = false) => {
+    if (!flow?.script || isGeneratingImages) return;
+
+    setIsGeneratingImages(true);
+    setError("");
+    persistFlow({
+      ...flow,
+      images: {
+        ...flow.images,
+        message: "Generating AI visual artwork...",
+        status: "generating"
+      }
+    });
+
+    try {
+      const mapWithConcurrency = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) => {
+        const results: R[] = [];
+        const executing: Promise<void>[] = [];
+        for (const item of items) {
+          const p = Promise.resolve().then(() => fn(item)).then(res => {
+            results.push(res);
+          });
+          const e = p.then(() => {
+            executing.splice(executing.indexOf(e), 1);
+          });
+          executing.push(e);
+          if (executing.length >= limit) {
+            await Promise.race(executing);
+          }
+        }
+        await Promise.all(executing);
+        return results;
+      };
+
+      const updatedScenes = flow.script.scenes.map(scene => {
+        if (forceRegenerateAll) {
+          return {
+            ...scene,
+            generatedImageUrl: undefined,
+            generatedImagePrompt: undefined,
+            generatedImageHash: undefined,
+            generatedImageStatus: "idle" as const,
+            generatedImageError: undefined
+          };
+        }
+        return { ...scene };
+      });
+
+      let errorsOccurred = false;
+
+      await mapWithConcurrency(updatedScenes, 2, async (scene) => {
+        if (scene.generatedImageStatus === "completed" || scene.generatedImageUrl) {
+          return;
+        }
+
+        scene.generatedImageStatus = "generating";
+
+        try {
+          const sceneCharacterNames = Array.from(new Set(scene.dialogues.map((d) => d.character).filter(Boolean)));
+          const sceneCharacterAppearances = sceneCharacterNames
+            .map((name) => flow.script?.characterVoices.find((v) => v.character.toLowerCase() === name.toLowerCase())?.appearance)
+            .filter((appearance): appearance is string => Boolean(appearance));
+
+          const response = await fetch("/api/video/image", {
+            body: JSON.stringify({
+              sceneId: `scene-${scene.sceneNumber}`,
+              imagePrompt: scene.imagePrompt || scene.visualPrompt || scene.title,
+              visualPrompt: scene.visualPrompt,
+              sceneTitle: scene.title,
+              location: scene.location,
+              mood: scene.mood,
+              genres: flow.genres,
+              existingHash: scene.generatedImageHash,
+              characterNames: sceneCharacterNames,
+              characterAppearances: sceneCharacterAppearances,
+            }),
+            headers: {
+              "Content-Type": "application/json"
+            },
+            method: "POST"
+          });
+          const payload = await response.json();
+
+          if (payload.duplicate === true) {
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? `Failed to generate image for Scene ${scene.sceneNumber}.`);
+          }
+
+          scene.generatedImageUrl = payload.imageUrl;
+          scene.generatedImagePrompt = payload.prompt;
+          scene.generatedImageHash = payload.hash;
+          scene.generatedImageStatus = "completed";
+          scene.generatedImageError = undefined;
+        } catch (err) {
+          console.error(err);
+          errorsOccurred = true;
+          scene.generatedImageStatus = "failed";
+          scene.generatedImageError = err instanceof Error ? err.message : "Image generation failed";
+        }
+      });
+
+      const anyImages = updatedScenes.some(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
+
+      persistFlow({
+        ...flow,
+        script: {
+          ...flow.script,
+          scenes: updatedScenes
+        },
+        images: {
+          message: errorsOccurred 
+            ? "Visual artwork generation finished, but some scenes failed." 
+            : "All scene visual artwork is ready.",
+          provider: "AI Visual Engine",
+          status: anyImages ? "ready" : "error"
+        },
+        videoOutdated: true
+      });
+    } catch (imgError) {
+      persistFlow({
+        ...flow,
+        images: {
+          ...flow.images,
+          message:
+            imgError instanceof Error
+              ? imgError.message
+              : "Visual artwork generation failed.",
+          status: "error"
+        }
+      });
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
+
+  const regenerateAllImages = () => {
+    generateSceneImages(true);
+  };
+
+  const generateBackgroundMusic = async (forceRegenerateAll = false) => {
     if (!flow?.script || isGeneratingMusic) return;
 
-    const primaryScene = flow.script.scenes[0];
     setIsGeneratingMusic(true);
     setError("");
     persistFlow({
       ...flow,
       music: {
         ...flow.music,
-        message: "Generating background music...",
+        message: "Generating scene-specific background music...",
         status: "generating"
       }
     });
 
     try {
-      const response = await fetch("/api/background-music", {
-        body: JSON.stringify({
-          audioPrompt: flow.script.scenes.map((scene) => scene.soundDesign).join("\n"),
-          sceneMood: primaryScene?.mood ?? flow.tones.join(", "),
-          sceneTitle: flow.script.title
-        }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST"
-      });
-      const payload = await response.json();
+      const mapWithConcurrency = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) => {
+        const results: R[] = [];
+        const executing: Promise<void>[] = [];
+        for (const item of items) {
+          const p = Promise.resolve().then(() => fn(item)).then(res => {
+            results.push(res);
+          });
+          
+          const e = p.then(() => {
+            executing.splice(executing.indexOf(e), 1);
+          });
+          executing.push(e);
+          
+          if (executing.length >= limit) {
+            await Promise.race(executing);
+          }
+        }
+        await Promise.all(executing);
+        return results;
+      };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Background music generation failed.");
-      }
+      const updatedScenes = flow.script.scenes.map(scene => {
+        if (forceRegenerateAll) {
+          return {
+            ...scene,
+            backgroundMusicUrl: undefined,
+            backgroundMusicTitle: undefined,
+            backgroundMusicMood: undefined,
+            backgroundMusicPrompt: undefined,
+            backgroundMusicHash: undefined,
+            backgroundMusicStatus: "idle" as const,
+            backgroundMusicError: undefined
+          };
+        }
+        return { ...scene };
+      });
+
+      let errorsOccurred = false;
+
+      await mapWithConcurrency(updatedScenes, 2, async (scene) => {
+        if (scene.backgroundMusicStatus === "completed" || scene.backgroundMusicUrl) {
+          return;
+        }
+
+        scene.backgroundMusicStatus = "generating";
+
+        try {
+          const response = await fetch("/api/background-music", {
+            body: JSON.stringify({
+              mood: scene.mood || scene.sceneTone || flow.tones.join(", "),
+              soundDesign: scene.soundDesign || "",
+              sceneTitle: scene.title,
+              sceneLocation: scene.location,
+              narration: scene.narration,
+              estimatedDuration: scene.estimatedDuration,
+              genres: flow.genres,
+              existingHash: scene.backgroundMusicHash,
+              sceneId: `scene-${scene.sceneNumber}`,
+            }),
+            headers: {
+              "Content-Type": "application/json"
+            },
+            method: "POST"
+          });
+          const payload = await response.json();
+
+          if (payload.duplicate === true) {
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? `Failed to generate music for Scene ${scene.sceneNumber}.`);
+          }
+
+          scene.backgroundMusicUrl = payload.audioUrl;
+          scene.backgroundMusicTitle = payload.title ?? `Scene ${scene.sceneNumber} Score`;
+          scene.backgroundMusicMood = payload.mood ?? scene.mood;
+          scene.backgroundMusicPrompt = payload.prompt;
+          scene.backgroundMusicHash = payload.hash;
+          scene.backgroundMusicStatus = "completed";
+          scene.backgroundMusicError = undefined;
+        } catch (err) {
+          console.error(err);
+          errorsOccurred = true;
+          scene.backgroundMusicStatus = "failed";
+          scene.backgroundMusicError = err instanceof Error ? err.message : "Generation failed";
+        }
+      });
+
+      const anyTracks = updatedScenes.some(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
 
       persistFlow({
         ...flow,
+        script: {
+          ...flow.script,
+          scenes: updatedScenes
+        },
         music: {
-          message: "Background music is ready.",
-          mood: payload.mood ?? primaryScene?.mood ?? "ambient",
-          status: "ready",
-          title: payload.title ?? "Generated Background Score",
-          trackUrl: payload.trackUrl ?? ""
+          message: errorsOccurred 
+            ? "Background music generation finished, but some scenes failed." 
+            : "Background music is ready.",
+          mood: updatedScenes[0]?.backgroundMusicMood ?? "ambient",
+          status: anyTracks ? "ready" : "error",
+          title: "Scene-Specific Background Score",
+          trackUrl: updatedScenes[0]?.backgroundMusicUrl ?? "",
+          provider: ""
         },
         videoOutdated: true
       });
@@ -839,6 +1108,10 @@ export default function VideoStudioScreen() {
     } finally {
       setIsGeneratingMusic(false);
     }
+  };
+
+  const regenerateAllMusic = () => {
+    generateBackgroundMusic(true);
   };
 
   const openPreview = () => {
@@ -981,8 +1254,19 @@ export default function VideoStudioScreen() {
                   script={visibleScript}
                   totalDialogueLines={totalDialogueLines}
                   onBack={() => setStage("scenes")}
-                  onContinue={() => setStage("music")}
+                  onContinue={() => setStage("images")}
                   onGenerate={generateVoice}
+                />
+              ) : null}
+
+              {flow.stage === "images" ? (
+                <ImageStage
+                  flow={flow}
+                  isGenerating={isGeneratingImages}
+                  onBack={() => setStage("voice")}
+                  onContinue={() => setStage("music")}
+                  onGenerate={() => generateSceneImages(false)}
+                  onRegenerateAll={regenerateAllImages}
                 />
               ) : null}
 
@@ -990,8 +1274,9 @@ export default function VideoStudioScreen() {
                 <MusicStage
                   flow={flow}
                   isGenerating={isGeneratingMusic}
-                  onBack={() => setStage("voice")}
-                  onGenerate={generateBackgroundMusic}
+                  onBack={() => setStage("images")}
+                  onGenerate={() => generateBackgroundMusic(false)}
+                  onRegenerateAll={regenerateAllMusic}
                   onPreview={openPreview}
                 />
               ) : null}
@@ -1476,12 +1761,12 @@ function VoiceStage({
             disabled={!script || isGenerating || !flow.voiceResult || flow.voiceNeedsRegeneration}
             onClick={onContinue}
           >
-            <Music2 className="h-4 w-4" />
-            Continue to Music
+            <ImageIcon className="h-4 w-4" />
+            Continue to Visuals
           </PrimaryButton>
           {!flow.voiceResult && !isGenerating && (
             <p className="col-span-full mt-2 text-center text-xs text-white/75 italic">
-              Please generate voice audio to unlock background music.
+              Please generate voice audio to unlock visual generation.
             </p>
           )}
         </div>
@@ -1494,19 +1779,124 @@ function VoiceStage({
   );
 }
 
+function ImageStage({
+  flow,
+  isGenerating,
+  onBack,
+  onGenerate,
+  onRegenerateAll,
+  onContinue
+}: {
+  flow: VideoStudioFlowState;
+  isGenerating: boolean;
+  onBack: () => void;
+  onGenerate: () => void;
+  onRegenerateAll: () => void;
+  onContinue: () => void;
+}) {
+  const allGenerated = flow.script?.scenes.every(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
+  const anyImages = flow.script?.scenes.some(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
+
+  return (
+    <section className="glass-panel rounded-[2rem] p-6">
+      <SectionHeader
+        icon={<ImageIcon className="h-7 w-7 text-white" />}
+        label="Stage 6"
+        title="Visual Image Generation"
+      />
+      <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-5">
+        <p className="text-xs uppercase tracking-[0.26em] text-white/75">Visual Status</p>
+        <h3 className="mt-2 text-xl font-semibold capitalize text-white">{flow.images?.status || "idle"}</h3>
+        <p className="mt-3 text-sm leading-7 text-white/90">{flow.images?.message || "Generate AI visual artwork for each scene."}</p>
+
+        {flow.script?.scenes.map((scene) => (
+          <div key={scene.sceneNumber} className="mt-4 border-t border-white/10 pt-4 flex flex-col gap-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-semibold text-white">Scene {scene.sceneNumber}: {scene.title}</p>
+                <p className="text-xs text-white/70 italic mt-1">"{scene.imagePrompt || scene.visualPrompt || "Cinematic visual"}"</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {(!scene.generatedImageStatus || scene.generatedImageStatus === "idle") && (
+                  <><span className="h-2 w-2 rounded-full bg-gray-500"></span><span className="text-gray-400">Not generated</span></>
+                )}
+                {scene.generatedImageStatus === "generating" && (
+                  <><Loader2 className="h-3 w-3 animate-spin text-amber-400" /><span className="text-amber-400">Generating...</span></>
+                )}
+                {scene.generatedImageStatus === "completed" && (
+                  <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Completed</span></>
+                )}
+                {scene.generatedImageStatus === "failed" && (
+                  <><X className="h-3 w-3 text-red-400" /><span className="text-red-400">Failed</span></>
+                )}
+              </div>
+            </div>
+
+            {scene.generatedImageUrl && (
+              <div className="relative overflow-hidden rounded-xl border border-white/15 bg-black/40 h-52 w-full max-w-xl">
+                <img src={scene.generatedImageUrl} alt={scene.title} className="h-full w-full object-cover" />
+              </div>
+            )}
+
+            {scene.generatedImageStatus === "failed" && (
+              <div className="flex flex-col gap-2 mt-1">
+                <p className="text-xs text-red-300 bg-red-900/30 p-2 rounded">{scene.generatedImageError}</p>
+                <button
+                  onClick={onGenerate}
+                  disabled={isGenerating}
+                  className="self-start text-xs text-red-400 underline hover:text-red-300"
+                >
+                  Retry Generation
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-stretch gap-3 [&>*]:flex-1 [&>*]:min-w-[200px] xl:[&>*]:min-w-[180px]">
+        <SecondaryButton onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </SecondaryButton>
+        <PrimaryButton disabled={isGenerating || allGenerated} onClick={onGenerate}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+          Generate Missing Images
+        </PrimaryButton>
+        <SecondaryButton disabled={isGenerating} onClick={onRegenerateAll}>
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+          Regenerate All Images
+        </SecondaryButton>
+        <PrimaryButton
+          disabled={isGenerating}
+          onClick={onContinue}
+        >
+          <Music2 className="h-4 w-4" />
+          Continue to Music
+        </PrimaryButton>
+      </div>
+    </section>
+  );
+}
+
 function MusicStage({
   flow,
   isGenerating,
   onBack,
   onGenerate,
+  onRegenerateAll,
   onPreview
 }: {
   flow: VideoStudioFlowState;
   isGenerating: boolean;
   onBack: () => void;
   onGenerate: () => void;
+  onRegenerateAll: () => void;
   onPreview: () => void;
 }) {
+  const allGenerated = flow.script?.scenes.every(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
+  const anyTracks = flow.script?.scenes.some(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
+
   return (
     <section className="glass-panel rounded-[2rem] p-6">
       <SectionHeader
@@ -1518,9 +1908,48 @@ function MusicStage({
         <p className="text-xs uppercase tracking-[0.26em] text-white/75">Music Status</p>
         <h3 className="mt-2 text-xl font-semibold capitalize text-white">{flow.music.status}</h3>
         <p className="mt-3 text-sm leading-7 text-white/90">{flow.music.message}</p>
-        {flow.music.trackUrl ? (
-          <audio controls src={flow.music.trackUrl} className="mt-4 w-full" />
-        ) : null}
+        
+        {flow.script?.scenes.map((scene) => (
+          <div key={scene.sceneNumber} className="mt-4 border-t border-white/10 pt-4 flex flex-col gap-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-semibold text-white">Scene {scene.sceneNumber}: {scene.title}</p>
+                <p className="text-xs text-white/70">Mood: {scene.backgroundMusicMood || scene.mood || "N/A"}</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {(!scene.backgroundMusicStatus || scene.backgroundMusicStatus === "idle") && (
+                  <><span className="h-2 w-2 rounded-full bg-gray-500"></span><span className="text-gray-400">Not generated</span></>
+                )}
+                {scene.backgroundMusicStatus === "generating" && (
+                  <><Loader2 className="h-3 w-3 animate-spin text-cyan-400" /><span className="text-cyan-400">Generating...</span></>
+                )}
+                {scene.backgroundMusicStatus === "completed" && (
+                  <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Completed</span></>
+                )}
+                {scene.backgroundMusicStatus === "failed" && (
+                  <><X className="h-3 w-3 text-red-400" /><span className="text-red-400">Failed</span></>
+                )}
+              </div>
+            </div>
+            
+            {scene.backgroundMusicStatus === "failed" && (
+              <div className="flex flex-col gap-2 mt-1">
+                <p className="text-xs text-red-300 bg-red-900/30 p-2 rounded">{scene.backgroundMusicError}</p>
+                <button
+                  onClick={onGenerate}
+                  disabled={isGenerating}
+                  className="self-start text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            
+            {(scene.backgroundMusicStatus === "completed" || scene.backgroundMusicUrl) && (
+              <audio controls src={scene.backgroundMusicUrl} className="w-full h-8 mt-1" />
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 flex flex-wrap items-stretch gap-3 [&>*]:flex-1 [&>*]:min-w-[200px] xl:[&>*]:min-w-[180px]">
@@ -1528,28 +1957,27 @@ function MusicStage({
           <ArrowLeft className="h-4 w-4" />
           Back
         </SecondaryButton>
-        <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
+        <PrimaryButton disabled={isGenerating || allGenerated} onClick={onGenerate}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music2 className="h-4 w-4" />}
-          Generate Music
+          Generate Missing Music
         </PrimaryButton>
-        <SecondaryButton disabled={isGenerating} onClick={onGenerate}>
+        <SecondaryButton disabled={isGenerating} onClick={onRegenerateAll}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-          Regenerate Music
+          Regenerate All Music
         </SecondaryButton>
         <div className="flex">
           <PreviewFinalAudioButton
-            backgroundMusicUrl={flow.music.trackUrl}
-            voiceAudioUrls={flow.script?.scenes.flatMap(scene => scene.dialogues.map(d => d.audioUrl)).filter((url): url is string => !!url) || []}
+            scenes={flow.script?.scenes || []}
           />
         </div>
         <PrimaryButton
-          disabled={!flow.music.trackUrl || isGenerating}
+          disabled={!anyTracks || isGenerating}
           onClick={onPreview}
         >
           <Clapperboard className="h-4 w-4" />
           Preview Video
         </PrimaryButton>
-        {!flow.music.trackUrl && !isGenerating && (
+        {!anyTracks && !isGenerating && (
           <p className="col-span-full mt-2 text-center text-xs text-white/75 italic">
             Complete background music to unlock final video preview.
           </p>

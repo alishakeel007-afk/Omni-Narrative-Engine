@@ -1,53 +1,81 @@
 import { NextResponse } from 'next/server';
+import { createClient } from "@/lib/supabase/server";
+import { generateSceneMusic } from "@/lib/audio/music-service";
+import { saveSceneMusic } from "@/lib/story-database";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const session = user ? { userId: user.id } : null;
+    
+    if (!session?.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { sceneMood, sceneTitle, audioPrompt } = body || {};
+    const {
+      mood,
+      soundDesign,
+      sceneTitle,
+      sceneLocation,
+      narration,
+      estimatedDuration,
+      genres,
+      existingHash,
+      projectId,
+      sceneId,
+      draftId,
+      sceneNumber
+    } = body;
 
-    // Lookup env keys (support poorly-named example key)
-    const apiKey = process.env.BACKGROUND_SOUND_API_KEY || process.env.BG_MUSIC_API_KEY || process.env.NEXT_PUBLIC_BG_MUSIC_KEY;
-    const apiUrl = process.env.BG_MUSIC_API_URL || process.env.NEXT_PUBLIC_BG_MUSIC_URL;
-
-    if (!apiKey || !apiUrl) {
-      // Return mocked response when no provider is configured
-      return NextResponse.json({
-        trackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        title: `Ambient ${sceneMood ?? 'Score'}`,
-        mood: sceneMood ?? 'ambient'
+    try {
+      const result = await generateSceneMusic({
+        sceneId,
+        mood,
+        soundDesign,
+        sceneTitle,
+        sceneLocation,
+        narration,
+        estimatedDuration,
+        genres,
+        existingHash,
+        projectId
       });
+
+      if (typeof draftId === "string" && typeof sceneNumber === "number") {
+        await saveSceneMusic(draftId, sceneNumber, {
+          url: result.url,
+          prompt: result.prompt,
+          provider: result.provider,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        audioUrl: result.url,
+        prompt: result.prompt,
+        hash: result.hash,
+        provider: result.provider
+      });
+    } catch (error: any) {
+      if (error.message === 'DUPLICATE') {
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          hash: existingHash
+        });
+      }
+      throw error;
     }
 
-    // If configured, proxy to the external background music API
-    const resp = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({ sceneMood, sceneTitle, audioPrompt })
-    });
-
-    if (!resp.ok) {
-      return NextResponse.json({
-        trackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        title: `Ambient ${sceneMood ?? 'Score'}`,
-        mood: sceneMood ?? 'ambient'
-      });
-    }
-
-    const data = await resp.json();
-    // Expecting data.trackUrl, data.title, data.mood
-    return NextResponse.json({
-      trackUrl: data.trackUrl,
-      title: data.title ?? `Ambient ${sceneMood ?? 'Score'}`,
-      mood: data.mood ?? sceneMood
-    });
-  } catch (err) {
-    return NextResponse.json({
-      trackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      title: 'Ambient Mock',
-      mood: 'ambient'
-    });
+  } catch (error: any) {
+    console.error("Background music generation error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to generate music" },
+      { status: 500 }
+    );
   }
 }

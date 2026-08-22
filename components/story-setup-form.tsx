@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
+import { initializeStoryProject } from "@/lib/story-project-init";
 import { CreateStorySetupForm } from "@/components/create-story-setup-form";
 import { useStory } from "@/context/StoryContext";
 import { DEFAULT_STORY_SETUP } from "@/lib/story-storage";
@@ -190,8 +191,28 @@ function GuidedStorySetupForm() {
   ].filter(Boolean) as string[];
   const canBeginStory = missingRequiredFields.length === 0;
 
-  const handleBeginStory = () => {
-    if (!canBeginStory) return;
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const handleBeginStory = async () => {
+    if (!canBeginStory || isInitializing) return;
+    setIsInitializing(true);
+
+    // Attempt to create a DB project/draft for persistence.
+    // If this fails, gameplay continues without DB persistence.
+    const dbResult = await initializeStoryProject({
+      title: setup.storyTitle,
+      mode: setup.mode,
+      genres: setup.genres,
+      tones: setup.moods,
+      numberOfScenes: setup.numberOfScenes,
+    });
+
+    if (dbResult) {
+      updateSetup({ projectId: dbResult.projectId, draftId: dbResult.draftId });
+      saveSetupOnly({ projectId: dbResult.projectId, draftId: dbResult.draftId });
+    }
+
+    setIsInitializing(false);
     beginStoryFromSetup();
     router.push("/story/play");
   };

@@ -10,14 +10,22 @@ export type VideoStudioStage =
   | "storyReview"
   | "scenes"
   | "voice"
+  | "images"
   | "music"
   | "preview";
 
 export type VideoStudioStatus = "idle" | "generating" | "ready" | "error";
 
+export type VideoStudioImageState = {
+  message: string;
+  provider: string;
+  status: VideoStudioStatus;
+};
+
 export type VideoStudioMusicState = {
   message: string;
   mood: string;
+  provider: string;
   status: VideoStudioStatus;
   title: string;
   trackUrl: string;
@@ -27,6 +35,7 @@ export type VideoStudioFlowState = {
   acceptedStory: string;
   generatedStory: string;
   genres: string[];
+  images: VideoStudioImageState;
   music: VideoStudioMusicState;
   roughIdea: string;
   sceneCount: number;
@@ -38,6 +47,9 @@ export type VideoStudioFlowState = {
   videoOutdated: boolean;
   voiceNeedsRegeneration: boolean;
   voiceResult: VideoGenerationResponse | null;
+  /** Database-backed persistence (Postgres is the source of truth once set; localStorage is a cache) */
+  projectId?: string;
+  draftId?: string;
 };
 
 export const DEFAULT_VIDEO_GENRES = [
@@ -68,6 +80,7 @@ export const VIDEO_STAGE_LABELS: Array<{ id: VideoStudioStage; label: string }> 
   { id: "storyReview", label: "Story Review" },
   { id: "scenes", label: "Scenes & Dialogues" },
   { id: "voice", label: "Voice Audio" },
+  { id: "images", label: "Visual Generation" },
   { id: "music", label: "Background Music" },
   { id: "preview", label: "Video Preview" }
 ];
@@ -165,9 +178,15 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
     acceptedStory: "",
     generatedStory: "",
     genres: [DEFAULT_VIDEO_GENRES[0]],
+    images: {
+      message: "Visual images have not been generated yet.",
+      provider: "",
+      status: "idle"
+    },
     music: {
       message: "Background music has not been generated yet.",
       mood: "",
+      provider: "",
       status: "idle",
       title: "",
       trackUrl: ""
@@ -181,7 +200,9 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
     updatedAt: new Date().toISOString(),
     videoOutdated: false,
     voiceNeedsRegeneration: false,
-    voiceResult: null
+    voiceResult: null,
+    projectId: undefined,
+    draftId: undefined
   };
 }
 
@@ -202,9 +223,15 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
     acceptedStory: toCleanString(source.acceptedStory, source.generatedStory || ""),
     generatedStory: toCleanString(source.generatedStory, ""),
     genres: toStringArray(source.genres, fallback.genres),
+    images: {
+      message: toCleanString(source.images?.message, fallback.images.message),
+      provider: toCleanString(source.images?.provider, ""),
+      status: toStatus(source.images?.status)
+    },
     music: {
       message: toCleanString(source.music?.message, fallback.music.message),
       mood: toCleanString(source.music?.mood, ""),
+      provider: toCleanString(source.music?.provider, ""),
       status: toStatus(source.music?.status),
       title: toCleanString(source.music?.title, ""),
       trackUrl: toCleanString(source.music?.trackUrl, "")
@@ -218,7 +245,9 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
     updatedAt: toCleanString(source.updatedAt, fallback.updatedAt),
     videoOutdated: Boolean(source.videoOutdated),
     voiceNeedsRegeneration: Boolean(source.voiceNeedsRegeneration),
-    voiceResult
+    voiceResult,
+    projectId: toCleanString(source.projectId, "") || undefined,
+    draftId: toCleanString(source.draftId, "") || undefined
   };
 }
 

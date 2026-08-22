@@ -1,5 +1,3 @@
-import { readFileSync } from "fs";
-import { join } from "path";
 import { NextResponse } from "next/server";
 import type {
   MovieCharacterVoice,
@@ -9,6 +7,8 @@ import type {
   VideoGenerationResponse
 } from "@/types/video";
 import { getEnvValue } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
+import { uploadTtsAudioToStorage } from "@/lib/audio/tts-storage";
 
 export const runtime = "nodejs";
 
@@ -487,7 +487,23 @@ function createCharacterVoice(params: {
   };
 }
 
-function assignCharacterVoices(scenes: MovieScene[]) {
+function parseCharacterAppearances(parsed: Record<string, unknown>): Map<string, string> {
+  const appearances = new Map<string, string>();
+  const rawCharacters = Array.isArray(parsed.characters) ? parsed.characters : [];
+
+  for (const entry of rawCharacters) {
+    const source = typeof entry === "object" && entry ? entry as Record<string, unknown> : {};
+    const name = textValue(source.name, "");
+    const appearance = textValue(source.appearance, "");
+    if (name && appearance) {
+      appearances.set(name.toLowerCase(), appearance);
+    }
+  }
+
+  return appearances;
+}
+
+function assignCharacterVoices(scenes: MovieScene[], appearancesByCharacter: Map<string, string> = new Map()) {
   const profilesByCharacter = new Map<string, MovieCharacterVoice>();
   const archetypeCounts = new Map<VoiceArchetype, number>();
   const usedModels = new Set<string>();
@@ -513,6 +529,10 @@ function assignCharacterVoices(scenes: MovieScene[]) {
           tone: performanceTone,
           usedModels
         });
+        const appearance = appearancesByCharacter.get(characterKey);
+        if (appearance) {
+          profile = { ...profile, appearance };
+        }
         profilesByCharacter.set(characterKey, profile);
         archetypeCounts.set(archetype, archetypeIndex + 1);
       }
@@ -555,6 +575,7 @@ Creative constraints:
 - Each scene must include cinematic narration and character dialogue.
 - Use multiple speaking characters when the story naturally needs them.
 - Give every character a stable name, role, and voice direction.
+- Give every named speaking character a fixed, detailed visual appearance description (face, hair, build, clothing, distinguishing features) that stays exactly the same every time that character appears, for use in AI image generation reference prompts.
 - Dialogues must be speakable by a text-to-speech system. Do not put stage directions inside dialogue lines.
 - Keep each dialogue line under 180 characters.
 - Keep narration under 450 characters per scene.
@@ -575,6 +596,12 @@ Use this exact shape:
   "genre": "Final genre label",
   "tone": "Final tone label",
   "estimatedRuntime": "3-5 minutes",
+  "characters": [
+    {
+      "name": "Character name (must match dialogue character names exactly)",
+      "appearance": "Fixed, detailed visual description used to keep this character's appearance consistent across every generated image: face, hair, build, clothing, distinguishing features."
+    }
+  ],
   "scenes": [
     {
       "sceneNumber": 1,
@@ -751,7 +778,7 @@ async function generateMovieScript(params: {
   }
 
   const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
-  const voiceResult = assignCharacterVoices(scenes);
+  const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
 
   return {
     characterVoices: voiceResult.characterVoices,
@@ -813,7 +840,7 @@ async function generateMovieScriptWithGroq(params: {
   }
 
   const scenes = rawScenes.slice(0, MAX_SCENES).map(normalizeScene);
-  const voiceResult = assignCharacterVoices(scenes);
+  const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
 
   return {
     characterVoices: voiceResult.characterVoices,
@@ -934,13 +961,17 @@ async function generateDeepgramDialogueAudio(params: {
   }
 
   const audio = await response.arrayBuffer();
-  const base64Audio = Buffer.from(audio).toString("base64");
   const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+  const audioUrl = await uploadTtsAudioToStorage({
+    audioBuffer: audio,
+    contentType,
+    dialogueId: params.line.id,
+  });
 
   return {
     ...params.line,
     audioMimeType: contentType,
-    audioUrl: `data:${contentType};base64,${base64Audio}`
+    audioUrl
   }
 }
 
@@ -1017,6 +1048,12 @@ async function attachDeepgramDialogueAudio(scenes: MovieScene[], apiKey: string)
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json() as VideoGenerationRequest;
     const scenario = textValue(body.scenario, "");
 

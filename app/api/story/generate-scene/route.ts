@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEnvValue } from "@/lib/env";
-import type { StorySetupData, MemoryItem, StoryScene } from "@/types/story";
+import { retrieveRelevantMemories, buildMemoryContextBlock } from "@/lib/memory/memory-service";
+import { getCharacterContextBlock, upsertCharacterState } from "@/lib/story-database";
+import { buildPrompt } from "@/lib/story-prompt";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -16,90 +18,6 @@ function getGeminiKey() {
 
 function getGroqFallbackKey() {
   return getEnvValue(["GROQ_FALLBACK_API", "GROQ_API_KEY"]);
-}
-
-function buildPrompt(params: {
-  setup: StorySetupData;
-  choice: string;
-  memoryTimeline: MemoryItem[];
-  currentScene: StoryScene | null;
-  sceneNumber: number;
-}) {
-  const { setup, choice, memoryTimeline, currentScene, sceneNumber } = params;
-  
-  const charList = setup.characters
-    .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Traits: ${c.traits.join(", ")})`)
-    .join("\n");
-
-  const recentMemories = memoryTimeline.slice(-3).map((m) => `Scene ${m.sceneNumber} (${m.choiceType}): ${m.result}`).join("\n");
-  const memoryContext = recentMemories ? `Recent events:\n${recentMemories}` : "This is the beginning of the story.";
-
-  const currentSceneContext = currentScene 
-    ? `The story was just at: ${currentScene.location}. Mood was: ${currentScene.mood}. \nLast scene text: ${currentScene.text}`
-    : `Scenario: ${setup.scenarioDescription}`;
-
-  return `You are the Omni-Narrative Engine, a cinematic story director.
-
-Story Title: "${setup.storyTitle}"
-Genres: ${setup.genres.join(", ")}
-Tones/Moods: ${setup.moods.join(", ")}
-Difficulty: ${setup.difficulty}
-
-Characters:
-${charList}
-(Main character is ${setup.characterName})
-
-${memoryContext}
-
-${currentSceneContext}
-
-The user has made the following choice to continue the story:
-"${choice}"
-
-Generate the next scene (Scene ${sceneNumber}). It must logically follow the previous events, respect the user's choice, and maintain narrative coherence.
-Keep character personalities consistent.
-If the choice involves risk or danger, reflect that in the text and mood.
-
-Return ONLY a JSON object. No markdown, no extra text.
-Use this exact shape:
-{
-  "title": "A compelling title for the scene",
-  "chapter": "Current chapter name",
-  "location": "Specific location of this scene",
-  "mood": "Dominant emotion or atmosphere",
-  "text": "The narrative text of the scene (1-2 paragraphs). Must incorporate the consequences of the user's choice.",
-  "options": [
-    "A suggested action for the user to take next",
-    "Another distinct suggested action",
-    "A third suggested action"
-  ],
-  "cast": [
-    {
-      "name": "Character Name",
-      "role": "Role",
-      "emotionalState": "Current emotional state",
-      "visualAppearance": "Brief visual description",
-      "traits": ["Trait1", "Trait2"],
-      "relationships": ["Relationship detail"],
-      "imageLabel": "Short label for character image"
-    }
-  ],
-  "media": {
-    "audioMoodPrompt": "Prompt for background music generation",
-    "backgroundMusicMood": "Short mood description for music",
-    "imageLabel": "Short caption for the scene image",
-    "imagePrompt": "Detailed cinematic prompt for generating a scene illustration",
-    "narrationDuration": "Estimated seconds, e.g., '30s'",
-    "narrationLabel": "Short voice direction",
-    "playerState": "ready"
-  }
-}
-
-Important Constraints:
-- options MUST be an array of exactly 3 strings representing distinct, actionable choices for the player.
-- cast MUST include the characters present in this scene.
-- DO NOT use markdown code blocks (like \`\`\`json). Return raw JSON.
-`;
 }
 
 function extractGeminiText(payload: unknown) {
@@ -203,7 +121,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { setup, choice, memoryTimeline, currentScene, sceneNumber } = body;
+    const { setup, choice, memoryTimeline, currentScene, sceneNumber, draftId } = body;
 
     if (!setup || !choice) {
       return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
@@ -219,12 +137,23 @@ export async function POST(request: Request) {
       );
     }
 
+    let memoryContextBlock = "";
+    let characterContextBlock = "";
+    if (draftId) {
+      const queryText = `Current context: ${currentScene?.location || ''} ${currentScene?.mood || ''}. Choice: ${choice}`;
+      const memories = await retrieveRelevantMemories(draftId, queryText, 8);
+      memoryContextBlock = buildMemoryContextBlock(memories);
+      characterContextBlock = await getCharacterContextBlock(draftId);
+    }
+
     const prompt = buildPrompt({
       setup,
       choice,
       memoryTimeline: memoryTimeline || [],
       currentScene: currentScene || null,
       sceneNumber: sceneNumber || 1,
+      memoryContextBlock,
+      characterContextBlock,
     });
 
     let sceneData;
@@ -258,6 +187,19 @@ export async function POST(request: Request) {
 
     // Ensure sceneNumber is injected back
     sceneData.sceneNumber = sceneNumber || 1;
+
+    // Auto-sync characters if draftId is present
+    if (draftId && Array.isArray(sceneData.cast)) {
+      await Promise.allSettled(
+        sceneData.cast.map((char: any) =>
+          upsertCharacterState(draftId, char.name, {
+            emotionalState: char.emotionalState,
+            visualAppearance: char.visualAppearance,
+            sceneNumber: sceneData.sceneNumber,
+          })
+        )
+      );
+    }
 
     return NextResponse.json({ scene: sceneData, provider });
   } catch (error) {

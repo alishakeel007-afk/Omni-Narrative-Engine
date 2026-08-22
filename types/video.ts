@@ -6,6 +6,8 @@ export type MovieCharacterVoice = {
   gender: string;
   tone: string;
   voiceName: string;
+  /** Fixed visual description used to keep this character's appearance consistent across generated images */
+  appearance?: string;
 };
 
 export type MovieDialogueLine = {
@@ -37,6 +39,16 @@ export type MovieScene = {
   backgroundMusicUrl?: string;
   backgroundMusicTitle?: string;
   backgroundMusicMood?: string;
+  backgroundMusicPrompt?: string;
+  backgroundMusicHash?: string;
+  backgroundMusicStatus?: "idle" | "generating" | "completed" | "failed";
+  backgroundMusicError?: string;
+  // Optional generated image fields attached by visual generation flow
+  generatedImageUrl?: string;
+  generatedImagePrompt?: string;
+  generatedImageHash?: string;
+  generatedImageStatus?: "idle" | "generating" | "completed" | "failed";
+  generatedImageError?: string;
 };
 
 export type VideoGenerationRequest = {

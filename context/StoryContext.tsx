@@ -22,12 +22,20 @@ import {
   type StorySetupData
 } from "@/lib/story-storage";
 import type { ChoiceType } from "@/types/story";
+import { useSaveQueue } from "@/hooks/useSaveQueue";
+import type { FullDraftState } from "@/lib/story-database";
+import { syncPendingSavesForDraft } from "@/lib/save-queue";
+import { checkGameOverCondition, validateStateIntegrity, type GameOverState } from "@/lib/game-over";
+import { analyzeChoiceStyle, calculateChoiceImpact, applyStatModifiers, assessChoiceRisk } from "@/lib/choice-impact";
+import { validateChoiceInput } from "@/lib/validation";
+import { InventoryManager } from "@/lib/inventory";
 
 type StoryContextValue = {
   beginStoryFromSetup: () => void;
   continueStory: () => void;
   generateAlternativeOptions: () => void;
   isReady: boolean;
+  loadFromDatabase: (projectId: string) => Promise<{ success: boolean; error?: string }>;
   restartStory: () => void;
   startFreshStorySetup: (mode: StorySetupData["mode"]) => StorySetupData;
   saveSetupOnly: (override?: Partial<StorySetupData>) => void;
@@ -37,6 +45,11 @@ type StoryContextValue = {
   setup: StorySetupData;
   state: PersistedStoryState;
   updateSetup: (partial: Partial<StorySetupData>) => void;
+  gameOverState: GameOverState | null;
+  isGameOver: boolean;
+  validationErrors: string[];
+  pendingSaveCount: () => number;
+  updateCurrentSceneMedia: (patch: Partial<PersistedStoryState["generatedMedia"]>) => void;
 };
 
 const StoryContext = createContext<StoryContextValue | null>(null);
@@ -176,6 +189,9 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
   const [setup, setSetup] = useState<StorySetupData>(DEFAULT_STORY_SETUP);
   const [state, setState] = useState<PersistedStoryState>(() => createInitialStoryState(DEFAULT_STORY_SETUP));
   const [isReady, setIsReady] = useState(false);
+  const [gameOverState, setGameOverState] = useState<GameOverState | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const { enqueue: enqueueSave, getPendingCount } = useSaveQueue();
 
   useEffect(() => {
     const savedSetup = window.localStorage.getItem(STORY_SETUP_STORAGE_KEY);
@@ -247,6 +263,21 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     state.selectedChoiceType
   ]);
 
+  // Check for game over conditions
+  useEffect(() => {
+    if (!isReady || gameOverState) return;
+
+    const gameOverCheck = checkGameOverCondition(
+      state.healthStatus,
+      state.currentSceneIndex,
+      Date.now()
+    );
+
+    if (gameOverCheck.isGameOver && gameOverCheck.gameOverState) {
+      setGameOverState(gameOverCheck.gameOverState);
+    }
+  }, [isReady, state.healthStatus, state.currentSceneIndex, gameOverState]);
+
   const updateSetup = (partial: Partial<StorySetupData>) => {
     setSetup((current) => ({ ...current, ...partial }));
   };
@@ -273,6 +304,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       const nextState = createInitialStoryState(setup);
       nextState.currentScene = initialScene;
       nextState.generatedMedia = initialScene.media;
+      nextState.dynamicCast = initialScene.cast || [];
       
       setState(nextState);
       saveSetupOnly();
@@ -302,10 +334,14 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
   const selectCustomChoice = () => {
     const trimmedChoice = state.customChoiceInput.trim();
+    const validation = validateChoiceInput(trimmedChoice);
 
-    if (!trimmedChoice) {
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors.map(e => e.message));
       return false;
     }
+
+    setValidationErrors([]);
 
     setState((current) => ({
       ...current,
@@ -342,16 +378,20 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
   const continueStory = async () => {
     if (!state.selectedChoice || !state.selectedChoiceType) return;
+    if (gameOverState) return; // Can't continue if game is over
 
     setState((current) => ({
       ...current,
       isLoading: true
     }));
 
+    const choiceSnapshot = state.selectedChoice;
+    const choiceTypeSnapshot = state.selectedChoiceType as ChoiceType;
+
     try {
       const nextSceneResult = await generateNextSceneFromAI({
-        choice: state.selectedChoice,
-        choiceType: state.selectedChoiceType as ChoiceType,
+        choice: choiceSnapshot,
+        choiceType: choiceTypeSnapshot,
         currentSceneIndex: state.currentSceneIndex,
         healthStatus: state.healthStatus,
         inventory: state.inventory,
@@ -361,13 +401,59 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
         pastScenes: state.pastScenes
       });
 
+      // Analyze choice style and calculate impacts
+      const choiceStyle = analyzeChoiceStyle(choiceSnapshot);
+      const choiceImpact = calculateChoiceImpact(choiceStyle, state.healthStatus);
+      const { updatedHealth, appliedModifiers } = applyStatModifiers(
+        state.healthStatus,
+        setup.characterAttributes,
+        choiceImpact.modifiers
+      );
+
+      // Add inventory reward if applicable based on LLM narrative consequence
+      let updatedInventory = [...state.inventory];
+      const inventoryUpdate = nextSceneResult.currentScene.inventoryUpdate;
+      if (inventoryUpdate) {
+        if (inventoryUpdate.action === "add" && !updatedInventory.includes(inventoryUpdate.item)) {
+          updatedInventory.push(inventoryUpdate.item);
+        } else if (inventoryUpdate.action === "remove") {
+          // Validate: Only remove if they actually have it
+          const index = updatedInventory.indexOf(inventoryUpdate.item);
+          if (index > -1) {
+            updatedInventory.splice(index, 1);
+          } else {
+            console.warn(`LLM tried to remove ${inventoryUpdate.item} but it is not in inventory.`);
+          }
+        }
+      }
+
       const memoryItem = createMemoryItem({
-        choiceType: state.selectedChoiceType as ChoiceType,
+        choiceType: choiceTypeSnapshot,
         result: nextSceneResult.resultSummary,
         scene: state.currentScene,
         update: nextSceneResult.updateSummary,
-        userChoice: state.selectedChoice
+        userChoice: choiceSnapshot
       });
+
+      // Check if health is critically low
+      if (updatedHealth.health < 30 && updatedHealth.health > 0) {
+        console.warn("Player health is critically low!");
+      }
+
+      // Capture state needed for save before setState
+      const nextSceneNumber = nextSceneResult.currentSceneIndex + 1;
+
+      // Merge dynamic cast
+      const nextCast = nextSceneResult.currentScene.cast || [];
+      const updatedDynamicCast = [...state.dynamicCast];
+      for (const char of nextCast) {
+        const idx = updatedDynamicCast.findIndex((c) => c.name.toLowerCase() === char.name.toLowerCase());
+        if (idx >= 0) {
+          updatedDynamicCast[idx] = { ...updatedDynamicCast[idx], ...char };
+        } else {
+          updatedDynamicCast.push(char);
+        }
+      }
 
       setState((current) => ({
         ...current,
@@ -375,14 +461,33 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
         currentSceneIndex: nextSceneResult.currentSceneIndex,
         customChoiceInput: setup.mode === "custom" ? setup.startingIdea : "",
         generatedMedia: nextSceneResult.generatedMedia,
-        healthStatus: nextSceneResult.healthStatus,
-        inventory: nextSceneResult.inventory,
+        healthStatus: updatedHealth,
+        inventory: updatedInventory,
         isLoading: false,
         memoryTimeline: [...current.memoryTimeline, memoryItem],
         pastScenes: [...current.pastScenes, current.currentScene],
         selectedChoice: "",
-        selectedChoiceType: null
+        selectedChoiceType: null,
+        dynamicCast: updatedDynamicCast
       }));
+
+      // Fire-and-forget: persist to DB without blocking gameplay
+      const projectId = setup.projectId;
+      const draftId = setup.draftId;
+      if (projectId && draftId) {
+        enqueueSave({
+          projectId,
+          draftId,
+          sceneNumber: nextSceneNumber,
+          scene: nextSceneResult.currentScene,
+          choice: { text: choiceSnapshot, choiceType: choiceTypeSnapshot },
+          currentState: {
+            sceneNumber: nextSceneResult.currentSceneIndex,
+            healthStatus: updatedHealth,
+            inventory: updatedInventory,
+          },
+        });
+      }
     } catch (error) {
       console.error(error);
       setState((current) => ({
@@ -396,6 +501,173 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     const nextState = createInitialStoryState(setup);
     setState(nextState);
     window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
+  };
+
+  const updateCurrentSceneMedia = (patch: Partial<PersistedStoryState["generatedMedia"]>) => {
+    setState((current) => ({
+      ...current,
+      generatedMedia: { ...current.generatedMedia, ...patch },
+      currentScene: { ...current.currentScene, media: { ...current.currentScene.media, ...patch } }
+    }));
+  };
+
+  /**
+   * Restores a full story session from PostgreSQL.
+   * DB data always wins. Falls back to localStorage only if the DB request fails.
+   * Returns { success: true } on success, or { success: false, error } on failure.
+   */
+  const loadFromDatabase = async (projectId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!projectId) return { success: false, error: "No project ID provided." };
+      
+    const targetDraftId = setup.draftId;
+
+    try {
+      // Step 1: Attempt to synchronize any pending offline saves for this draft
+      if (targetDraftId) {
+        const syncSuccess = await syncPendingSavesForDraft(targetDraftId);
+        if (!syncSuccess) {
+          console.warn("[StoryContext] Offline synchronization failed, falling back to local storage if available.");
+          // If we have offline saves that failed to sync, we MUST use local storage to avoid data loss.
+          const cachedProgress = window.localStorage.getItem(STORY_PROGRESS_STORAGE_KEY);
+          if (cachedProgress) {
+            const parsed = JSON.parse(cachedProgress) as PersistedStoryState;
+            setState(normalizeProgress(parsed, setup));
+            return { success: true };
+          }
+        }
+      }
+
+      // Step 2: Fetch the authoritative state from PostgreSQL
+      const response = await fetch(`/api/story/${projectId}/load`);
+
+      if (!response.ok) {
+        // DB unavailable or forbidden — try localStorage fallback
+        const cachedProgress = window.localStorage.getItem(STORY_PROGRESS_STORAGE_KEY);
+        if (cachedProgress) {
+          const parsed = JSON.parse(cachedProgress) as PersistedStoryState;
+          setState(normalizeProgress(parsed, setup));
+          return { success: true };
+        }
+        return { success: false, error: "Story not found. Please start a new story." };
+      }
+
+      const { storyState } = await response.json() as { storyState: FullDraftState };
+
+      if (!storyState || storyState.scenes.length === 0) {
+        return { success: false, error: "No scenes saved yet for this story." };
+      }
+
+      // Reconstruct StoryScene objects from DB records
+      const lastDbScene = storyState.scenes[storyState.scenes.length - 1];
+      const selectedChoice = lastDbScene.choices.find((c) => c.selected);
+
+      const restoredScene = {
+        sceneNumber: lastDbScene.sceneNumber,
+        title: lastDbScene.title,
+        text: lastDbScene.description,
+        location: lastDbScene.location ?? "",
+        mood: lastDbScene.mood ?? "",
+        chapter: "",
+        options: [],
+        cast: storyState.characters.map((c) => ({
+          name: c.name,
+          role: c.role,
+          emotionalState: "",
+          visualAppearance: "",
+          traits: c.traits,
+          relationships: [],
+          imageLabel: c.name,
+        })),
+        media: {
+          audioMoodPrompt: "",
+          backgroundMusicMood: "",
+          imageLabel: "",
+          imagePrompt: "",
+          narrationDuration: "",
+          narrationLabel: "",
+          playerState: "ready" as const,
+          imageUrl: lastDbScene.imageUrl ?? undefined,
+          narrationAudioUrl: lastDbScene.narrationAudioUrl ?? undefined,
+          musicUrl: lastDbScene.musicUrl ?? undefined,
+        },
+        inventoryUpdate: null,
+        resultSummary: selectedChoice?.resultText ?? "",
+      };
+
+      // Reconstruct memoryTimeline from StoryMemory records
+      const restoredMemoryTimeline = storyState.memories
+        .filter((m) => m.memoryType === "CHOICE")
+        .map((m, i) => ({
+          choiceType: "AI Suggested" as const,
+          location: "",
+          mood: "",
+          result: m.content,
+          sceneNumber: i + 1,
+          timestamp: new Date().toISOString(),
+          update: "",
+          userChoice: m.content,
+        }));
+
+      // Reconstruct pastScenes (all except the last, which is current)
+      const pastScenes = storyState.scenes.slice(0, -1).map((s) => ({
+        sceneNumber: s.sceneNumber,
+        title: s.title,
+        text: s.description,
+        location: s.location ?? "",
+        mood: s.mood ?? "",
+        chapter: "",
+        options: [],
+        cast: [],
+        media: {
+          audioMoodPrompt: "", backgroundMusicMood: "",
+          imageLabel: "", imagePrompt: "",
+          narrationDuration: "", narrationLabel: "",
+          playerState: "ready" as const,
+        },
+        inventoryUpdate: null,
+      }));
+
+      const progress = storyState.progressState;
+      const restoredHealth = {
+        health: progress?.health ?? 100,
+        mana: progress?.mana ?? 100,
+        resolve: progress?.resolve ?? 100,
+      };
+
+      const restoredState: PersistedStoryState = {
+        ...createInitialStoryState(setup),
+        currentScene: restoredScene,
+        currentSceneIndex: lastDbScene.sceneNumber - 1,
+        generatedMedia: restoredScene.media,
+        healthStatus: restoredHealth,
+        inventory: progress?.inventory ?? [],
+        memoryTimeline: restoredMemoryTimeline,
+        pastScenes,
+        lastSavedAt: new Date().toISOString(),
+        isLoading: false,
+      };
+
+      setState(restoredState);
+
+      // Also update localStorage so offline fallback stays current
+      window.localStorage.setItem(STORY_PROGRESS_STORAGE_KEY, JSON.stringify(restoredState));
+
+      return { success: true };
+    } catch (err) {
+      console.error("[loadFromDatabase] Failed:", err);
+      // Last-resort: try localStorage
+      const cachedProgress = window.localStorage.getItem(STORY_PROGRESS_STORAGE_KEY);
+      if (cachedProgress) {
+        try {
+          const parsed = JSON.parse(cachedProgress) as PersistedStoryState;
+          setState(normalizeProgress(parsed, setup));
+          return { success: true };
+        } catch {
+          // localStorage also corrupt
+        }
+      }
+      return { success: false, error: "Failed to load story. Please try again." };
+    }
   };
 
   const startFreshStorySetup = (mode: StorySetupData["mode"]) => {
@@ -425,6 +697,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       continueStory,
       generateAlternativeOptions,
       isReady,
+      loadFromDatabase,
       restartStory,
       startFreshStorySetup,
       saveSetupOnly,
@@ -433,9 +706,15 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       setCustomChoiceInput,
       setup,
       state,
-      updateSetup
+      updateSetup,
+      gameOverState,
+      isGameOver: !!gameOverState,
+      validationErrors,
+      pendingSaveCount: getPendingCount,
+      updateCurrentSceneMedia,
     }),
-    [isReady, setup, state]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isReady, setup, state, gameOverState, validationErrors, getPendingCount]
   );
 
   return <StoryContext.Provider value={value}>{children}</StoryContext.Provider>;

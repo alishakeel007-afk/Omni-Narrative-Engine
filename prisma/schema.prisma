@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
 model StoryProject {
@@ -16,31 +18,32 @@ model StoryProject {
   status    ProjectStatus @default(DRAFT)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-
   drafts    StoryDraft[]
 
   @@index([userId])
 }
 
 model StoryDraft {
-  id               String      @id @default(uuid())
+  id               String               @id @default(uuid())
   storyProjectId   String
   versionNumber    Int
   title            String
   genres           Json
   tones            Json
   numberOfScenes   Int
-  includeNarration Boolean     @default(true)
-  status           DraftStatus @default(EDITING)
-  isActive         Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-
-  project          StoryProject         @relation(fields: [storyProjectId], references: [id], onDelete: Cascade)
+  includeNarration Boolean              @default(true)
+  status           DraftStatus          @default(EDITING)
+  isActive         Boolean              @default(false)
+  progressState    Json?                // health, inventory, currentSceneIndex
+  videoStudioState Json?                // Video Studio flow: stage, roughIdea, acceptedStory, logline, estimatedRuntime, regeneration flags
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   characters       Character[]
-  scenes           Scene[]
-  memories         StoryMemory[]
   mediaAssets      MediaAsset[]
+  scenes           Scene[]
+  project          StoryProject         @relation(fields: [storyProjectId], references: [id], onDelete: Cascade)
+  memories         StoryMemory[]
+  memoryEmbeddings StoryMemoryEmbedding[]
   videoJobs        VideoGenerationJob[]
 
   @@unique([storyProjectId, versionNumber])
@@ -48,29 +51,32 @@ model StoryDraft {
 }
 
 model Character {
-  id                String          @id @default(uuid())
-  draftId           String
-  name              String
-  role              String
-  personalityTone   String
-  traits            Json
-  voiceStyle        String?
-  appearancePrompt  String?
-  referenceImageUrl String?
-  voiceSampleUrl    String?
-  sourceType        CharacterSource @default(TEXT)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  draft             StoryDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
-  dialogues         Dialogue[]
-  mediaAssets       MediaAsset[]
+  id                     String          @id @default(uuid())
+  draftId                String
+  name                   String
+  role                   String
+  personalityTone        String
+  traits                 Json
+  voiceStyle             String?
+  appearancePrompt       String?
+  referenceImageUrl      String?
+  voiceSampleUrl         String?
+  sourceType             CharacterSource @default(TEXT)
+  // Identity tracking fields — updated after each scene generation
+  lastSeenScene          Int?
+  currentEmotionalState  String?
+  voiceProfile           Json?           // MovieCharacterVoice: archetype, deepgramModel, tone, gender, voiceName (Video Studio only)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  draft                  StoryDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  dialogues              Dialogue[]
+  mediaAssets            MediaAsset[]
 
   @@index([draftId])
 }
 
 model Scene {
-  id                 String   @id @default(uuid())
+  id                 String        @id @default(uuid())
   draftId            String
   sceneNumber        Int
   title              String
@@ -78,13 +84,19 @@ model Scene {
   location           String?
   mood               String?
   selectedSuggestion String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  draft              StoryDraft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  // Video Studio fields (null for Guided Story scenes)
+  directorNotes      String?
+  sceneGenre         String?
+  sceneTone          String?
+  soundDesign        String?
+  visualPrompt       String?
+  estimatedDuration  String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
   choices            Choice[]
   dialogues          Dialogue[]
   mediaAssets        MediaAsset[]
+  draft              StoryDraft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
   memories           StoryMemory[]
 
   @@unique([draftId, sceneNumber])
@@ -92,17 +104,16 @@ model Scene {
 }
 
 model Dialogue {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   sceneId     String
   characterId String?
   text        String
   delivery    String?
   audioUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  character   Character? @relation(fields: [characterId], references: [id])
   scene       Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  character   Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 
   @@index([sceneId])
   @@index([characterId])
@@ -117,26 +128,44 @@ model Choice {
   resultText String?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
-
   scene      Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
 
   @@index([sceneId])
 }
 
 model StoryMemory {
-  id              String   @id @default(uuid())
-  draftId          String
-  sceneId          String?
-  memoryType       String
-  content          String
-  importanceScore  Int      @default(1)
-  createdAt        DateTime @default(now())
-
-  draft            StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
-  scene            Scene?     @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+  id              String     @id @default(uuid())
+  draftId         String
+  sceneId         String?
+  memoryType      String
+  content         String
+  importanceScore Int        @default(1)
+  createdAt       DateTime   @default(now())
+  draft           StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  scene           Scene?     @relation(fields: [sceneId], references: [id])
+  embeddings      StoryMemoryEmbedding[]
 
   @@index([draftId])
   @@index([sceneId])
+}
+
+model StoryMemoryEmbedding {
+  id         String   @id @default(uuid())
+  draftId    String
+  sceneId    String?
+  memoryId   String
+  userId     String
+  content    String
+  memoryType String
+  memoryHash String
+  metadata   Json?
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime @default(now())
+
+  draft  StoryDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  memory StoryMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, memoryHash])
 }
 
 model MediaAsset {
@@ -152,10 +181,9 @@ model MediaAsset {
   status      MediaStatus @default(PENDING)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
+  character   Character?  @relation(fields: [characterId], references: [id])
   draft       StoryDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
-  scene       Scene?      @relation(fields: [sceneId], references: [id], onDelete: SetNull)
-  character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  scene       Scene?      @relation(fields: [sceneId], references: [id])
 
   @@index([draftId])
   @@index([sceneId])
@@ -163,15 +191,14 @@ model MediaAsset {
 }
 
 model VideoGenerationJob {
-  id                String    @id @default(uuid())
+  id                String     @id @default(uuid())
   draftId           String
-  status            JobStatus @default(PENDING)
+  status            JobStatus  @default(PENDING)
   outputUrl         String?
   outputStoragePath String?
   errorMessage      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
   draft             StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
 
   @@index([draftId])
