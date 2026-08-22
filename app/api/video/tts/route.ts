@@ -6,6 +6,7 @@ import type {
 } from "@/types/video";
 import { getEnvValue } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { uploadTtsAudioToStorage } from "@/lib/audio/tts-storage";
 
 export const runtime = "nodejs";
 
@@ -90,6 +91,7 @@ async function generateDeepgramDialogueAudio(params: {
   fallbackModel: string;
   line: MovieDialogueLine;
   scene: MovieScene;
+  projectId?: string;
 }) {
   const url = new URL(DEEPGRAM_TTS_ENDPOINT);
   url.searchParams.set(
@@ -114,13 +116,18 @@ async function generateDeepgramDialogueAudio(params: {
   }
 
   const audio = await response.arrayBuffer();
-  const base64Audio = Buffer.from(audio).toString("base64");
   const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+  const audioUrl = await uploadTtsAudioToStorage({
+    audioBuffer: audio,
+    contentType,
+    projectId: params.projectId,
+    dialogueId: params.line.id,
+  });
 
   return {
     ...params.line,
     audioMimeType: contentType,
-    audioUrl: `data:${contentType};base64,${base64Audio}`
+    audioUrl
   };
 }
 
@@ -144,7 +151,7 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function attachDeepgramDialogueAudio(scenes: MovieScene[], apiKey: string) {
+async function attachDeepgramDialogueAudio(scenes: MovieScene[], apiKey: string, projectId?: string) {
   const fallbackModel =
     getEnvValue(["DEEPGRAM_TTS_MODEL", "deepgramttsmodel"]) || DEFAULT_DEEPGRAM_TTS_MODEL;
   const allDialogueRefs = scenes.flatMap((scene, sceneIndex) =>
@@ -165,7 +172,8 @@ async function attachDeepgramDialogueAudio(scenes: MovieScene[], apiKey: string)
         apiKey,
         fallbackModel,
         line: reference.line,
-        scene: reference.scene
+        scene: reference.scene,
+        projectId
       });
       generatedCount += 1;
       return { ...reference, line };
@@ -212,6 +220,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const script = getSubmittedScript(body);
+    const projectId = typeof body?.projectId === "string" ? body.projectId : undefined;
 
     if (!script) {
       return NextResponse.json(
@@ -233,7 +242,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const audioResult = await attachDeepgramDialogueAudio(script.scenes, deepgramTtsApiKey);
+    const audioResult = await attachDeepgramDialogueAudio(script.scenes, deepgramTtsApiKey, projectId);
     const payload: VideoGenerationResponse = {
       ...script,
       audio: {

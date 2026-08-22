@@ -25,6 +25,7 @@ export async function uploadToSupabaseStorage(params: {
   const response = await fetch(storageUrl, {
     method: "POST",
     headers: {
+      apikey: config.serviceRoleKey,
       Authorization: `Bearer ${config.serviceRoleKey}`,
       "Content-Type": params.contentType,
       "x-upsert": params.upsert ? "true" : "false",

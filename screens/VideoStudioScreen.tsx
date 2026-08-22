@@ -800,7 +800,7 @@ export default function VideoStudioScreen() {
 
     try {
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script: flow.script }),
+        body: JSON.stringify({ script: flow.script, projectId: flow.projectId }),
         headers: {
           "Content-Type": "application/json"
         },

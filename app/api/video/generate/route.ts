@@ -8,6 +8,7 @@ import type {
 } from "@/types/video";
 import { getEnvValue } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { uploadTtsAudioToStorage } from "@/lib/audio/tts-storage";
 
 export const runtime = "nodejs";
 
@@ -960,13 +961,17 @@ async function generateDeepgramDialogueAudio(params: {
   }
 
   const audio = await response.arrayBuffer();
-  const base64Audio = Buffer.from(audio).toString("base64");
   const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+  const audioUrl = await uploadTtsAudioToStorage({
+    audioBuffer: audio,
+    contentType,
+    dialogueId: params.line.id,
+  });
 
   return {
     ...params.line,
     audioMimeType: contentType,
-    audioUrl: `data:${contentType};base64,${base64Audio}`
+    audioUrl
   }
 }
 
