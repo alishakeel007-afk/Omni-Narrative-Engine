@@ -141,17 +141,19 @@ export default function AudioGenerationScreen() {
         };
       });
 
+      const generatedCount = data.audio?.generatedCount ?? 0;
+
       persistDraft({
         ...draft,
         scenes: updatedScenes,
         audio: {
           ...draft.audio,
-          voiceMessage: `Generated ${data.generatedCount} voice lines successfully.`,
+          voiceMessage: `Generated ${generatedCount} voice lines successfully.`,
           voiceStatus: "ready"
         }
       });
 
-      await logActivity("audio_generated", { type: "voice", storyTitle: draft.storyTitle, lines: data.generatedCount });
+      await logActivity("audio_generated", { type: "voice", storyTitle: draft.storyTitle, lines: generatedCount });
 
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
@@ -183,9 +185,10 @@ export default function AudioGenerationScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sceneMood: draft.tones[0] || "cinematic",
+          mood: draft.tones[0] || "cinematic",
           sceneTitle: draft.storyTitle,
-          audioPrompt: `A ${draft.genres.join(" ")} soundtrack`
+          soundDesign: `A ${draft.genres.join(" ")} soundtrack`,
+          sceneId: `draft-${draft.storyTitle}`
         })
       });
 
@@ -201,7 +204,7 @@ export default function AudioGenerationScreen() {
           ...draft.audio,
           backgroundMusicMessage: "Background music generated successfully.",
           backgroundMusicStatus: "ready",
-          backgroundMusicUrl: data.trackUrl
+          backgroundMusicUrl: data.audioUrl
         }
       });
 
@@ -218,6 +221,75 @@ export default function AudioGenerationScreen() {
         }
       });
     }
+  };
+
+  const generateVisuals = async (forceRegenerateAll = false) => {
+    if (!draft || draft.visuals.status === "generating") return;
+
+    persistDraft({
+      ...draft,
+      visuals: {
+        message: "Generating scene visuals...",
+        status: "generating"
+      }
+    });
+
+    let errorsOccurred = false;
+    const updatedScenes = draft.scenes.map((scene) =>
+      forceRegenerateAll
+        ? { ...scene, generatedImageUrl: undefined, generatedImagePrompt: undefined, generatedImageStatus: "idle" as const, generatedImageError: undefined }
+        : { ...scene }
+    );
+
+    for (const scene of updatedScenes) {
+      if (scene.generatedImageStatus === "ready" || scene.generatedImageUrl) continue;
+
+      scene.generatedImageStatus = "generating";
+      const sceneCharacterNames = scene.activeCharacterIds
+        .map((id) => draft.characters.find((c) => c.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+
+      try {
+        const res = await fetch("/api/video/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sceneId: scene.id,
+            imagePrompt: scene.storyDescription || scene.selectedSuggestion || scene.title,
+            sceneTitle: scene.title,
+            mood: scene.sceneTone,
+            genres: draft.genres,
+            existingHash: undefined,
+            characterNames: sceneCharacterNames
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.imageUrl) {
+          throw new Error(data.error ?? `Failed to generate visual for "${scene.title}".`);
+        }
+        scene.generatedImageUrl = data.imageUrl;
+        scene.generatedImagePrompt = data.prompt;
+        scene.generatedImageStatus = "ready";
+        scene.generatedImageError = undefined;
+      } catch (err) {
+        errorsOccurred = true;
+        scene.generatedImageStatus = "error";
+        scene.generatedImageError = err instanceof Error ? err.message : "Visual generation failed";
+      }
+    }
+
+    persistDraft({
+      ...draft,
+      scenes: updatedScenes,
+      visuals: {
+        message: errorsOccurred
+          ? "Scene visuals generated, but some scenes failed."
+          : "All scene visuals are ready.",
+        status: updatedScenes.some((s) => s.generatedImageUrl) ? "ready" : "error"
+      }
+    });
+
+    await logActivity("visuals_generated", { storyTitle: draft.storyTitle });
   };
 
   const generateVideo = async () => {
@@ -254,16 +326,23 @@ export default function AudioGenerationScreen() {
 
   const voiceReady = draft.audio.voiceStatus === "ready";
   const musicReady = draft.audio.backgroundMusicStatus === "ready";
-  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && musicReady;
+  const visualsReady = draft.scenes.length > 0 && draft.scenes.every((s) => Boolean(s.generatedImageUrl));
+  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && musicReady && visualsReady;
 
-  const currentStep: AiStoryStudioStep = draft.audio.voiceStatus === "ready" ? 4 : 3;
+  const currentStep: AiStoryStudioStep = musicReady
+    ? 6
+    : visualsReady
+      ? 5
+      : voiceReady
+        ? 4
+        : 3;
 
   return (
     <ProtectedRoute>
       <ScreenLayout
         eyebrow="AI Story Studio"
         title="Audio Generation"
-        description="Review the final story, assign voice placeholders, generate character voices and background music separately, then continue to video preview."
+        description="Review the final story, assign voice placeholders, generate character voices, preview scene visuals, and background music, then continue to video preview."
         maxWidth="max-w-7xl"
       >
         <AiStoryStudioStepper currentStep={currentStep} />
@@ -282,6 +361,7 @@ export default function AudioGenerationScreen() {
               <Stat label="Scenes" value={String(draft.scenes.length)} />
               <Stat label="Characters" value={String(draft.characters.length)} />
               <Stat label="Voices" value={draft.audio.voiceStatus} />
+              <Stat label="Visuals" value={draft.visuals.status} />
               <Stat label="Music" value={draft.audio.backgroundMusicStatus} />
             </div>
           </div>
@@ -304,6 +384,22 @@ export default function AudioGenerationScreen() {
               {draft.audio.voiceStatus === "idle" && (
                 <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter">Required for music</p>
               )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => generateVisuals(false)}
+                disabled={draft.visuals.status === "generating"}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition-all duration-300 hover:bg-gold/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
+              >
+                {draft.visuals.status === "generating" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {visualsReady ? "Regenerate Visuals" : "Preview Visuals"}
+              </button>
             </div>
 
             <div className="flex flex-col gap-1">
@@ -360,17 +456,23 @@ export default function AudioGenerationScreen() {
                 Generate Video
               </button>
               {!canGenerateVideo && (
-                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio and visuals</p>
               )}
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             <StatusPanel
               icon={<Mic2 className="h-4 w-4" />}
               label="Voice Status"
               message={draft.audio.voiceMessage}
               status={draft.audio.voiceStatus}
+            />
+            <StatusPanel
+              icon={<Sparkles className="h-4 w-4" />}
+              label="Visuals Status"
+              message={draft.visuals.message}
+              status={draft.visuals.status}
             />
             <div className="flex flex-col gap-3">
               <StatusPanel
@@ -396,6 +498,22 @@ export default function AudioGenerationScreen() {
         <section className="mt-8 space-y-6">
           {draft.scenes.map((scene) => (
             <article key={scene.id} className="glass-panel overflow-hidden rounded-[2rem]">
+              {scene.generatedImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={scene.generatedImageUrl}
+                  alt={scene.title}
+                  className="h-56 w-full object-cover"
+                />
+              ) : scene.generatedImageStatus === "generating" ? (
+                <div className="flex h-40 items-center justify-center bg-black/20 text-sm text-white/60">
+                  Generating scene visual...
+                </div>
+              ) : scene.generatedImageStatus === "error" ? (
+                <div className="flex h-40 flex-col items-center justify-center gap-2 bg-black/20 px-4 text-center text-sm text-red-300">
+                  <span>{scene.generatedImageError || "Visual generation failed."}</span>
+                </div>
+              ) : null}
               <div className="border-b border-white/10 bg-white/[0.03] p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                   <div className="mb-4 flex flex-wrap items-center gap-2">

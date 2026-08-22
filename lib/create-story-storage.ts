@@ -36,6 +36,10 @@ export function createDefaultDraft(): CreateStoryDraft {
       voiceMessage: "Character voices have not been generated yet.",
       voiceStatus: "idle"
     },
+    visuals: {
+      message: "Scene visuals have not been generated yet.",
+      status: "idle"
+    },
     characters: defaultCharacters,
     genres: ["Fantasy"],
     includeNarration: true,
@@ -211,7 +215,11 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
                     storyTitle,
                     tones
                   }),
-            title: scene.title || `Scene ${index + 1}`
+            title: scene.title || `Scene ${index + 1}`,
+            generatedImageUrl: scene.generatedImageUrl,
+            generatedImagePrompt: scene.generatedImagePrompt,
+            generatedImageStatus: scene.generatedImageStatus,
+            generatedImageError: scene.generatedImageError
           };
         })
       : [];
@@ -222,6 +230,10 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
     audio: {
       ...fallback.audio,
       ...value?.audio
+    },
+    visuals: {
+      ...fallback.visuals,
+      ...value?.visuals
     },
     characters,
     genres,
