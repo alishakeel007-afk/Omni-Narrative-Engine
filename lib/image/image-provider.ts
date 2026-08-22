@@ -90,23 +90,40 @@ export class PollinationsImageProvider implements ImageProvider {
     const seed = buildImageSeed(request);
     const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=576&seed=${seed}&nologo=true`;
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Pollinations AI error (${response.status})`);
+    const maxAttempts = 4;
+    let lastError: Error = new Error("Pollinations AI request failed.");
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "image/jpeg";
+        const buffer = await response.arrayBuffer();
+
+        if (buffer.byteLength < 100) {
+          throw new Error("Pollinations AI returned empty image data.");
+        }
+
+        return {
+          imageBuffer: buffer,
+          contentType,
+          provider: this.name,
+        };
+      }
+
+      lastError = new Error(`Pollinations AI error (${response.status})`);
+
+      // Only rate limits (429) and transient server errors (5xx) are worth retrying.
+      const isRetryable = response.status === 429 || response.status >= 500;
+      if (!isRetryable || attempt === maxAttempts) {
+        throw lastError;
+      }
+
+      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 10000);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    const buffer = await response.arrayBuffer();
-
-    if (buffer.byteLength < 100) {
-      throw new Error("Pollinations AI returned empty image data.");
-    }
-
-    return {
-      imageBuffer: buffer,
-      contentType,
-      provider: this.name,
-    };
+    throw lastError;
   }
 }
 

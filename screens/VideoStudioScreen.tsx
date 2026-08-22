@@ -877,7 +877,10 @@ export default function VideoStudioScreen() {
 
       let errorsOccurred = false;
 
-      await mapWithConcurrency(updatedScenes, 2, async (scene) => {
+      // Concurrency of 1: Cloudflare has no configured credentials in this environment,
+      // so every image request currently falls through to the Pollinations fallback.
+      // Firing scenes one at a time avoids tripping its rate limit.
+      await mapWithConcurrency(updatedScenes, 1, async (scene) => {
         if (scene.generatedImageStatus === "completed" || scene.generatedImageUrl) {
           return;
         }
