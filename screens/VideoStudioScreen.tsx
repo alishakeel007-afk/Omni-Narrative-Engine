@@ -32,6 +32,11 @@ import {
   type VideoStudioFlowState,
   type VideoStudioStage
 } from "@/lib/video-storage";
+import {
+  createVideoStudioProject,
+  loadVideoStudioFromDatabase,
+  saveVideoStudioToDatabase
+} from "@/lib/video-studio-db";
 import type { MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/types/video";
 
 type EditableSceneField =
@@ -73,7 +78,17 @@ export default function VideoStudioScreen() {
   const [customToneInput, setCustomToneInput] = useState("");
 
   useEffect(() => {
-    setFlow(loadVideoStudioFlow());
+    const localFlow = loadVideoStudioFlow();
+    setFlow(localFlow);
+
+    if (localFlow.projectId) {
+      loadVideoStudioFromDatabase(localFlow.projectId).then((dbFlow) => {
+        if (dbFlow) {
+          setFlow(dbFlow);
+          saveVideoStudioFlow(dbFlow);
+        }
+      });
+    }
   }, []);
 
   const visibleScript = flow?.voiceResult ?? flow?.script ?? null;
@@ -85,6 +100,10 @@ export default function VideoStudioScreen() {
   const persistFlow = (nextFlow: VideoStudioFlowState) => {
     setFlow(nextFlow);
     saveVideoStudioFlow(nextFlow);
+
+    if (nextFlow.projectId && nextFlow.draftId && (nextFlow.script || nextFlow.voiceResult)) {
+      saveVideoStudioToDatabase(nextFlow);
+    }
   };
 
   const updateFlow = (partial: Partial<VideoStudioFlowState>) => {
@@ -222,6 +241,17 @@ export default function VideoStudioScreen() {
 
       const script = payload as VideoGenerationResponse;
       const storyText = createStoryTextFromScript(script);
+
+      let projectId = flow.projectId;
+      let draftId = flow.draftId;
+      if (!projectId || !draftId) {
+        const created = await createVideoStudioProject({ ...flow, script });
+        if (created) {
+          projectId = created.projectId;
+          draftId = created.draftId;
+        }
+      }
+
       persistFlow({
         ...flow,
         acceptedStory: storyText,
@@ -232,7 +262,9 @@ export default function VideoStudioScreen() {
         stage: "storyReview",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
-        voiceResult: null
+        voiceResult: null,
+        projectId,
+        draftId
       });
     } catch (generationError) {
       setError(
@@ -278,6 +310,17 @@ export default function VideoStudioScreen() {
       }
 
       const script = payload as VideoGenerationResponse;
+
+      let projectId = flow.projectId;
+      let draftId = flow.draftId;
+      if (!projectId || !draftId) {
+        const created = await createVideoStudioProject({ ...flow, script });
+        if (created) {
+          projectId = created.projectId;
+          draftId = created.draftId;
+        }
+      }
+
       persistFlow({
         ...flow,
         generatedStory: flow.generatedStory || createStoryTextFromScript(script),
@@ -286,7 +329,9 @@ export default function VideoStudioScreen() {
         stage: "scenes",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
-        voiceResult: null
+        voiceResult: null,
+        projectId,
+        draftId
       });
     } catch (generationError) {
       setError(

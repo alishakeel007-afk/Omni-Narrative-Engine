@@ -47,6 +47,9 @@ export type VideoStudioFlowState = {
   videoOutdated: boolean;
   voiceNeedsRegeneration: boolean;
   voiceResult: VideoGenerationResponse | null;
+  /** Database-backed persistence (Postgres is the source of truth once set; localStorage is a cache) */
+  projectId?: string;
+  draftId?: string;
 };
 
 export const DEFAULT_VIDEO_GENRES = [
@@ -197,7 +200,9 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
     updatedAt: new Date().toISOString(),
     videoOutdated: false,
     voiceNeedsRegeneration: false,
-    voiceResult: null
+    voiceResult: null,
+    projectId: undefined,
+    draftId: undefined
   };
 }
 
@@ -240,7 +245,9 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
     updatedAt: toCleanString(source.updatedAt, fallback.updatedAt),
     videoOutdated: Boolean(source.videoOutdated),
     voiceNeedsRegeneration: Boolean(source.voiceNeedsRegeneration),
-    voiceResult
+    voiceResult,
+    projectId: toCleanString(source.projectId, "") || undefined,
+    draftId: toCleanString(source.draftId, "") || undefined
   };
 }
 
