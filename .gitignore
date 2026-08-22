@@ -1,0 +1,33 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+node_modules
+.next
+out
+dist
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+
+.env.example
+
+# Database
+*.db
+*.db-journal
+
+
+/lib/generated/prisma
+
+#md files
+AI_STORY_STUDIO_FLOW.md
+CREATE_YOUR_OWN_STORY.md
+VIDEO_STUDIO_FLOW.md
+OMNI_NARRATIVE_PROJECT_FLOW.md
+SQLITE_AUTH_SETUP.md

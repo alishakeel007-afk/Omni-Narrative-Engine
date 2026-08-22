@@ -1,0 +1,405 @@
+COMSATS University Islamabad (CUI)
+Project Proposal
+For
+Omni-Narrative Engine
+Version 1.0
+By
+M. Ali Shakeel      CIIT/SP23-BDS-007/ISB
+Imran Nadeem      CIIT/SP23-BDS-020/ISB
+SupervisorAamir Shabir Parre
+Bachelor of Science in Data Science (2023-2027)
+Table of Contents
+Abstract1
+1.Introduction2
+2.Problem Statement2
+3.Problem Solution/Objectives of the Proposed System2
+3.1Objectives3
+4.Related System Analysis/Literature Review3
+5.Vision Statement5
+6.Scope6
+7.Modules6
+7.1 User Interface & Interaction System6
+7.2 Narrative Engine (Story Generation System)6
+7.3 State Manager & Game Logic System7
+7.4 Metadata Parsing & Scene Interpretation7
+7.5 Visual Identity & Image Generation7
+7.6 Audio Generation & Sound Design7
+7.7 LongTerm Memory & Story Context System8
+7.8 Asynchronous Processing & System Orchestration8
+7.9 Narrative Coherence Engine8
+7.10 Emotion Detection Engine8
+7.11 Adaptive Difficulty System9
+7.12 Character Identity Tracker9
+8.System Limitations/Constraints9
+9.Data Gathering Approach10
+10.Tools and Technologies11
+11.Project Stakeholders and Roles12
+12.Module based Work Division12
+13.WBS and Gantt Chart13
+15.Mockups16
+16.References21
+17.Plagiarism Report21
+Project Category:
+ A-Web Application/Web Application based Information System                                                  B-Problem Solving and Artificial Intelligence   A-Web Application/Web Application based Information System                                                  B-Problem Solving and Artificial Intelligence  
+ A-Web Application/Web Application based Information System                                                 
+ B-Problem Solving and Artificial Intelligence  
+ A-Web Application/Web Application based Information System                                                 
+ B-Problem Solving and Artificial Intelligence  
+Abstract
+Traditional AI storytelling often lacks synchronization between text, visuals, and audio, resulting in fragmented user experiences and narrative inconsistencies. This project introduces the Omni-Narrative Engine, an integrated "digital director" designed to generate cohesive, real-time multimedia narratives. By orchestrating a Large Language Model (LLM) with image generation and audio synthesis tools, the system produces coordinated story arcs, character visuals, and emotionally resonant scores. To solve the common issue of narrative drift, the Engine utilizes structured state management and a vector database for long-term memory, ensuring character and plot consistency across extended chapters. The result is a dynamic, asynchronous framework where user choices drive a unified multimedia evolution. This project demonstrates the potential of AI to move beyond simple text generation toward fully immersive, intelligent storytelling platforms.
+Introduction
+The growing adoption of artificial intelligence in interactive storytelling has introduced new possibilities for dynamic narrative generation, yet several limitations still prevent these systems from delivering a fully immersive experience. Most existing AI storytelling platforms primarily generate textual narratives, requiring users to imagine the visual and auditory aspects of the story themselves. Although some tools are capable of generating images or sound independently, they often fail to synchronize these elements with the narrative context, resulting in fragmented storytelling experiences. Another significant challenge is maintaining character consistency, as AI image generation models frequently produce different visual representations of the same character across multiple scenes, which disrupts immersion and narrative clarity. In addition, many AI storytelling systems lack longterm narrative memory, causing them to forget important events or character details introduced earlier in the story. Furthermore, multimedia components such as text, images, and audio are often generated sequentially, leading to slower response times and reduced interactivity for users. These limitations highlight the need for an integrated storytelling system capable of coordinating multiple AI components while maintaining narrative continuity, character consistency, and realtime responsiveness.
+Problem Statement
+The growing adoption of artificial intelligence in interactive storytelling has introduced new possibilities for dynamic narrative generation, yet several limitations still prevent these systems from delivering a fully immersive experience. Most existing AI storytelling platforms primarily generate textual narratives, requiring users to imagine the visual and auditory aspects of the story themselves. Although some tools are capable of generating images or sound independently, they often fail to synchronize these elements with the narrative context, resulting in fragmented storytelling experiences. Another significant challenge is maintaining character consistency, as AI image generation models frequently produce different visual representations of the same character across multiple scenes, which disrupts immersion and narrative clarity. In addition, many AI storytelling systems lack long term narrative memory, causing them to forget important events or character details introduced earlier in the story. Furthermore, multimedia components such as text, images, and audio are often generated sequentially, leading to slower response times and reduced interactivity for users. These limitations highlight the need for an integrated storytelling system capable of coordinating multiple AI components while maintaining narrative continuity, character consistency, and real time responsiveness.
+Problem Solution/Objectives of the Proposed System
+The proposed system is the OmniNarrative Engine, an AIpowered multimedia storytelling platform designed to generate synchronized narrative experiences by coordinating multiple artificial intelligence components. The system will generate story text using a large language model while simultaneously producing character visuals and background audio that correspond to the narrative context. To maintain narrative continuity, the system will incorporate structured state management and longterm memory mechanisms that store previous story events, character details, and user decisions, allowing the narrative to remain consistent throughout the storytelling process. Additionally, a visual identity module will be implemented to ensure that characters maintain consistent appearances across different scenes by using reference seeds or characterspecific prompts during image generation. The system will also employ asynchronous orchestration, enabling text, image, and audio generation processes to run in parallel, thereby reducing response time and providing a smoother and more immersive user experience.
+Objectives
+BO1: To generate dynamic story narratives using large language models based on user decisions
+BO2: To maintain narrative continuity and longterm memory using vector database technology
+BO3: To ensure visual consistency of characters across multiple scenes through referencebased image generation
+BO4: To synchronize text, images, and audio for immersive multimedia storytelling experiences
+BO5: To improve system responsiveness through asynchronous orchestration of multimedia generation processes
+BO-6: To provide users with both guided story options and custom story control, allowing them to shape the complete narrative from start to end according to their own choices.
+Related System Analysis/Literature Review
+Table 1: Related System Analysis
+System
+Platform Coverage
+Key Features
+Limitations
+Gap Addressed
+AI Dungeon
+Web, Mobile
+AIgenerated interactive storytelling, user choices affect narrative, dynamic story generation
+Limited multimedia support, inconsistent story coherence, limited character consistency
+Structured narrative generation with consistent characters and multimedia integration
+NovelAI
+Web
+AIassisted story generation, customizable writing styles, narrative memory features
+Primarily textbased, limited visual or audio storytelling capabilities
+Integrated text, image, and audio narrative generation
+Inworld AI
+Web, Game Engines
+AI characters with dialogue, personality modeling, interactive conversations
+Focused mainly on character interaction, limited full narrative generation
+Complete story generation engine with scene progression and narrative control
+Charisma AI
+Web, VR, AR
+Interactive storytelling with virtual characters, conversational AI narratives
+Requires heavy setup for narrative control, limited automated story coherence
+Automated narrative coherence with structured storytelling logic
+Latitude AI Story Engine
+Web
+Procedural storytelling, AIdriven plot generation, branching narratives
+Weak longterm memory and inconsistent narrative continuity
+Longterm memory system with narrative coherence management
+StoryWizard AI
+Web
+AIgenerated stories, educational storytelling tools, simple interactive narratives
+Limited customization, minimal multimedia integration
+Advanced narrative personalization with adaptive storytelling features
+Vision Statement
+For users who enjoy immersive storytelling experiences and struggle with the fragmented, inconsistent nature of traditional AI-driven narratives, the Omni-Narrative Engine is an intelligent, multi-modal storytelling platform that generates synchronized, real-time multimedia narratives. Unlike existing tools that focus on a single medium or lack long-term coherence, our product provides a unified "digital director" that orchestrates language, image, and audio models to ensure visual consistency and narrative continuity based on individual user decisions.
+Scope
+The proposed system is a web-based, AI-powered multimedia storytelling platform called the Omni-Narrative Engine, designed to enable users to experience interactive narratives generated in real time. The system allows users to interact through a dedicated interface to explore story scenarios, select character roles, and make decisions that directly influence the progression and direction of the narrative.
+In addition to system-generated story options, the platform will also provide a custom story control feature, where users can create and guide their own story from beginning to end. At each stage of the story, the user will have two choices: either select from AI-generated options provided by the system or enter their own custom action, dialogue, decision, or storyline direction. This gives users full creative freedom while still allowing beginners to continue with guided options if they do not already have a story idea.
+The system focuses on the integration of large language models, image generation models, and audio synthesis tools to automatically produce synchronized text, visuals, and background audio that reflect the specific narrative context. The system incorporates structured state management and long-term memory mechanisms using vector database technology to track important elements such as character attributes, locations, previous events, user decisions, and custom user-written story directions. This ensures that the storyline remains logically consistent across multiple scenes.
+A dedicated character identity management layer is implemented to maintain consistent visual appearances of characters across all generated images. Narrative continuity is further supported by an orchestration layer that coordinates the simultaneous execution of multimedia generation processes to enhance immersion and system responsiveness.
+While the system provides synchronized storytelling capabilities, it does not include full cinematic animation, real-time multiplayer environments, or professional video production tools. The platform relies on external AI services and third-party APIs for its generative processes, meaning performance is subject to external service availability. The primary focus of the project is the design and implementation of the middleware architecture that coordinates narrative generation, multimedia synthesis, custom user choices, guided story options, and long-term memory management to deliver a consistent and personalized storytelling experience.
+Modules
+User Interface & Interaction System
+This module provides the main interface through which users interact with the system. It allows users to start the narrative experience, choose characters, and make decisions that influence the progression of the story. The interface displays generated story text, images, and audio in real time to create an immersive storytelling experience. It also collects user inputs and forwards them to the backend narrative engine for processing.
+FE1: Display narrative text generated by the system.FE2: Present generated scene images alongside the story.FE3: Play background music and narration audio.FE4: Allow users to select choices that affect the story progression.FE5: Update the interface dynamically as new scenes are generated.                                                            FE-6: Provide a custom input box where users can write their own story choice at every scene.FE-7: Display both system-generated choices and a custom choice option for flexible story progression.FE-8: Allow users to start the story either from a predefined template or from their own custom idea.
+Narrative Engine (Story Generation System)
+The Narrative Engine is responsible for generating the storyline based on user input and previous story context. It produces structured narrative outputs that describe the current scene, characters, actions, and emotional tone of the story. The generated content forms the foundation for other modules such as image generation and audio synthesis.
+FE1: Generate narrative scenes based on user choices.FE2: Produce structured outputs containing story text and scene metadata.FE3: Support branching storylines depending on user decisions.FE4: Maintain narrative coherence across multiple scenes.FE5: Provide scene descriptions for multimedia generation.                                                                            FE-6: Generate story scenes based on both predefined choices and custom user-written inputs.FE-7: Convert user-written custom decisions into structured story progression.FE-8: Maintain logical flow even when the user creates their own story path
+State Manager & Game Logic System
+The State Manager maintains the internal state of the story and the player throughout the narrative experience. It tracks important information such as the player’s health, inventory, location, and story progress. This module ensures that the story remains logically consistent and adapts to the player's decisions during gameplay.
+FE1: Track player attributes such as health and status.FE2: Manage player inventory and collected items.FE3: Store current story location and progression stage.FE4: Update game state based on narrative events.FE5: Provide state information to other modules when generating new scenes.
+Metadata Parsing & Scene Interpretation
+This module processes the generated narrative text and extracts meaningful information required by other system components. It identifies key elements such as characters, objects, and environmental details from the story. The extracted data is then converted into structured prompts that guide image generation and audio modules.
+FE1: Extract scene descriptions from generated narrative text.FE2: Identify key objects, characters, and environmental elements in the story.FE3: Generate image prompts from narrative context.FE4: Detect emotional tone and atmosphere of the scene.FE5: Produce sound mood tags for audio generation modules.
+Visual Identity & Image Generation
+This module generates visual representations of the scenes described in the narrative. It ensures that characters maintain a consistent appearance throughout the story by using reference attributes or seeds. The generated images help users visualize the environment, characters, and actions taking place within the narrative.
+FE1: Generate scene images based on narrative prompts.FE2: Maintain character visual consistency using reference seeds.FE3: Generate environment visuals such as forests, castles, or cities.FE4: Ensure the same characters retain consistent appearances across scenes.FE5: Display generated visuals within the user interface.
+7.6 Audio Generation & Sound Design
+The Audio Generation module enhances the storytelling experience by producing voice narration and background music that matches the emotional tone of the story. It converts narrative elements into audio outputs that reflect the atmosphere and intensity of each scene, thereby creating a more immersive multimedia experience.
+FE1: Generate voice narration for story text.FE2: Produce character dialogue audio when required.FE3: Generate background music based on scene mood.FE4: Adjust music tempo and intensity based on emotional tone.FE5: Synchronize audio playback with narrative progression
+LongTerm Memory & Story Context System
+This module stores previously generated story segments and retrieves relevant information when generating new scenes. By maintaining longterm memory, the system ensures that the narrative remains consistent over time and references past events accurately. This prevents contradictions in the storyline and improves narrative continuity.
+FE1: Store previous story scenes in a structured database.FE2: Retrieve relevant past events when generating new scenes.FE3: Maintain historical context for characters and locations.FE4: Prevent contradictions in narrative progression.FE5: Provide contextual memory for the narrative engine.
+Asynchronous Processing & System Orchestration
+The Asynchronous Processing module coordinates the execution of multiple system components simultaneously. Instead of generating text, images, and audio sequentially, this module manages parallel processing to improve system performance and reduce response time. It ensures that all multimedia elements are generated efficiently and presented to the user in a synchronized manner.
+FE1: Execute multiple generation processes in parallel.FE2: Coordinate communication between system modules.FE3: Reduce response latency during scene generation.FE4: Manage task scheduling for multimedia generation.FE5: Ensure synchronized output of text, images, and audio.
+Narrative Coherence Engine
+The Narrative Coherence Engine ensures that the generated story remains logically consistent throughout the narrative progression. It analyzes previous story events, character actions, and environmental context to prevent contradictions or unrealistic developments in the storyline. By maintaining logical relationships between scenes and events, the module helps the system generate narratives that feel continuous, believable, and structured.
+FE1: Analyze previous story events for logical consistency.FE2: Detect contradictions in newly generated narrative content.FE3: Maintain continuity between scenes and story elements.FE4: Validate character actions against previous narrative context.FE5: Provide coherence feedback to the narrative generation system.
+Emotion Detection Engine
+The Emotion Detection Engine analyzes the emotional tone of the generated narrative and determines the dominant mood of each scene. This information is used to guide other modules such as background music generation, narration style, and visual atmosphere. By identifying emotions such as tension, excitement, fear, or calmness, the module enhances the immersive quality of the storytelling experience.
+FE1: Analyze narrative text to detect emotional tone.FE2: Classify scene emotions such as suspense, joy, fear, or calmness.FE3: Provide mood labels for audio and music generation.FE4: Assist visual modules in selecting atmosphereappropriate imagery.FE5: Adapt narration style based on detected emotions.
+ Adaptive Difficulty System
+The Adaptive Difficulty System dynamically adjusts the complexity and challenge level of the narrative based on the player's actions and progress. It evaluates user decisions, performance, and story progression to determine whether the narrative should become more challenging or remain balanced. This ensures that the experience remains engaging for different users without becoming too easy or excessively difficult.
+FE1: Monitor player decisions and story progression.FE2: Evaluate user performance during narrative interactions.FE3: Adjust difficulty of narrative events dynamically.FE4: Modify challenges or obstacles within the story.FE5: Maintain balanced gameplay experience for different users.
+ Character Identity Tracker
+The Character Identity Tracker maintains consistent information about characters throughout the story. It stores attributes such as appearance, personality traits, roles, and relationships to ensure that characters behave consistently across different scenes. This module also helps maintain visual consistency for generated character images and prevents sudden or unrealistic character changes during the narrative.
+FE1: Store character attributes such as appearance and personality.FE2: Track relationships between story characters.FE3: Maintain consistent character behavior across scenes.FE4: Provide reference data for visual character generation.FE5: Prevent inconsistencies in character roles or identities.
+Custom Story Path & Guided Choice System
+This module allows users to control the story according to their own imagination. At the beginning of the story, users can either choose a system-provided story setup or enter their own custom story idea. During every scene, the system provides multiple predefined choices for users who need guidance. However, users can also type their own custom decision, action, dialogue, or story direction. This enables both beginner users and creative users to enjoy the platform according to their needs.
+The module works with the Narrative Engine, State Manager, Long-Term Memory System, and Narrative Coherence Engine to make sure that custom user inputs are properly understood, stored, and continued in the next scenes without breaking the story flow.
+FE-1: Allow users to choose between Guided Story Mode and Custom Story Mode at the start of the experience.FE-2: Provide AI-generated story options at every step for users who do not have their own story idea.FE-3: Allow users to enter custom actions, dialogues, character decisions, or story directions at every scene.FE-4: Store custom user choices in story memory so future scenes remain connected with previous decisions.FE-5: Validate custom user input to maintain narrative coherence and prevent illogical story progression.FE-6: Allow users to switch between provided options and custom input during the story.FE-7: Display a clear story progress path showing previous choices, current scene, and possible next steps.
+System Limitations/Constraints
+LI-1: The system relies on third-party AI services such as Google Gemini, ElevenLabs, and models from Hugging Face. If these services experience downtime, API restrictions, or rate limits, the story generation, image creation, or audio synthesis may temporarily stop or slow down.
+LI-2: The consistency of characters and environments depends on seed values or reference images generated by models like FLUX.1-schnell. Perfect visual consistency across all scenes cannot be fully guaranteed because generative models may still produce slight variations.
+LI-3: The system generates multimedia content dynamically, which may introduce latency when producing text, images, and audio simultaneously. Even with asynchronous execution using Python’s asyncio, slower internet connections or limited hardware resources may affect response time.
+LI-4: The long-term memory module uses a vector database such as ChromaDB to recall past story events. However, memory retrieval is dependent on similarity search, which means some older events may not always be perfectly recalled or prioritized by the system.
+LI-5: The narrative quality depends on the reasoning and creativity of the language model. While the system attempts to maintain story continuity and logical progression, the AI may still occasionally produce inconsistent or unrealistic narrative elements.
+LI-6: Audio generation for background music and voice acting relies on AI synthesis models. Emotional tone matching (e.g., tense, calm, dramatic) is approximate and may not always perfectly match the exact emotional context of the scene.
+LI-7: The system operates primarily as a prototype research project and may not support large numbers of concurrent users. Performance may degrade if multiple users attempt to generate complex multimedia scenes simultaneously.
+LI-8: The Streamlit-based interface built with Streamlit is intended for demonstration and development purposes. It may lack the scalability, security, and performance optimization required for a fully deployed commercial application.
+LI-9: The system requires stable internet connectivity to access AI APIs and multimedia generation services. Offline functionality is limited because most generation processes rely on cloud-based models.
+LI-10: The multimedia content produced by the system (images, text, and audio) is generated automatically and may occasionally produce inaccurate, biased, or inappropriate outputs depending on the prompts and model behavior.
+LI-11: The system does not include advanced editing controls for users to manually adjust generated images, audio, or story elements after generation. Any changes require regenerating the content through the AI pipeline.
+LI-12: Hardware limitations such as low RAM, slow CPUs, or lack of GPU acceleration may affect the speed of local modules, particularly when processing multiple AI outputs or managing large vector databases.
+LI-13: The system is designed for experimental interactive storytelling and multimedia generation. It does not guarantee cinematic-level quality or professional production standards for generated images, audio, or narrative structure.
+Data Gathering Approach
+Data will be gathered through literature review, analysis of existing AI storytelling and multimedia generation tools, publicly available APIs, and generated sample datasets. Technical information about narrative generation, image synthesis, and audio generation will be collected from research papers, official documentation, and developer resources of platforms such as Google Gemini, ChromaDB, ElevenLabs, and models available through Hugging Face. User requirements and expectations for interactive storytelling systems will be gathered through informal discussions, questionnaires, and feedback from potential users such as students and gamers. Additionally, simulated story scenarios and test prompts will be created to evaluate how the system generates narrative text, images, and audio in different situations.
+Tools and Technologies
+Table 2: Tools and Technologies for Proposed Project
+Tools
+Version
+Rationale
+Streamlit
+Latest
+Used to build the web-based user interface that displays story text, generated images, and audio playback for the interactive narrative experience.
+Google Gemini
+3.1 Flash
+Large Language Model used as the Narrative Engine to generate story text and structured JSON outputs for images, audio mood, and game state updates.
+ChromaDB
+Latest
+Vector database used to store story events and retrieve past narrative context for long-term memory using Retrieval-Augmented Generation (RAG).
+FLUX.1-schnell
+Latest
+Image generation model used to create story visuals while maintaining character consistency through seed values and reference prompts.
+Hugging Face
+Latest
+Platform used to access AI models and APIs for image generation and other machine learning tasks.
+ElevenLabs
+Latest
+AI voice synthesis platform used to generate character dialogues and narration audio.
+AudioLDM
+Latest
+AI audio generation model used to create background music and ambient sound effects based on story mood.
+Python
+Latest
+Main programming language used to implement system logic, connect APIs, manage modules, and coordinate the multimedia pipeline.
+asyncio
+Latest
+Python asynchronous framework used to run text, image, and audio generation tasks simultaneously to improve system speed and responsiveness.
+Project Stakeholders and Roles
+Table 3 Project Stakeholders for Proposed Project
+Project Sponsor
+COMSATS University Islamabad, Islamabad Campus
+Stakeholder
+Students : Ali Shakeel, Imran Nadeem
+Project Supervisor: Aamir Shabir Pare
+Final Year Project Committee: Evaluation of project
+Module based Work Division
+Table 4 Team Member Work Division for Proposed Project
+Student Name
+Registration Number
+Responsibility / Module / Feature
+M. Ali Shakeel
+CIIT/SP23-BDS-007/ISB
+Module 2 – Narrative Engine: LLM integration for dynamic story generation, branching logic, and scene metadata 
+M. Ali Shakeel
+CIIT/SP23-BDS-007/ISB
+Module 5 – Visual Identity & Image Generation: FLUX.1-schnell integration and seed-based character consistency 
+M. Ali Shakeel
+CIIT/SP23-BDS-007/ISB
+Module 7 – Long-Term Memory: ChromaDB setup, RAG-based context retrieval, and historical continuity 
+M. Ali Shakeel
+CIIT/SP23-BDS-007/ISB
+Module 8 – Asynchronous Orchestration: Python asyncio framework for parallel multimedia processing 
+Imran Nadeem
+CIIT/SP23-BDS-020/ISB
+Module 1 – User Interface & Interaction: Dynamic Streamlit frontend for story display and user input 
+Imran Nadeem
+CIIT/SP23-BDS-020/ISB
+Module 3 – State Manager & Game Logic: Player attribute tracking (health, inventory) and story progression 
+Imran Nadeem
+CIIT/SP23-BDS-020/ISB
+Module 4 – Metadata Parsing: Scene interpretation, automated prompt generation, and tone extraction 
+Imran Nadeem
+CIIT/SP23-BDS-020/ISB
+Module 6 – Audio Generation: AI voice synthesis, narration synchronization, and mood-based music 
+WBS and Gantt Chart
+Gantt Chart Table for OmniNarrative
+Table 6: Gantt Chart timeline
+Task ID
+Description
+Start Month
+End Month
+Dependencies
+1.1
+Interface & Interaction Development
+Jan 2026
+Feb 2026
+None
+2.1
+LLM Narrative Engine Integration
+Jan 2026
+Feb 2026
+None
+3.1
+State Management & Game Logic
+Feb 2026
+Mar 2026
+2.1
+4.1
+Metadata Parsing & Interpretation
+Mar 2026
+Apr 2026
+2.1
+5.1
+Visual Identity & Image Generation
+Apr 2026
+May 2026
+4.1
+6.1
+Audio & Sound Design Integration
+Apr 2026
+May 2026
+4.1
+7.1
+Long-Term Memory (RAG) Setup
+May 2026
+Jun 2026
+2.1
+8.1
+Asynchronous Orchestration Engine
+Jun 2026
+Jul 2026
+1.1, 5.1, 6.1
+9.1
+Narrative Coherence Logic
+Jul 2026
+Aug 2026
+7.1
+10.1
+Emotion Detection Implementation
+Aug 2026
+Sep 2026
+4.1
+11.1
+Adaptive Difficulty System
+Sep 2026
+Oct 2026
+3.1
+12.1
+Character Identity Tracking
+Oct 2026
+Nov 2026
+5.1
+Work Breakdown Structure (WBS)
+Table 6: WBS
+Module
+Task ID
+Task Description
+Assigned To
+Module 1: User Interface & Interaction System
+1.1
+Develop web-based interface for interactive storytelling 
+M. Ali Shakeel
+1.2
+Implement genre/scenario selection and dynamic text display 
+Imran Nadeem
+Module 2: Narrative Engine (Story Generation)
+2.1
+Integrate LLM for dynamic story segment generation 
+M. Ali Shakeel
+2.2
+Implement branching story logic and structured JSON outputs 
+M. Ali Shakeel
+Module 3: State Manager & Game Logic System
+3.1
+Implement player state tracking (health, attributes, inventory) 
+Imran Nadeem
+3.2
+Track location/scene progression and update game state 
+Imran Nadeem
+Module 4: Metadata Parsing & Scene Interpretation
+4.1
+Extract key environmental elements and characters from text 
+M. Ali Shakeel
+4.2
+Automate image prompt generation and sound mood tagging 
+Imran Nadeem
+Module 5: Visual Identity & Image Generation
+5.1
+Integrate FLUX.1-schnell for scene image generation 
+M. Ali Shakeel
+5.2
+Implement seed-based character visual consistency 
+M. Ali Shakeel
+Module 6: Audio Generation & Sound Design
+6.1
+Implement background music generation based on mood 
+Imran Nadeem
+6.2
+Integrate AI voice synthesis for narration and dialogue 
+Imran Nadeem
+Module 7: Long-Term Memory & Story Context
+7.1
+Set up ChromaDB for story segment storage 
+M. Ali Shakeel
+7.2
+Develop RAG-based retrieval for narrative continuity 
+M. Ali Shakeel
+Module 8: Asynchronous Processing & Orchestration
+8.1
+Implement Python asyncio for parallel task execution 
+M. Ali Shakeel
+8.2
+Coordinate synchronized delivery of multimedia to UI 
+M. Ali Shakeel
+Module 9: Narrative Coherence Engine
+9.1
+Develop logic for contradiction detection and logical flow 
+Imran Nadeem
+Module 10: Emotion Detection Engine
+10.1
+Implement text analysis for mood classification 
+M. Ali Shakeel
+Module 11: Adaptive Difficulty System
+11.1
+Create dynamic complexity adjustment based on user actions 
+Imran Nadeem
+Module 12: Character Identity Tracker
+12.1
+Store and maintain character personality and relationship data 
+Imran Nadeem
+WBS & GANTT CHART:
+Mockups
+ 
+ 
+Reference 
+Book 
+S. Russell and P. Norvig, Artificial Intelligence: A Modern Approach, 3rd ed. Upper Saddle River, NJ: Pearson Education, 2010, pp. 1–80.
+I. Goodfellow, Y. Bengio, and A. Courville, Deep Learning. Cambridge, MA: MIT Press, 2016, pp. 1–120.
+J. Jurafsky and J. H. Martin, Speech and Language Processing, 3rd ed. Boston, MA: Pearson, 2023, pp. 35–150.
+M. Wooldridge, An Introduction to MultiAgent Systems, 2nd ed. Chichester, UK: Wiley, 2009, pp. 50–120.
+Article in a Journal 
+L. J. Martin, P. Ammanabrolu, and M. O. Riedl, “Event representations for automated story generation with deep neural networks,” Proceedings of the AAAI Conference on Artificial Intelligence, vol. 32, no. 1, pp. 868–875, 2018.
+A. See, P. J. Liu, and C. D. Manning, “Get to the point: Summarization with pointergenerator networks,” Transactions of the Association for Computational Linguistics, vol. 5, pp. 1–14, 2017.
+T. Brown et al., “Language models are fewshot learners,” Advances in Neural Information Processing Systems, vol. 33, pp. 1877–1901, 2020.
+Articles from Conference Proceedings (published) 
+A. Radford et al., “Improving language understanding by generative pretraining,” in Proc. OpenAI Research Conference, 2018, pp. 1–12.
+R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer, “Highresolution image synthesis with latent diffusion models,” in Proc. IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2022, pp. 10684–10695.
+J. Devlin, M. Chang, K. Lee, and K. Toutanova, “BERT: Pretraining of deep bidirectional transformers for language understanding,” in Proc. NAACLHLT Conference, 2019, pp. 4171–4186.
+World Wide Web 
+OpenAI, “GPT Models and Generative AI.” Internet: https://openai.com, accessed Jan. 12, 2026.
+Stability AI, “Stable Diffusion Documentation.” Internet: https://stability.ai, accessed Jan. 15, 2026.
+ElevenLabs, “AI Voice Generation Platform.” Internet: https://elevenlabs.io, accessed Jan. 18, 2026.
+Hugging Face, “Transformers Documentation.” Internet: https://huggingface.co/docs, accessed Jan. 20, 2026.
+LangChain Developers, “LangChain Framework Documentation.” Internet: https://python.langchain.com/docs, accessed Jan. 22, 2026.
+PostgreSQL Global Development Group, “PostgreSQL Documentation.” Internet: https://www.postgresql.org/docs/, accessed Jan. 24, 2026.
+Plagiarism Report

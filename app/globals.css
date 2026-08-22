@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-midnight text-slate-950 antialiased;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 52%, #f8fafc 100%);
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+  color: #111827;
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-slate-200 bg-white shadow-card;
+  }
+
+  .story-grid {
+    background-image:
+      linear-gradient(rgba(15,23,42,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15,23,42,0.035) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .gold-ring {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.14),
+      0 18px 45px rgba(15, 23, 42, 0.08);
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-slate-950 via-slate-900 to-gold bg-clip-text text-transparent;
+  }
+
+  .input {
+    @apply w-full rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
+  }
+
+  .textarea {
+    @apply w-full resize-y rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
+  }
+}
+
+@layer utilities {
+  .animate-scene-reveal {
+    animation: sceneReveal 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes sceneReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+body [class*="min-h-screen"],
+body [class*="bg-midnight"],
+body [class*="bg-abyss"],
+body [class*="bg-velvet"],
+body [class*="from-slate-950"],
+body [class*="via-slate-900"],
+body [class*="to-slate-950"] {
+  background: #f8fafc !important;
+  background-image: none !important;
+}
+
+body [class*="bg-black"],
+body [class*="bg-slate-950"],
+body [class*="bg-slate-900"],
+body [class*="bg-slate-800"] {
+  background-color: #ffffff !important;
+}
+
+body [class*="text-white"],
+body [class*="text-slate-100"],
+body [class*="text-slate-200"],
+body [class*="text-slate-300"] {
+  color: #111827 !important;
+}
+
+body [class*="text-white/"],
+body [class*="text-slate-400"],
+body [class*="text-slate-500"],
+body [class*="text-starlight"] {
+  color: #475569 !important;
+}
+
+body [class*="border-white/"],
+body [class*="border-slate-"],
+body [class*="border-cyan-"],
+body [class*="border-blue-"],
+body [class*="border-purple-"],
+body [class*="border-violet-"],
+body [class*="border-gold"] {
+  border-color: #e2e8f0 !important;
+}
+
+body [class*="bg-white/"],
+body [class*="bg-cyan-"],
+body [class*="bg-blue-"],
+body [class*="bg-purple-"],
+body [class*="bg-violet-"],
+body [class*="bg-gold"] {
+  background-color: #ffffff !important;
+}
+
+body [class*="text-cyan-"],
+body [class*="text-blue-"],
+body [class*="text-purple-"],
+body [class*="text-violet-"],
+body [class*="text-gold"] {
+  color: #2563eb !important;
+}
+
+body button[class*="bg-gradient"],
+body a[class*="bg-gradient"],
+body button[class*="bg-cyan"],
+body a[class*="bg-cyan"],
+body button[class*="bg-blue"],
+body a[class*="bg-blue"],
+body button[class*="bg-gold"],
+body a[class*="bg-gold"] {
+  background: #2563eb !important;
+  background-image: none !important;
+  border-color: rgba(37, 99, 235, 0.55) !important;
+  color: #ffffff !important;
+}
+
+body button[class*="bg-gradient"]:hover,
+body a[class*="bg-gradient"]:hover,
+body button[class*="bg-cyan"]:hover,
+body a[class*="bg-cyan"]:hover,
+body button[class*="bg-blue"]:hover,
+body a[class*="bg-blue"]:hover,
+body button[class*="bg-gold"]:hover,
+body a[class*="bg-gold"]:hover {
+  background: #1d4ed8 !important;
+}
+
+body button[class*="red-"],
+body a[class*="red-"] {
+  background: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
+}
+
+body button[class*="red-"]:hover,
+body a[class*="red-"]:hover {
+  background: #fecaca !important;
+  color: #7f1d1d !important;
+}

@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model StoryProject {
+  id        String        @id @default(uuid())
+  userId    String
+  title     String
+  mode      StoryMode
+  status    ProjectStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  drafts    StoryDraft[]
+
+  @@index([userId])
+}
+
+model StoryDraft {
+  id               String               @id @default(uuid())
+  storyProjectId   String
+  versionNumber    Int
+  title            String
+  genres           Json
+  tones            Json
+  numberOfScenes   Int
+  includeNarration Boolean              @default(true)
+  status           DraftStatus          @default(EDITING)
+  isActive         Boolean              @default(false)
+  progressState    Json?                // health, inventory, currentSceneIndex
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  characters       Character[]
+  mediaAssets      MediaAsset[]
+  scenes           Scene[]
+  project          StoryProject         @relation(fields: [storyProjectId], references: [id], onDelete: Cascade)
+  memories         StoryMemory[]
+  memoryEmbeddings StoryMemoryEmbedding[]
+  videoJobs        VideoGenerationJob[]
+
+  @@unique([storyProjectId, versionNumber])
+  @@index([storyProjectId])
+}
+
+model Character {
+  id                     String          @id @default(uuid())
+  draftId                String
+  name                   String
+  role                   String
+  personalityTone        String
+  traits                 Json
+  voiceStyle             String?
+  appearancePrompt       String?
+  referenceImageUrl      String?
+  voiceSampleUrl         String?
+  sourceType             CharacterSource @default(TEXT)
+  // Identity tracking fields — updated after each scene generation
+  lastSeenScene          Int?
+  currentEmotionalState  String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  draft                  StoryDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  dialogues              Dialogue[]
+  mediaAssets            MediaAsset[]
+
+  @@index([draftId])
+}
+
+model Scene {
+  id                 String        @id @default(uuid())
+  draftId            String
+  sceneNumber        Int
+  title              String
+  description        String
+  location           String?
+  mood               String?
+  selectedSuggestion String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  choices            Choice[]
+  dialogues          Dialogue[]
+  mediaAssets        MediaAsset[]
+  draft              StoryDraft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  memories           StoryMemory[]
+
+  @@unique([draftId, sceneNumber])
+  @@index([draftId])
+}
+
+model Dialogue {
+  id          String     @id @default(uuid())
+  sceneId     String
+  characterId String?
+  text        String
+  delivery    String?
+  audioUrl    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  character   Character? @relation(fields: [characterId], references: [id])
+  scene       Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+  @@index([characterId])
+}
+
+model Choice {
+  id         String     @id @default(uuid())
+  sceneId    String
+  choiceText String
+  choiceType ChoiceType
+  selected   Boolean    @default(false)
+  resultText String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  scene      Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+}
+
+model StoryMemory {
+  id              String     @id @default(uuid())
+  draftId         String
+  sceneId         String?
+  memoryType      String
+  content         String
+  importanceScore Int        @default(1)
+  createdAt       DateTime   @default(now())
+  draft           StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  scene           Scene?     @relation(fields: [sceneId], references: [id])
+  embeddings      StoryMemoryEmbedding[]
+
+  @@index([draftId])
+  @@index([sceneId])
+}
+
+model StoryMemoryEmbedding {
+  id         String   @id @default(uuid())
+  draftId    String
+  sceneId    String?
+  memoryId   String
+  userId     String
+  content    String
+  memoryType String
+  memoryHash String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  draft  StoryDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  memory StoryMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, memoryHash])
+}
+
+model MediaAsset {
+  id          String      @id @default(uuid())
+  draftId     String
+  sceneId     String?
+  characterId String?
+  type        MediaType
+  url         String?
+  storagePath String?
+  prompt      String?
+  provider    String?
+  status      MediaStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  character   Character?  @relation(fields: [characterId], references: [id])
+  draft       StoryDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  scene       Scene?      @relation(fields: [sceneId], references: [id])
+
+  @@index([draftId])
+  @@index([sceneId])
+  @@index([characterId])
+}
+
+model VideoGenerationJob {
+  id                String     @id @default(uuid())
+  draftId           String
+  status            JobStatus  @default(PENDING)
+  outputUrl         String?
+  outputStoragePath String?
+  errorMessage      String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  draft             StoryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+}
+
+enum StoryMode {
+  GUIDED
+  CUSTOM
+}
+
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum DraftStatus {
+  EDITING
+  READY
+  ACCEPTED
+  GENERATED
+  ARCHIVED
+}
+
+enum CharacterSource {
+  TEXT
+  CAMERA
+  UPLOAD
+}
+
+enum ChoiceType {
+  AI_SUGGESTED
+  CUSTOM
+}
+
+enum MediaType {
+  IMAGE
+  AUDIO
+  VIDEO
+  MUSIC
+}
+
+enum MediaStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
