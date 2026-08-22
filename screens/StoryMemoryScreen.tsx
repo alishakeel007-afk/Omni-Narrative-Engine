@@ -7,6 +7,7 @@ import { useStory } from "@/context/StoryContext";
 
 export default function StoryMemoryScreen() {
   const { setup, state } = useStory();
+  const hasActiveStory = state.currentScene.sceneNumber > 0;
   const scenes = [...state.pastScenes, state.currentScene];
   const locations = Array.from(new Set(scenes.map((scene) => scene.location)));
   const characters = Array.from(
@@ -47,6 +48,21 @@ export default function StoryMemoryScreen() {
         </Link>
       </div>
 
+      {!hasActiveStory ? (
+        <div className="glass-panel rounded-[1.5rem] p-8 text-center">
+          <p className="text-sm font-semibold text-white">No active story yet</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-white/72">
+            The continuity board tracks key events, characters, locations, and active threads as you
+            play a guided story. Start one to begin filling it in.
+          </p>
+          <Link
+            href="/setup"
+            className="mt-5 inline-block rounded-full border border-gold/25 bg-gold/10 px-6 py-3 text-sm font-semibold text-gold"
+          >
+            Start a Guided Story
+          </Link>
+        </div>
+      ) : (
       <div className="grid gap-5 lg:grid-cols-2">
         <MemoryPanel title="Key Events">
           {state.memoryTimeline.length === 0 ? (
@@ -89,6 +105,7 @@ export default function StoryMemoryScreen() {
           ))}
         </MemoryPanel>
       </div>
+      )}
     </ScreenLayout>
   );
 }
