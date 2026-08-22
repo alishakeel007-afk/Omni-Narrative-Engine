@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       genres,
       existingHash,
       projectId,
+      characterNames,
     } = body;
 
     if (!imagePrompt && !visualPrompt && !sceneTitle) {
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
         genres,
         existingHash,
         projectId,
+        characterNames,
       });
 
       return NextResponse.json({

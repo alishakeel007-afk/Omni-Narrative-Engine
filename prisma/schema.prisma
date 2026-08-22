@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
 model StoryProject {
@@ -148,6 +150,7 @@ model StoryMemoryEmbedding {
   memoryType String
   memoryHash String
   metadata   Json?
+  embedding  Unsupported("vector(768)")?
   createdAt  DateTime @default(now())
 
   draft  StoryDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)

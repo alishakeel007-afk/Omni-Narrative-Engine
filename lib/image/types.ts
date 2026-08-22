@@ -16,6 +16,8 @@ export type ImageGenerationRequest = {
   genres?: string[];
   width?: number;
   height?: number;
+  /** Character names present in the scene, used to derive a stable per-character seed for visual consistency */
+  characterNames?: string[];
 };
 
 /** Output from an image provider */

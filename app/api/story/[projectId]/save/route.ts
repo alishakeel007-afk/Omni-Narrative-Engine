@@ -28,6 +28,15 @@ const saveSchema = z.object({
       z.null(),
     ]).optional(),
     options: z.array(z.string()).optional(),
+    cast: z.array(z.object({
+      name: z.string(),
+      role: z.string().optional(),
+      emotionalState: z.string().optional(),
+      visualAppearance: z.string().optional(),
+      traits: z.array(z.string()).optional(),
+      relationships: z.array(z.string()).optional(),
+      imageLabel: z.string().optional(),
+    })).optional(),
   }),
   choice: z.object({
     text: z.string(),
@@ -153,7 +162,15 @@ export async function POST(
         options: scene.options ?? [],
         resultSummary: scene.resultSummary,
         inventoryUpdate: scene.inventoryUpdate ?? null,
-        cast: [],
+        cast: (scene.cast ?? []).map((character) => ({
+          name: character.name,
+          role: character.role ?? "",
+          emotionalState: character.emotionalState ?? "",
+          visualAppearance: character.visualAppearance ?? "",
+          traits: character.traits ?? [],
+          relationships: character.relationships ?? [],
+          imageLabel: character.imageLabel ?? "",
+        })),
         media: {
           audioMoodPrompt: "", backgroundMusicMood: "",
           imageLabel: "", imagePrompt: "",

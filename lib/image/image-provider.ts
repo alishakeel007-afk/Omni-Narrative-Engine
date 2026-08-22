@@ -5,7 +5,7 @@
 // ============================================================
 
 import type { ImageGenerationRequest, GeneratedImage } from "./types";
-import { buildImagePrompt } from "./image-prompt";
+import { buildImagePrompt, buildImageSeed } from "./image-prompt";
 
 export interface ImageProvider {
   readonly name: string;
@@ -38,7 +38,7 @@ export class CloudflareImageProvider implements ImageProvider {
         Authorization: `Bearer ${this.apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, seed: buildImageSeed(request) }),
     });
 
     if (!response.ok) {
@@ -87,7 +87,8 @@ export class PollinationsImageProvider implements ImageProvider {
   async generateImage(request: ImageGenerationRequest): Promise<GeneratedImage> {
     const prompt = buildImagePrompt(request);
     const encodedPrompt = encodeURIComponent(prompt.slice(0, 300));
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=576&seed=${Math.floor(Math.random() * 1000000)}&nologo=true`;
+    const seed = buildImageSeed(request);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=576&seed=${seed}&nologo=true`;
 
     const response = await fetch(url);
     if (!response.ok) {

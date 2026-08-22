@@ -850,6 +850,7 @@ export default function VideoStudioScreen() {
               mood: scene.mood,
               genres: flow.genres,
               existingHash: scene.generatedImageHash,
+              characterNames: Array.from(new Set(scene.dialogues.map((d) => d.character).filter(Boolean))),
             }),
             headers: {
               "Content-Type": "application/json"
