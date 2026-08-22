@@ -6,15 +6,18 @@ type Props = {
   sceneMood?: string;
   sceneTitle?: string;
   audioPrompt?: string;
+  sceneId?: string;
+  projectId?: string;
 };
 
-export default function BackgroundMusicPlayer({ sceneMood, sceneTitle, audioPrompt }: Props) {
+export default function BackgroundMusicPlayer({ sceneMood, sceneTitle, audioPrompt, sceneId, projectId }: Props) {
   const [trackUrl, setTrackUrl] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    if (!sceneId) return;
     let mounted = true;
     async function fetchTrack() {
       setLoading(true);
@@ -22,16 +25,25 @@ export default function BackgroundMusicPlayer({ sceneMood, sceneTitle, audioProm
         const res = await fetch('/api/background-music', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sceneMood, sceneTitle, audioPrompt })
+          body: JSON.stringify({
+            mood: sceneMood,
+            sceneTitle,
+            soundDesign: audioPrompt,
+            sceneId,
+            projectId
+          })
         });
         const data = await res.json();
         if (!mounted) return;
-        setTrackUrl(data.trackUrl);
-        setTitle(data.title ?? `Ambient ${sceneMood ?? ''}`);
+        if (!res.ok || !data.audioUrl) {
+          throw new Error(data.error ?? "Background music generation failed.");
+        }
+        setTrackUrl(data.audioUrl);
+        setTitle(`Ambient ${sceneMood ?? ''}`);
       } catch (err) {
         if (!mounted) return;
-        setTrackUrl('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
-        setTitle(`Ambient ${sceneMood ?? ''}`);
+        setTrackUrl(null);
+        setTitle(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -39,7 +51,7 @@ export default function BackgroundMusicPlayer({ sceneMood, sceneTitle, audioProm
 
     fetchTrack();
     return () => { mounted = false; };
-  }, [sceneMood, sceneTitle, audioPrompt]);
+  }, [sceneMood, sceneTitle, audioPrompt, sceneId, projectId]);
 
   return (
     <div>

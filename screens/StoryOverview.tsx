@@ -68,6 +68,11 @@ export default function StoryOverview() {
             sceneMood={`${setup.mood} + ${scene?.mood ?? ""}`}
             imagePrompt={state.generatedMedia?.imagePrompt}
             audioPrompt={state.generatedMedia?.audioMoodPrompt}
+            location={scene?.location}
+            sceneId={`scene-${state.currentSceneIndex}`}
+            projectId={setup.projectId}
+            characterNames={(scene?.cast ?? []).map((c) => c.name).filter(Boolean)}
+            characterAppearances={(scene?.cast ?? []).map((c) => c.visualAppearance).filter(Boolean)}
           />
         </div>
       </div>
