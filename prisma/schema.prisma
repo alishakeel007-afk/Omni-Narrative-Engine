@@ -35,6 +35,7 @@ model StoryDraft {
   status           DraftStatus          @default(EDITING)
   isActive         Boolean              @default(false)
   progressState    Json?                // health, inventory, currentSceneIndex
+  videoStudioState Json?                // Video Studio flow: stage, roughIdea, acceptedStory, logline, estimatedRuntime, regeneration flags
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   characters       Character[]
@@ -64,6 +65,7 @@ model Character {
   // Identity tracking fields — updated after each scene generation
   lastSeenScene          Int?
   currentEmotionalState  String?
+  voiceProfile           Json?           // MovieCharacterVoice: archetype, deepgramModel, tone, gender, voiceName (Video Studio only)
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   draft                  StoryDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
@@ -82,6 +84,13 @@ model Scene {
   location           String?
   mood               String?
   selectedSuggestion String?
+  // Video Studio fields (null for Guided Story scenes)
+  directorNotes      String?
+  sceneGenre         String?
+  sceneTone          String?
+  soundDesign        String?
+  visualPrompt       String?
+  estimatedDuration  String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   choices            Choice[]
