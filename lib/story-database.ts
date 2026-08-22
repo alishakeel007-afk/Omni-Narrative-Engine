@@ -483,3 +483,294 @@ export async function loadFullDraftState(
     })),
   };
 }
+
+// ─── Video Studio Persistence ───────────────────────────────────────────────
+
+export type VideoStudioStateInput = {
+  stage: string;
+  roughIdea: string;
+  acceptedStory: string;
+  generatedStory: string;
+  logline: string;
+  estimatedRuntime: string;
+  scenesNeedRegeneration: boolean;
+  voiceNeedsRegeneration: boolean;
+  videoOutdated: boolean;
+};
+
+export function saveVideoStudioFlowMeta(draftId: string, state: VideoStudioStateInput) {
+  return prisma.storyDraft.update({
+    where: { id: draftId },
+    data: { videoStudioState: state as unknown as Prisma.InputJsonValue },
+  });
+}
+
+async function ensureVideoCharacter(draftId: string, name: string) {
+  const existing = await prisma.character.findFirst({
+    where: { draftId, name: { equals: name, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const created = await prisma.character.create({
+    data: {
+      draftId,
+      name,
+      role: "Character",
+      personalityTone: "",
+      traits: [] as Prisma.InputJsonValue,
+      sourceType: CharacterSource.TEXT,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+export async function upsertVideoCharacterVoice(draftId: string, name: string, voiceProfile: unknown) {
+  const id = await ensureVideoCharacter(draftId, name);
+  return prisma.character.update({
+    where: { id },
+    data: { voiceProfile: voiceProfile as Prisma.InputJsonValue },
+  });
+}
+
+export type SaveMovieSceneInput = {
+  sceneNumber: number;
+  title: string;
+  narration: string;
+  location: string;
+  mood: string;
+  directorNotes: string;
+  sceneGenre: string;
+  sceneTone: string;
+  soundDesign: string;
+  visualPrompt: string;
+  estimatedDuration: string;
+  dialogues: Array<{
+    character: string;
+    line: string;
+    delivery: string;
+    audioUrl?: string;
+  }>;
+};
+
+export async function saveMovieScene(draftId: string, input: SaveMovieSceneInput) {
+  const scene = await prisma.scene.upsert({
+    where: { draftId_sceneNumber: { draftId, sceneNumber: input.sceneNumber } },
+    create: {
+      draftId,
+      sceneNumber: input.sceneNumber,
+      title: input.title,
+      description: input.narration,
+      location: input.location,
+      mood: input.mood,
+      directorNotes: input.directorNotes,
+      sceneGenre: input.sceneGenre,
+      sceneTone: input.sceneTone,
+      soundDesign: input.soundDesign,
+      visualPrompt: input.visualPrompt,
+      estimatedDuration: input.estimatedDuration,
+    },
+    update: {
+      title: input.title,
+      description: input.narration,
+      location: input.location,
+      mood: input.mood,
+      directorNotes: input.directorNotes,
+      sceneGenre: input.sceneGenre,
+      sceneTone: input.sceneTone,
+      soundDesign: input.soundDesign,
+      visualPrompt: input.visualPrompt,
+      estimatedDuration: input.estimatedDuration,
+    },
+    select: { id: true },
+  });
+
+  // Dialogue lines don't have a stable identity across regenerations, so each
+  // save replaces the full set for this scene rather than trying to diff-upsert.
+  await prisma.dialogue.deleteMany({ where: { sceneId: scene.id } });
+
+  for (const dialogue of input.dialogues) {
+    if (!dialogue.line.trim()) continue;
+    const characterId = await ensureVideoCharacter(draftId, dialogue.character);
+    await prisma.dialogue.create({
+      data: {
+        sceneId: scene.id,
+        characterId,
+        text: dialogue.line,
+        delivery: dialogue.delivery,
+        audioUrl: dialogue.audioUrl,
+      },
+    });
+  }
+
+  return scene;
+}
+
+async function upsertSceneMediaAsset(params: {
+  draftId: string;
+  sceneId: string;
+  type: MediaType;
+  url: string;
+  prompt?: string;
+  provider?: string;
+}) {
+  const existing = await prisma.mediaAsset.findFirst({
+    where: { draftId: params.draftId, sceneId: params.sceneId, type: params.type },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return prisma.mediaAsset.update({
+      where: { id: existing.id },
+      data: { url: params.url, prompt: params.prompt, provider: params.provider, status: MediaStatus.READY },
+    });
+  }
+
+  return prisma.mediaAsset.create({
+    data: {
+      draftId: params.draftId,
+      sceneId: params.sceneId,
+      type: params.type,
+      url: params.url,
+      prompt: params.prompt,
+      provider: params.provider,
+      status: MediaStatus.READY,
+    },
+  });
+}
+
+export async function saveSceneImage(draftId: string, sceneNumber: number, params: { url: string; prompt?: string; provider?: string }) {
+  const scene = await prisma.scene.findUnique({
+    where: { draftId_sceneNumber: { draftId, sceneNumber } },
+    select: { id: true },
+  });
+  if (!scene) return null;
+  return upsertSceneMediaAsset({ draftId, sceneId: scene.id, type: MediaType.IMAGE, ...params });
+}
+
+export async function saveSceneMusic(draftId: string, sceneNumber: number, params: { url: string; prompt?: string; provider?: string }) {
+  const scene = await prisma.scene.findUnique({
+    where: { draftId_sceneNumber: { draftId, sceneNumber } },
+    select: { id: true },
+  });
+  if (!scene) return null;
+  return upsertSceneMediaAsset({ draftId, sceneId: scene.id, type: MediaType.MUSIC, ...params });
+}
+
+export type FullVideoStudioState = {
+  projectId: string;
+  draftId: string;
+  videoStudioState: VideoStudioStateInput | null;
+  genres: string[];
+  tones: string[];
+  scenes: Array<{
+    sceneNumber: number;
+    title: string;
+    narration: string;
+    location: string | null;
+    mood: string | null;
+    directorNotes: string | null;
+    sceneGenre: string | null;
+    sceneTone: string | null;
+    soundDesign: string | null;
+    visualPrompt: string | null;
+    estimatedDuration: string | null;
+    dialogues: Array<{ character: string; line: string; delivery: string | null; audioUrl: string | null }>;
+    imageUrl: string | null;
+    imagePrompt: string | null;
+    musicUrl: string | null;
+    musicPrompt: string | null;
+  }>;
+  characterVoices: Array<{ name: string; voiceProfile: unknown }>;
+};
+
+export async function loadFullVideoStudioState(
+  projectId: string,
+  userId: string
+): Promise<FullVideoStudioState | null> {
+  const project = await prisma.storyProject.findFirst({
+    where: { id: projectId, userId },
+    select: {
+      id: true,
+      drafts: {
+        where: { isActive: true },
+        orderBy: { versionNumber: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          genres: true,
+          tones: true,
+          videoStudioState: true,
+          characters: { select: { name: true, voiceProfile: true } },
+          scenes: {
+            orderBy: { sceneNumber: "asc" },
+            select: {
+              sceneNumber: true,
+              title: true,
+              description: true,
+              location: true,
+              mood: true,
+              directorNotes: true,
+              sceneGenre: true,
+              sceneTone: true,
+              soundDesign: true,
+              visualPrompt: true,
+              estimatedDuration: true,
+              dialogues: {
+                select: {
+                  text: true,
+                  delivery: true,
+                  audioUrl: true,
+                  character: { select: { name: true } },
+                },
+              },
+              mediaAssets: {
+                select: { type: true, url: true, prompt: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!project || project.drafts.length === 0) return null;
+  const draft = project.drafts[0];
+
+  return {
+    projectId: project.id,
+    draftId: draft.id,
+    videoStudioState: (draft.videoStudioState as unknown as VideoStudioStateInput) ?? null,
+    genres: Array.isArray(draft.genres) ? (draft.genres as string[]) : [],
+    tones: Array.isArray(draft.tones) ? (draft.tones as string[]) : [],
+    scenes: draft.scenes.map((s) => {
+      const image = s.mediaAssets.find((m) => m.type === MediaType.IMAGE);
+      const music = s.mediaAssets.find((m) => m.type === MediaType.MUSIC);
+      return {
+        sceneNumber: s.sceneNumber,
+        title: s.title,
+        narration: s.description,
+        location: s.location,
+        mood: s.mood,
+        directorNotes: s.directorNotes,
+        sceneGenre: s.sceneGenre,
+        sceneTone: s.sceneTone,
+        soundDesign: s.soundDesign,
+        visualPrompt: s.visualPrompt,
+        estimatedDuration: s.estimatedDuration,
+        dialogues: s.dialogues.map((d) => ({
+          character: d.character?.name ?? "Unknown",
+          line: d.text,
+          delivery: d.delivery,
+          audioUrl: d.audioUrl,
+        })),
+        imageUrl: image?.url ?? null,
+        imagePrompt: image?.prompt ?? null,
+        musicUrl: music?.url ?? null,
+        musicPrompt: music?.prompt ?? null,
+      };
+    }),
+    characterVoices: draft.characters.map((c) => ({ name: c.name, voiceProfile: c.voiceProfile })),
+  };
+}
