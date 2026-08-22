@@ -48,7 +48,8 @@ export default function StoryPlay() {
     generateAlternativeOptions,
     selectSuggestedChoice,
     selectCustomChoice,
-    setCustomChoiceInput
+    setCustomChoiceInput,
+    updateCurrentSceneMedia
   } = useStory();
 
   const scene = state.currentScene;
@@ -169,6 +170,22 @@ export default function StoryPlay() {
             mood={scene.mood}
             location={scene.location}
             imageLabel={state.generatedMedia?.imageLabel}
+            imagePrompt={state.generatedMedia?.imagePrompt}
+            narrationLabel={state.generatedMedia?.narrationLabel}
+            narrationDuration={state.generatedMedia?.narrationDuration}
+            audioMoodPrompt={state.generatedMedia?.audioMoodPrompt}
+            backgroundMusicMood={state.generatedMedia?.backgroundMusicMood}
+            sceneNumber={scene.sceneNumber}
+            draftId={setup.draftId}
+            projectId={setup.projectId}
+            characterNames={(state.dynamicCast?.length > 0 ? state.dynamicCast : setup.characters).map((c) => c.name).filter(Boolean)}
+            characterAppearances={(state.dynamicCast ?? [])
+              .map((c) => ("visualAppearance" in c ? c.visualAppearance : ""))
+              .filter((v): v is string => Boolean(v))}
+            existingImageUrl={state.generatedMedia?.imageUrl}
+            existingNarrationUrl={state.generatedMedia?.narrationAudioUrl}
+            existingMusicUrl={state.generatedMedia?.musicUrl}
+            onMediaUpdate={updateCurrentSceneMedia}
           />
 
           {isCustomMode ? (

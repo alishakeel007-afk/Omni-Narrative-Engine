@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from "@/lib/supabase/server";
 import { generateSceneMusic } from "@/lib/audio/music-service";
+import { saveSceneMusic } from "@/lib/story-database";
 
 export const runtime = "nodejs";
 
@@ -15,17 +16,19 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { 
-      mood, 
-      soundDesign, 
-      sceneTitle, 
-      sceneLocation, 
-      narration, 
-      estimatedDuration, 
-      genres, 
-      existingHash, 
-      projectId, 
-      sceneId 
+    const {
+      mood,
+      soundDesign,
+      sceneTitle,
+      sceneLocation,
+      narration,
+      estimatedDuration,
+      genres,
+      existingHash,
+      projectId,
+      sceneId,
+      draftId,
+      sceneNumber
     } = body;
 
     try {
@@ -41,6 +44,14 @@ export async function POST(req: Request) {
         existingHash,
         projectId
       });
+
+      if (typeof draftId === "string" && typeof sceneNumber === "number") {
+        await saveSceneMusic(draftId, sceneNumber, {
+          url: result.url,
+          prompt: result.prompt,
+          provider: result.provider,
+        });
+      }
 
       return NextResponse.json({
         success: true,

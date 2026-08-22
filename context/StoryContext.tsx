@@ -49,6 +49,7 @@ type StoryContextValue = {
   isGameOver: boolean;
   validationErrors: string[];
   pendingSaveCount: () => number;
+  updateCurrentSceneMedia: (patch: Partial<PersistedStoryState["generatedMedia"]>) => void;
 };
 
 const StoryContext = createContext<StoryContextValue | null>(null);
@@ -502,6 +503,14 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
   };
 
+  const updateCurrentSceneMedia = (patch: Partial<PersistedStoryState["generatedMedia"]>) => {
+    setState((current) => ({
+      ...current,
+      generatedMedia: { ...current.generatedMedia, ...patch },
+      currentScene: { ...current.currentScene, media: { ...current.currentScene.media, ...patch } }
+    }));
+  };
+
   /**
    * Restores a full story session from PostgreSQL.
    * DB data always wins. Falls back to localStorage only if the DB request fails.
@@ -577,6 +586,9 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
           narrationDuration: "",
           narrationLabel: "",
           playerState: "ready" as const,
+          imageUrl: lastDbScene.imageUrl ?? undefined,
+          narrationAudioUrl: lastDbScene.narrationAudioUrl ?? undefined,
+          musicUrl: lastDbScene.musicUrl ?? undefined,
         },
         inventoryUpdate: null,
         resultSummary: selectedChoice?.resultText ?? "",
@@ -699,6 +711,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       isGameOver: !!gameOverState,
       validationErrors,
       pendingSaveCount: getPendingCount,
+      updateCurrentSceneMedia,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isReady, setup, state, gameOverState, validationErrors, getPendingCount]

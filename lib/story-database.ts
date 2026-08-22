@@ -344,6 +344,9 @@ export type FullDraftState = {
       selected: boolean;
       resultText: string | null;
     }>;
+    imageUrl: string | null;
+    narrationAudioUrl: string | null;
+    musicUrl: string | null;
   }>;
   characters: Array<{
     id: string;
@@ -413,6 +416,9 @@ export async function loadFullDraftState(
                   resultText: true,
                 },
               },
+              mediaAssets: {
+                select: { type: true, url: true },
+              },
             },
           },
           memories: {
@@ -466,6 +472,9 @@ export async function loadFullDraftState(
         selected: c.selected,
         resultText: c.resultText,
       })),
+      imageUrl: s.mediaAssets.find((m) => m.type === MediaType.IMAGE)?.url ?? null,
+      narrationAudioUrl: s.mediaAssets.find((m) => m.type === MediaType.AUDIO)?.url ?? null,
+      musicUrl: s.mediaAssets.find((m) => m.type === MediaType.MUSIC)?.url ?? null,
     })),
     characters: draft.characters.map((c) => ({
       id: c.id,
@@ -663,6 +672,15 @@ export async function saveSceneMusic(draftId: string, sceneNumber: number, param
   });
   if (!scene) return null;
   return upsertSceneMediaAsset({ draftId, sceneId: scene.id, type: MediaType.MUSIC, ...params });
+}
+
+export async function saveSceneNarration(draftId: string, sceneNumber: number, params: { url: string; prompt?: string; provider?: string }) {
+  const scene = await prisma.scene.findUnique({
+    where: { draftId_sceneNumber: { draftId, sceneNumber } },
+    select: { id: true },
+  });
+  if (!scene) return null;
+  return upsertSceneMediaAsset({ draftId, sceneId: scene.id, type: MediaType.AUDIO, ...params });
 }
 
 export type FullVideoStudioState = {

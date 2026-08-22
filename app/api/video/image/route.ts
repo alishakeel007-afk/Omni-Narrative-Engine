@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateSceneImage } from "@/lib/image/image-service";
+import { saveSceneImage } from "@/lib/story-database";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
       projectId,
       characterNames,
       characterAppearances,
+      draftId,
+      sceneNumber,
     } = body;
 
     if (!imagePrompt && !visualPrompt && !sceneTitle) {
@@ -55,6 +58,14 @@ export async function POST(req: Request) {
         characterNames,
         characterAppearances,
       });
+
+      if (typeof draftId === "string" && typeof sceneNumber === "number") {
+        await saveSceneImage(draftId, sceneNumber, {
+          url: result.url,
+          prompt: result.prompt,
+          provider: result.provider,
+        });
+      }
 
       return NextResponse.json({
         success: true,

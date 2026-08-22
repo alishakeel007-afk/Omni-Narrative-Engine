@@ -71,6 +71,9 @@ export type GeneratedMedia = {
   narrationDuration: string;
   narrationLabel: string;
   playerState: "ready" | "generating";
+  imageUrl?: string;
+  narrationAudioUrl?: string;
+  musicUrl?: string;
 };
 
 export type StoryScene = {
