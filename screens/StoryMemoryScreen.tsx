@@ -22,12 +22,15 @@ export default function StoryMemoryScreen() {
       ].map((character) => [character.name, character])
     ).values()
   );
-  const activeThreads = [
-    setup.scenarioTitle,
-    state.selectedChoice || "Next decision pending",
-    `${setup.difficulty} difficulty path`,
-    `${setup.mood} tone baseline`
-  ];
+  const activeThreads = scenes
+    .filter((scene) => scene.sceneNumber > 0 && scene.text && scene.text !== "Generating scene...")
+    .slice(-4)
+    .reverse()
+    .map((scene) => ({
+      key: `thread-scene-${scene.sceneNumber}`,
+      label: `Scene ${scene.sceneNumber}: ${scene.title}`,
+      summary: scene.text.length > 220 ? `${scene.text.slice(0, 220).trim()}...` : scene.text
+    }));
 
   return (
     <ScreenLayout
@@ -98,11 +101,16 @@ export default function StoryMemoryScreen() {
         </MemoryPanel>
 
         <MemoryPanel title="Active Threads">
-          {activeThreads.map((thread) => (
-            <article key={thread} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-sm leading-7 text-white/72">{thread}</p>
-            </article>
-          ))}
+          {activeThreads.length === 0 ? (
+            <Empty text="No active plot threads yet." />
+          ) : (
+            activeThreads.map((thread) => (
+              <article key={thread.key} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-gold">{thread.label}</p>
+                <p className="mt-2 text-sm leading-7 text-white/72">{thread.summary}</p>
+              </article>
+            ))
+          )}
         </MemoryPanel>
       </div>
       )}
