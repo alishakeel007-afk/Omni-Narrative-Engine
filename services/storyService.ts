@@ -1,4 +1,3 @@
-import { buildSceneCharacters } from "@/lib/story-engine";
 import {
   DEFAULT_HEALTH_STATUS,
   DEFAULT_INVENTORY,
@@ -14,9 +13,8 @@ import type {
 } from "@/types/story";
 
 function getEmptyScene(setup: StorySetupData = DEFAULT_STORY_SETUP): StoryScene {
-  const cast = buildSceneCharacters(setup)[0] ?? [];
   return {
-    cast,
+    cast: [],
     chapter: "Loading...",
     location: "Unknown",
     media: {
