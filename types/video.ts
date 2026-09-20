@@ -1,3 +1,5 @@
+export type VideoLanguage = "en" | "ur";
+
 export type MovieCharacterVoice = {
   archetype: string;
   character: string;
@@ -54,6 +56,7 @@ export type MovieScene = {
 export type VideoGenerationRequest = {
   genre?: string | string[];
   includeAudio?: boolean;
+  language?: VideoLanguage;
   sceneCount?: number;
   scenario: string;
   tone?: string | string[];

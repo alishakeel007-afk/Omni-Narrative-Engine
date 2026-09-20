@@ -7,7 +7,7 @@
 // ============================================================
 
 import type { VideoStudioFlowState } from "./video-storage";
-import type { MovieCharacterVoice, MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/types/video";
+import type { MovieCharacterVoice, MovieDialogueLine, MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
 
 const DEFAULT_VOICE_PROFILE: MovieCharacterVoice = {
   archetype: "neutral_female",
@@ -66,6 +66,7 @@ export async function saveVideoStudioToDatabase(flow: VideoStudioFlowState): Pro
           roughIdea: flow.roughIdea,
           acceptedStory: flow.acceptedStory,
           generatedStory: flow.generatedStory,
+          language: flow.language,
           logline: script.logline,
           estimatedRuntime: script.estimatedRuntime,
           scenesNeedRegeneration: flow.scenesNeedRegeneration,
@@ -116,7 +117,7 @@ export async function loadVideoStudioFromDatabase(projectId: string): Promise<Vi
         projectId: string;
         draftId: string;
         videoStudioState: {
-          stage: string; roughIdea: string; acceptedStory: string; generatedStory: string;
+          stage: string; roughIdea: string; acceptedStory: string; generatedStory: string; language?: VideoLanguage;
           logline: string; estimatedRuntime: string;
           scenesNeedRegeneration: boolean; voiceNeedsRegeneration: boolean; videoOutdated: boolean;
         } | null;
@@ -178,8 +179,14 @@ export async function loadVideoStudioFromDatabase(projectId: string): Promise<Vi
     });
 
     const meta = videoStudioState.videoStudioState;
+    const restoredLanguage: VideoLanguage = meta?.language === "ur" ? "ur" : "en";
     const script: VideoGenerationResponse = {
-      audio: { errors: [], generatedCount: 0, provider: "Deepgram TTS", requested: false },
+      audio: {
+        errors: [],
+        generatedCount: 0,
+        provider: restoredLanguage === "ur" ? "ElevenLabs Eleven v3" : "Deepgram TTS",
+        requested: false
+      },
       estimatedRuntime: meta?.estimatedRuntime || "",
       generatedAt: new Date().toISOString(),
       genre: videoStudioState.genres.join(" + "),
@@ -200,6 +207,7 @@ export async function loadVideoStudioFromDatabase(projectId: string): Promise<Vi
         provider: "",
         status: scenes.some((s) => s.generatedImageUrl) ? "ready" : "idle"
       },
+      language: restoredLanguage,
       music: {
         message: scenes.some((s) => s.backgroundMusicUrl) ? "Background music restored from your saved project." : "Background music has not been generated yet.",
         mood: "",

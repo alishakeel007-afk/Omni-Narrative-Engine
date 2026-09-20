@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import type {
   MovieDialogueLine,
   MovieScene,
-  VideoGenerationResponse
+  VideoGenerationResponse,
+  VideoLanguage
 } from "@/types/video";
 import { getEnvValue } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { uploadTtsAudioToStorage } from "@/lib/audio/tts-storage";
+import { generateUrduElevenLabsSpeech } from "@/lib/audio/elevenlabs-urdu-tts";
+
+const ELEVENLABS_PROVIDER_LABEL = "ElevenLabs Eleven v3";
+const DEEPGRAM_PROVIDER_LABEL = "Deepgram TTS";
 
 export const runtime = "nodejs";
 
@@ -33,6 +38,10 @@ function getSubmittedScript(value: unknown): VideoGenerationResponse | null {
   return script as VideoGenerationResponse;
 }
 
+// Punctuation-only pacing: it inserts/adjusts ASCII "," "." "!" characters and
+// never touches letters, so it is reused unchanged for Urdu dialogue. If Urdu
+// text uses Arabic-script punctuation (،  ؟) instead of ASCII, these regexes
+// simply find no match and the text passes through unmodified - safe either way.
 function applySituationalSpeechPacing(line: MovieDialogueLine, scene: MovieScene) {
   const situation = `${scene.sceneTone} ${scene.mood} ${line.delivery} ${line.voiceProfile.tone}`.toLowerCase();
   let text = line.line.trim();
@@ -131,6 +140,30 @@ async function generateDeepgramDialogueAudio(params: {
   };
 }
 
+async function generateElevenLabsDialogueAudio(params: {
+  line: MovieDialogueLine;
+  scene: MovieScene;
+  projectId?: string;
+}) {
+  const speech = await generateUrduElevenLabsSpeech({
+    text: applySituationalSpeechPacing(params.line, params.scene),
+    voiceProfile: params.line.voiceProfile
+  });
+
+  const audioUrl = await uploadTtsAudioToStorage({
+    audioBuffer: speech.audioBuffer,
+    contentType: speech.contentType,
+    projectId: params.projectId,
+    dialogueId: params.line.id,
+  });
+
+  return {
+    ...params.line,
+    audioMimeType: speech.contentType,
+    audioUrl
+  };
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -210,6 +243,64 @@ async function attachDeepgramDialogueAudio(scenes: MovieScene[], apiKey: string,
   };
 }
 
+async function attachElevenLabsDialogueAudio(scenes: MovieScene[], projectId?: string) {
+  const allDialogueRefs = scenes.flatMap((scene, sceneIndex) =>
+    scene.dialogues.map((line, dialogueIndex) => ({
+      dialogueIndex,
+      line,
+      scene,
+      sceneIndex
+    }))
+  );
+  const dialogueRefs = allDialogueRefs.slice(0, MAX_AUDIO_LINES);
+  const errors: string[] = [];
+  let generatedCount = 0;
+
+  const generatedLines = await mapWithConcurrency(dialogueRefs, 3, async (reference) => {
+    try {
+      const line = await generateElevenLabsDialogueAudio({
+        line: reference.line,
+        scene: reference.scene,
+        projectId
+      });
+      generatedCount += 1;
+      return { ...reference, line };
+    } catch (error) {
+      // Unsupported archetypes / missing voice IDs land here per-line, so one
+      // unconfigured character never blocks audio for the rest of the cast -
+      // and this line is never silently retried against an English Deepgram voice.
+      const message = error instanceof Error ? error.message : "Unknown ElevenLabs Urdu TTS audio error";
+      errors.push(message);
+      return {
+        ...reference,
+        line: {
+          ...reference.line,
+          audioError: message
+        }
+      };
+    }
+  });
+
+  const nextScenes = scenes.map((scene) => ({
+    ...scene,
+    dialogues: scene.dialogues.map((dialogue) => ({ ...dialogue }))
+  }));
+
+  for (const generatedLine of generatedLines) {
+    nextScenes[generatedLine.sceneIndex].dialogues[generatedLine.dialogueIndex] = generatedLine.line;
+  }
+
+  if (dialogueRefs.length < allDialogueRefs.length) {
+    errors.push(`Audio was limited to the first ${MAX_AUDIO_LINES} dialogue lines to control response size and API usage.`);
+  }
+
+  return {
+    errors,
+    generatedCount,
+    scenes: nextScenes
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -221,12 +312,38 @@ export async function POST(request: Request) {
     const body = await request.json();
     const script = getSubmittedScript(body);
     const projectId = typeof body?.projectId === "string" ? body.projectId : undefined;
+    const language: VideoLanguage = body?.language === "ur" ? "ur" : "en";
 
     if (!script) {
       return NextResponse.json(
         { error: "Please provide a confirmed film sequence before generating voices." },
         { status: 400 }
       );
+    }
+
+    if (language === "ur") {
+      const elevenLabsApiKey = getEnvValue(["ELEVENLABS_API_KEY"]);
+      if (!elevenLabsApiKey) {
+        return NextResponse.json(
+          { error: "ElevenLabs API key is missing. Add ELEVENLABS_API_KEY in .env.local." },
+          { status: 500 }
+        );
+      }
+
+      const audioResult = await attachElevenLabsDialogueAudio(script.scenes, projectId);
+      const payload: VideoGenerationResponse = {
+        ...script,
+        audio: {
+          errors: audioResult.errors,
+          generatedCount: audioResult.generatedCount,
+          provider: ELEVENLABS_PROVIDER_LABEL,
+          requested: true
+        },
+        generatedAt: new Date().toISOString(),
+        scenes: audioResult.scenes
+      };
+
+      return NextResponse.json(payload);
     }
 
     const deepgramTtsApiKey = getEnvValue([
@@ -248,7 +365,7 @@ export async function POST(request: Request) {
       audio: {
         errors: audioResult.errors,
         generatedCount: audioResult.generatedCount,
-        provider: "Deepgram TTS",
+        provider: DEEPGRAM_PROVIDER_LABEL,
         requested: true
       },
       generatedAt: new Date().toISOString(),

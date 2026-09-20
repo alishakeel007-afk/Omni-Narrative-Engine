@@ -46,6 +46,7 @@ const saveSchema = z.object({
     roughIdea: z.string(),
     acceptedStory: z.string(),
     generatedStory: z.string(),
+    language: z.enum(["en", "ur"]).default("en"),
     logline: z.string().optional().default(""),
     estimatedRuntime: z.string().optional().default(""),
     scenesNeedRegeneration: z.boolean(),

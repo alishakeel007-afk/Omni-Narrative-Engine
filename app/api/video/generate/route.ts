@@ -3,6 +3,7 @@ import type {
   MovieCharacterVoice,
   MovieDialogueLine,
   MovieScene,
+  VideoLanguage,
   VideoGenerationRequest,
   VideoGenerationResponse
 } from "@/types/video";
@@ -555,12 +556,24 @@ function assignCharacterVoices(scenes: MovieScene[], appearancesByCharacter: Map
 
 function buildGeminiPrompt(request: Required<Pick<VideoGenerationRequest, "scenario">> & {
   genres: string[];
+  language: VideoLanguage;
   sceneCount?: number;
   tones: string[];
 }) {
   const sceneCountInstruction = request.sceneCount
     ? `Generate EXACTLY ${request.sceneCount} scenes. The "scenes" array in your JSON response must contain exactly ${request.sceneCount} entries, no more and no fewer, even if you would otherwise prefer a different count.`
     : "Choose the number of scenes the story naturally needs. Usually 3-5 scenes is enough for an MVP short film, but use fewer or more when the story needs it.";
+  const languageInstruction = request.language === "ur"
+    ? `
+Language requirements for audience-facing story text:
+- Generate the title, logline, narration, and every dialogue line in natural Urdu written in Urdu script.
+- Do not use Roman Urdu.
+- Keep character names consistent wherever they appear in the JSON.
+- Keep voiceArchetype as the exact existing English identifier from the allowed list below.
+- Keep all production metadata in English: character appearance descriptions, location, mood, sceneGenre, sceneTone, directorNotes, visualPrompt, imagePrompt, soundDesign, delivery, and voiceTone. These are technical inputs for existing visual, music, and voice systems.
+- Do not translate visual/image prompts, character appearance descriptions, camera notes, or sound/music prompts into Urdu.
+`
+    : "";
 
   return `You are the Omni-Narrative Engine, a cinematic story director for an AI video creation module.
 
@@ -591,6 +604,7 @@ Creative constraints:
   elder_male, elder_female, young_male, young_female, child, creature_robot,
   neutral_male, neutral_female, narrator.
 - Use voiceTone to describe performance tone for that exact line, like "low and threatening" or "bright but afraid".
+${languageInstruction}
 
 Return JSON only. Do not include markdown.
 Use this exact shape:
@@ -739,6 +753,7 @@ function normalizeScene(scene: unknown, index: number): MovieScene {
 async function generateMovieScript(params: {
   apiKey: string;
   genres: string[];
+  language: VideoLanguage;
   model: string;
   sceneCount?: number;
   scenario: string;
@@ -799,6 +814,7 @@ async function generateMovieScript(params: {
 async function generateMovieScriptWithGroq(params: {
   apiKey: string;
   genres: string[];
+  language: VideoLanguage;
   model: string;
   sceneCount?: number;
   scenario: string;
@@ -862,6 +878,7 @@ async function generateMovieScriptWithGroq(params: {
 async function generateMovieScriptWithFallback(params: {
   geminiApiKey: string;
   genres: string[];
+  language: VideoLanguage;
   sceneCount?: number;
   scenario: string;
   tones: string[];
@@ -877,6 +894,7 @@ async function generateMovieScriptWithFallback(params: {
     return await generateMovieScript({
       apiKey: params.geminiApiKey,
       genres: params.genres,
+      language: params.language,
       model: geminiModel,
       sceneCount: params.sceneCount,
       scenario: params.scenario,
@@ -891,6 +909,7 @@ async function generateMovieScriptWithFallback(params: {
       return await generateMovieScriptWithGroq({
         apiKey: groqApiKey,
         genres: params.genres,
+        language: params.language,
         model: getEnvValue(["GROQ_FALLBACK_MODEL", "GROQ_MODEL"]) || DEFAULT_GROQ_MODEL,
         sceneCount: params.sceneCount,
         scenario: params.scenario,
@@ -1086,11 +1105,13 @@ export async function POST(request: Request) {
 
     const genres = listValue(body.genre, ["Cinematic Drama"]);
     const tones = listValue(body.tone, ["Immersive and emotional"]);
+    const language: VideoLanguage = body.language === "ur" ? "ur" : "en";
     const includeAudio = body.includeAudio !== false;
     const sceneCount = body.sceneCount !== undefined ? clampSceneCount(body.sceneCount) : undefined;
     const script = await generateMovieScriptWithFallback({
       geminiApiKey,
       genres,
+      language,
       sceneCount,
       scenario,
       tones

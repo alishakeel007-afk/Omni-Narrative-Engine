@@ -37,7 +37,7 @@ import {
   loadVideoStudioFromDatabase,
   saveVideoStudioToDatabase
 } from "@/lib/video-studio-db";
-import type { MovieDialogueLine, MovieScene, VideoGenerationResponse } from "@/types/video";
+import type { MovieDialogueLine, MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
 
 type EditableSceneField =
   | "directorNotes"
@@ -225,6 +225,7 @@ export default function VideoStudioScreen() {
         body: JSON.stringify({
           genre: flow.genres,
           includeAudio: false,
+          language: flow.language,
           scenario,
           tone: flow.tones
         }),
@@ -310,6 +311,7 @@ export default function VideoStudioScreen() {
         body: JSON.stringify({
           genre: flow.genres,
           includeAudio: false,
+          language: flow.language,
           scenario,
           sceneCount: currentSceneCount,
           tone: flow.tones
@@ -816,7 +818,7 @@ export default function VideoStudioScreen() {
 
     try {
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script: flow.script, projectId: flow.projectId }),
+        body: JSON.stringify({ script: flow.script, projectId: flow.projectId, language: flow.language }),
         headers: {
           "Content-Type": "application/json"
         },
@@ -1216,6 +1218,7 @@ export default function VideoStudioScreen() {
                   onCustomToneInputChange={setCustomToneInput}
                   onToggleGenre={toggleGenre}
                   onToggleTone={toggleTone}
+                  onLanguageChange={(language) => updateFlow({ language })}
                 />
               ) : null}
 
@@ -1430,7 +1433,8 @@ function SetupStage({
   onCustomGenreInputChange,
   onCustomToneInputChange,
   onToggleGenre,
-  onToggleTone
+  onToggleTone,
+  onLanguageChange
 }: {
   flow: VideoStudioFlowState;
   customGenreInput: string;
@@ -1442,6 +1446,7 @@ function SetupStage({
   onCustomToneInputChange: (value: string) => void;
   onToggleGenre: (value: string) => void;
   onToggleTone: (value: string) => void;
+  onLanguageChange: (language: VideoLanguage) => void;
 }) {
   return (
     <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
@@ -1476,6 +1481,20 @@ function SetupStage({
           />
         </div>
 
+        <label className="mt-6 block">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+            Language
+          </span>
+          <select
+            value={flow.language}
+            onChange={(event) => onLanguageChange(event.target.value as VideoLanguage)}
+            className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-cyan-400/60"
+          >
+            <option value="en">English</option>
+            <option value="ur">اردو</option>
+          </select>
+        </label>
+
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-white/70">
           Scenes are now built dynamically. Start with an AI-generated draft, then add, remove, and edit scenes until the story naturally ends.
         </div>
@@ -1491,7 +1510,7 @@ function SetupStage({
 
       <InfoPanel
         title="What this stage saves"
-        text="Genre and tone stay saved as your base palette. You can still change genre, tone, cast, voice, and dialogue inside each scene later."
+        text="Genre, tone, and language stay saved as your base palette. You can still change genre, tone, cast, voice, and dialogue inside each scene later."
       />
     </div>
   );

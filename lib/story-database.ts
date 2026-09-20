@@ -8,6 +8,7 @@ import {
   StoryMode,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { VideoLanguage } from "@/types/video";
 
 export type CreateStoryProjectInput = {
   title: string;
@@ -500,6 +501,7 @@ export type VideoStudioStateInput = {
   roughIdea: string;
   acceptedStory: string;
   generatedStory: string;
+  language: VideoLanguage;
   logline: string;
   estimatedRuntime: string;
   scenesNeedRegeneration: boolean;

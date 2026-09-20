@@ -1,4 +1,4 @@
-import type { MovieScene, VideoGenerationResponse } from "@/types/video";
+import type { MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
 
 export const VIDEO_DRAFT_STORAGE_KEY = "omni-narrative-engine-video-draft";
 export const VIDEO_VOICE_RESULT_STORAGE_KEY = "omni-narrative-engine-video-voice-result";
@@ -36,6 +36,7 @@ export type VideoStudioFlowState = {
   generatedStory: string;
   genres: string[];
   images: VideoStudioImageState;
+  language: VideoLanguage;
   music: VideoStudioMusicState;
   roughIdea: string;
   sceneCount: number;
@@ -121,6 +122,10 @@ function toStatus(value: unknown): VideoStudioStatus {
   return value === "generating" || value === "ready" || value === "error" ? value : "idle";
 }
 
+function toVideoLanguage(value: unknown): VideoLanguage {
+  return value === "ur" ? "ur" : "en";
+}
+
 function normalizeScene(scene: MovieScene, index: number): MovieScene {
   return {
     ...scene,
@@ -183,6 +188,7 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
       provider: "",
       status: "idle"
     },
+    language: "en",
     music: {
       message: "Background music has not been generated yet.",
       mood: "",
@@ -228,6 +234,7 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
       provider: toCleanString(source.images?.provider, ""),
       status: toStatus(source.images?.status)
     },
+    language: toVideoLanguage(source.language),
     music: {
       message: toCleanString(source.music?.message, fallback.music.message),
       mood: toCleanString(source.music?.mood, ""),
