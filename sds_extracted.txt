@@ -1,0 +1,1503 @@
+COMSATS University, Islamabad Pakistan
+Omni-Narrative Engine
+By
+Imran Nadeem      CIIT/SP23-BDS-020/ISB
+ Muhammad Ali Shakeel           CIIT/ SP23-BDS-007/ISB
+SupervisorSir Amir Shabbir Pare
+Bachelor of Science in Data Science (2023-2027)
+Table of Contents
+Chapter 3: Design and Architecture6
+3.1.1 Purpose of Architectural Overview6
+3.2 Conceptual Architecture Diagram6
+3.3 Architecture Style / Pattern8
+3.3.1 Justification for Choosing Client-Server Architecture with Layered Backend8
+3.3.2 Layer Description and Component Mapping8
+3.3.3 Architecture Diagram9
+3.4 Design Models10
+3.4.1 Class Diagram10
+3.4.2 Activity Diagrams14
+3.4.3 Sequence Diagrams20
+3.4.4 State Transition Diagrams25
+3.5 Data Design29
+3.5.1 Data Storage and Organization29
+3.5.2 Major Data Entities29
+3.5.3 Data Flow and Processing32
+3.5.4 Data Security32
+Chapter 4: Implementation35
+4.1 Project Methodology & Algorithms35
+4.1.1 Project Methodology35
+4.1.2 Methodology Phases (Detailed Workflow)35
+4.1.3 Algorithms38
+4.2 AI Model and Prompting Setup40
+4.3 Authentication and Security40
+4.3.1 Authentication40
+4.3.2 Encryption40
+4.3.3 Attack Prevention40
+4.3.4 Additional Security Measures40
+4.3.5 Security Testing Results41
+4.4 External APIs / SDKs41
+4.5 User Interfaces42
+4.5.1 Landing Page42
+4.5.2 Signup Screen43
+4.5.3 Login Screen44
+4.5.4 Dashboard45
+4.5.5 Story Mode Selection45
+4.5.6 Guided Video Studio46
+4.5.7 AI Story Studio/Custom mode50
+4.5.8 Play Story55
+4.5.9 Story Memory Board56
+4.5.13 Forgot Password57
+4.6 Deployment58
+4.6.1 Web Application Deployment58
+4.6.2 Database Deployment58
+4.6.3 External API Integrations58
+4.6.4 Server Configuration & Software Stack58
+Chapter 5: Testing and Evaluation59
+5.1 Unit Testing59
+5.1.1 Authentication and Input Validation59
+5.1.2 Story Setup Validation59
+5.1.3 Story Storage and Memory Functions60
+5.1.4 AI Response and Media Validation60
+5.2 Functional Testing61
+5.2.1 User Account and Authentication61
+5.2.2 Story Setup and Story Hub61
+5.2.3 Active Story, Memory, History, and Player State61
+5.2.4 Guided Video Studio and AI Story Studio62
+5.3 Business Rules Testing62
+5.3.1 Decision Table 1: Password Validation Rules62
+5.3.2 Decision Table 2: Story Setup Completion Rules63
+5.3.3 Decision Table 3: AI Provider Fallback Rules64
+5.3.4 Decision Table 4: Audio Generation Rules65
+5.4 Integration Testing66
+5.4.1 User Registration with Authentication Session66
+5.4.2 Story Setup with Scene Generation66
+5.4.3 Active Story with Memory, History, and Player State66
+5.4.4 Video Studio with AI, Voice, Music, and Preview67
+5.4.5 Draft Persistence and Back/Edit Workflow67
+List of Tables
+Table 1: Key Components and Services in Omni-Narrative Architecture7
+Table 2: Layer Description and Component Mapping9
+Table 3: Major Data Entities30
+Table 4: Data Flow and Processing32
+Table 5: External APIs / SDKs41
+Table 6: Server Configuration & Software Stack58
+Table 7: Authentication and Input Validation59
+Table 8: Story Setup Validation59
+Table 9: Story Storage and Memory60
+Table 10: AI Response and Media Validation60
+Table 11: User Account and Authentication61
+Table 12: Story Setup and Story Hub61
+Table 13: Active Story Workflow62
+Table 14: Video Studio and AI Story Studio62
+Table 15: Password Validation Rules63
+Table 16: Password Validation Test Cases63
+Table 17: Story Setup Completion Rules63
+Table 18: Story Setup Test Cases64
+Table 19: AI Provider Fallback Rules64
+Table 20: AI Provider Fallback Test Cases64
+Table 21: Audio Generation Rules65
+Table 22: Audio Generation Test Cases65
+Table 23: User Registration with Authentication66
+Table 24: Story Setup with Scene Generation66
+Table 25: Active Story Context Integration67
+Table 26: Video Studio Integration67
+Table 27: Draft Persistence Integration67
+List of Figures
+Figure 1: High-level conceptual architecture diagram6
+Figure 2: Layered Architecture9
+Figure 3: Class Diagram13
+Figure 4: AD-01 Story Setup and Mode Selection15
+Figure 5: AD-02 Custom Story Generation Flow16
+Figure 6: AD-03 Scenario-to-Movie Generation17
+Figure 7: AD-04 Voice and Background Music Flow18
+Figure 8: AD-05 Active Story Loop19
+Figure 9: SD-01 Custom Story Request21
+Figure 10: SD-02 Video Generation and TTS22
+Figure 11: SD-03 Background Music Request23
+Figure 12: SD-04 User Authentication24
+Figure 13: STD-01 Story Session State Transition26
+Figure 14: STD-02 Video Studio State Transition27
+Figure 15: STD-03 Authentication State Transition28
+Figure 16: ER Diagram: Data Design31
+Figure 17: Landing Page42
+Figure 18: Signup Screen43
+Figure 19: Login Screen44
+Figure 20: Dashboard45
+Figure 21: Story Mode Selection45
+Figure 22: Guided Video Studio46
+Figure 23: AI Story Studio/Custom mode51
+Figure 24: Play Story55
+Figure 25: Story Memory Board56
+Figure 26: Forgot Password57
+Chapter 3: Design and Architecture
+This chapter presents the high-level architectural design of Omni-Narrative Engine, describing how the web interface, story state, AI services, voice generation, background music context, and video studio modules interact. The design focuses on modularity, secure API usage, responsive user interaction, and extensibility for future multimedia generation components
+3.1 System Architecture Overview
+The Omni-Narrative Engine is an AI-powered cinematic storytelling platform that allows users to create interactive stories, guided adventures, custom scene-by-scene scripts, character dialogues, voice narration, background music, and video-ready previews. The system is implemented as a Next.js web application with server-side API routes that integrate with external AI services.
+3.1.1 Purpose of Architectural Overview
+The purpose of this overview is to describe how the major modules of Omni-Narrative Engine cooperate as one system. It identifies where each feature resides, how frontend screens communicate with backend API routes, how external AI services are called securely, and how story data is preserved between steps.
+3.2 Conceptual Architecture Diagram
+Figure 1: High-level conceptual architecture diagram
+Component
+Description
+Technology Used
+Security Mechanism
+Frontend Web App
+Landing, auth, dashboard, guided video studio, AI Story Studio, audio generation, memory board, preview.
+Next.js, React, TypeScript, Tailwind CSS
+Protected routes, input validation, HTTPS-ready deployment
+Backend API Routes
+Authentication, activity logging, Gemini/Groq generation, Deepgram TTS, background music.
+Next.js API routes on Node.js
+JWT validation, server-only API keys, structured request validation
+Narrative Engine
+Generates cinematic stories, scenes, dialogues, narration, prompts, character voice metadata.
+Google Gemini, Groq fallback
+API keys in environment variables, JSON output parsing
+Audio Generation Layer
+Converts dialogues and narration into voice audio and manages music generation status.
+Deepgram TTS, background music route
+Server-side token usage, API response checks
+Authentication Module
+Registers users, logs users in/out, verifies current session, protects private routes.
+Prisma, SQLite, bcryptjs, jose JWT
+Password hashing, HTTP-only token strategy, middleware route protection
+Data Layer
+Stores accounts, activity records, and active workflow drafts.
+SQLite via Prisma, localStorage
+Hashed credentials, scoped browser storage, no exposed secrets
+Video Preview Layer
+Displays video-ready story summary and placeholder until real video rendering is integrated.
+Next.js page components
+No video backend keys exposed; download disabled until backend exists
+Table 1: Key Components and Services in Omni-Narrative Architecture
+3.3 Architecture Style / Pattern
+The system adopts a Client-Server Architecture with a Layered Backend pattern. The client-side interface collects user input, displays workflow stages, and shows generated content. Server-side API routes own sensitive operations such as authentication and calls to Gemini, Groq, Deepgram, and background music providers.
+3.3.1 Justification for Choosing Client-Server Architecture with Layered Backend
+Clear separation of concerns between UI screens and provider/backend logic.
+API keys remain in .env.local and are never sent to the browser.
+AI routes can later be moved to independent services without redesigning the frontend workflow.
+Guided Mode, AI Story Studio, audio generation, and preview logic are separated into dedicated screens and storage helpers.
+Groq fallback protects story and dialogue generation when Gemini returns high-demand or unavailable responses.
+Real image generation, vector memory, and video rendering can be added as separate backend modules.
+3.3.2 Layer Description and Component Mapping
+Layer / Component
+Description
+Technologies Used
+Role / Responsibilities
+Presentation Layer
+Interactive cinematic web UI.
+Next.js App Router, React, Tailwind CSS
+Collect setup, show modes, display scenes, edit dialogues, play audio, preview video.
+API Layer
+Backend entry point for frontend requests.
+Next.js API routes
+Validate requests, call AI/audio services, return structured JSON.
+Business Logic Layer
+Story workflow orchestration and draft handling.
+TypeScript services, storage helpers
+Manage stages, regeneration flags, local draft persistence.
+AI Processing Layer
+Story/dialogue generation and fallback.
+Gemini, Groq
+Generate scripts, dialogue, suggestions, scene metadata.
+Audio Processing Layer
+Voice and music generation.
+Deepgram TTS, background music route
+Generate voices, background music status, audio URLs.
+Data Access Layer
+Authentication/activity persistence and draft persistence.
+Prisma, SQLite, localStorage
+Store users, activities, story drafts, video studio flow.
+Security Layer
+Access control and secrets management.
+bcryptjs, jose JWT, middleware
+Hash passwords, protect routes, keep provider keys server-side.
+Preview / Export Layer
+Future video output layer.
+Current placeholder; future FFmpeg/Remotion candidate
+Summarize video-ready data and reserve export feature.
+Table 2: Layer Description and Component Mapping
+3.3.3 Architecture Diagram
+Figure 2: Layered Architecture
+3.4 Design Models
+This section reserves the UML and workflow diagrams required for the SDS presentation. The textual descriptions explain what each diagram should represent when the final figures are inserted.
+3.4.1 Class Diagram
+Purpose: 
+The class diagram represents the static structure of the Omni-Narrative Engine system. It illustrates the main classes, their attributes, methods, and relationships, including composition and associations. This diagram provides a blueprint for the system’s object-oriented design and serves as a reference for developers and stakeholders, ensuring modularity, maintainability, and scalability across both the web frontend and AI-driven backend services.
+Key Classes: 
+The class diagram of the Omni-Narrative Engine application identifies several core classes that form the foundation of the system’s functionality. These classes can be grouped into four main categories: Core Entity Classes, State Manager Classes, Generative AI Classes, and Supporting Story/Media Classes. Each class contributes to the overall functionality of the interactive story and video platform by encapsulating data, behavior, and interactions.
+Core Entity Classes 
+User 
+Represents the central entity of the system stored in the database.
+Attributes: id, name, email, passwordHash 
+Methods: login(), register() 
+Serves as the parent entity for tracking user accounts, session activity, and authentication data.
+UserActivity 
+Stores user-specific actions and platform analytics. 
+Attributes: id, activityType, metadata 
+Methods: logActivity() 
+Maintains an audit trail of how users interact with the story generation and video studio features.
+PasswordResetToken 
+Handles secure authentication recovery flows. 
+Attributes: id, tokenHash, expiresAt 
+Methods: validateToken()
+State Manager Classes 
+PersistedStoryState 
+Handles the active lifecycle and real-time state of an ongoing interactive story session.
+Attributes: currentSceneIndex, isLoading, lastSavedAt, selectedChoice
+Methods: loadState(), saveState()
+Acts as the central aggregate root, tying together story history, current health status, and scene data.
+StorySetupData 
+Stores the initial configuration parameters defined by the user before a story begins. 
+Attributes: characterName, characterRole, genre, mode, difficulty
+Methods: updateSetup(), validate() 
+Dictates the foundational prompt logic sent to the LLM during generation.
+VideoStudioFlowState
+Manages the multi-stage pipeline of transforming a scenario into a final video.
+Attributes: stage, sceneCount, scenesNeedRegeneration 
+Methods: nextStage(), saveDraft() 
+Coordinates the progression between story generation, script editing, voice synthesis, and music generation.
+Generative AI Classes 
+VideoGenerationResponse 
+Captures and structures the direct JSON output returned by the Gemini LLM.
+Attributes: title, logline, estimatedRuntime 
+Methods: parseResponse() 
+Converts raw LLM responses into structured scenes and character voice profiles.
+GeneratedMediaMock 
+Handles the metadata required for generating visual and audio assets during active gameplay. 
+Attributes: imagePrompt, audioMoodPrompt, playerState
+Methods: generateMedia() 
+Acts as the bridge to text-to-image (FLUX) and TTS generation within an interactive story.
+MovieCharacterVoice 
+Maps story characters to specific text-to-speech audio models.
+Attributes: character, archetype, deepgramModel 
+Methods: getVoiceProfile()
+Additional Supporting Classes 
+StoryScene & MovieScene 
+Represents an individual chunk of the narrative, either in interactive mode (StoryScene) or video mode (MovieScene).
+Attributes: sceneNumber, text/narration, location, imagePrompt
+Methods: renderScene(), generateVisuals() 
+Holds the core content that the user reads or watches.
+HealthStatus & CharacterAttributes 
+Manages RPG-style mechanics within the story.
+Attributes: health, mana, resolve, strength, intelligence, charisma
+Methods: applyDelta(), calculateBonus()
+Tracks dynamic difficulty adjustments and player survival mechanics.
+MemoryItem 
+Supports the RAG (Retrieval-Augmented Generation) memory system.
+Attributes: sceneNumber, userChoice, timestamp 
+Methods: logDecision() 
+Logs critical user choices so the LLM can reference them in future scenes.
+MovieDialogueLine 
+Handles individual spoken lines within the video studio. 
+Attributes: character, line, audioUrl 
+Methods: fetchAudio() 
+Works in conjunction with the Deepgram TTS service to manage generated voice audio clips.
+Contribution: The class diagram ensures all entities and their relationships are well-defined, supporting a modular and extensible design. It clearly shows compositions and associations (such as PersistedStoryState containing StoryScene and HealthStatus), helping developers implement complex AI prompting logic consistently while maintaining high cohesion and low coupling across the Next.js ecosystem.
+Figure 3: Class DiagramFigure 3: Class DiagramDiagram:
+Figure 3: Class Diagram
+Figure 3: Class Diagram
+3.4.2 Activity Diagrams
+Purpose: The purpose of activity diagrams in the Omni-Narrative Engine system is to illustrate the dynamic workflow of key processes such as interactive story generation, scenario-to-video pipelines, custom text input validation, RAG-based memory retrieval, and AI-driven media generation. These diagrams visualize the flow of actions between the user, the Next.js frontend app, backend API routes, core narrative engines, and external AI services like Gemini, Deepgram, and ChromaDB. Activity diagrams clearly demonstrate the sequence of steps, decision logic, constraint validations, and automated system responses involved in each module. They provide a complete picture of how a user prompt starts a process, how data flows through different coherence checks, and how generative results are delivered back to the UI. By mapping these workflows, the Omni-Narrative Engine ensures that all stakeholders—developers, prompt engineers, and system designers—share a unified understanding of how core storytelling and video creation features function operationally.
+Contribution: Activity diagrams significantly contribute to the Omni-Narrative Engine’s system design by modeling the procedural flow of major operations, such as: 
+Generating structured, multi-branch narratives via the Gemini LLM
+Validating custom user inputs for logical coherence and story continuity
+Retrieving contextual memory from ChromaDB vector storage
+Synthesizing character voices and background music through external APIs
+Managing dynamic player states, RPG mechanics, and inventory updates 
+These diagrams reveal how the engine transitions between user interaction, asynchronous backend processing, AI prompt orchestration, and frontend rendering. They are particularly valuable because almost all processes involve complex, multi-step asynchronous interactions between the Next.js server, multiple external AI models, and local browser state. Activity diagrams ensure clarity before complex prompt chains are developed, support workflow validation, and help optimize the latency and efficiency across all interactive media features.
+3.4.2.1 Activity Diagram - AD-01 Story Setup and Mode Selection 
+Purpose: This flowchart outlines the complete process of starting a new interactive story session, from authentication checks to initial world-building. It details how users select either a "Guided" or "Custom" mode, configure genres, adjust difficulty settings, and allocate RPG attributes (Strength, Intelligence, etc.). The diagram shows how these selections initialize the core StorySetupData and Character Identity Tracker before the very first scene is generated.
+Figure 4: AD-01 Story Setup and Mode Selection
+3.4.2.2 Activity Diagram - AD-02 Custom Story Generation Flow 
+Purpose: This flowchart visualizes the logic execution when a user submits a custom text action instead of choosing a pre-defined option. It details the strict validation pipeline, showing how the input is checked for logical coherence, continuity, and physical possibility within the story world. The diagram highlights how valid inputs trigger RAG memory retrieval from ChromaDB to provide context to the Gemini LLM, and includes the contradiction detection loop that forces a regeneration if the AI makes a narrative mistake.
+Figure 5: AD-02 Custom Story Generation Flow
+3.4.2.3 Activity Diagram - AD-03 Scenario-to-Movie Generation 
+Purpose: This flowchart outlines the initial stages of the Video Studio pipeline. It maps the workflow from the moment a user submits a rough story idea, showing how the backend structures a complex prompt for the Gemini API. The diagram details how the LLM generates a cohesive title, logline, and an array of individual scenes with director notes, and illustrates the user's ability to review, edit, or selectively regenerate portions of the script before proceeding to media generation.
+Figure 6: AD-03 Scenario-to-Movie Generation
+3.4.2.4 Activity Diagram - AD-04 Voice and Background Music Flow 
+Purpose: This flowchart illustrates the automated media synthesis processes within the Video Studio. It details how generated character dialogues are mapped to specific vocal archetypes and sent to the Deepgram Aura-2 API for Text-to-Speech (TTS) processing. Additionally, it shows the parallel process of requesting mood-appropriate background music via the SUNO API (or falling back to mock providers), and how the resulting audio URLs are persisted to the local storage state for final video preview.
+Figure 7: AD-04 Voice and Background Music Flow
+3.4.2.5 Activity Diagram - AD-05 Active Story Loop 
+Purpose: This flowchart represents the core operational "gameplay" loop of the Omni-Narrative Engine. It demonstrates the cyclical process of a user making a choice, the system updating player mechanics (Health, Mana, Resolve) and inventory, and the parallel orchestration of next-scene generation. It specifically highlights the asynchronous processing where text generation (Gemini), image generation (FLUX), and memory storage (ChromaDB) happen concurrently before the unified new scene is rendered to the user interface.
+Figure 8: AD-05 Active Story Loop
+3.4.3 Sequence Diagrams
+Purpose: The purpose of sequence diagrams in the Omni-Narrative Engine system is to illustrate how different system components interact over time to complete major storytelling and media generation workflows. These diagrams show the flow of messages and interactions between the user, the Next.js frontend, the backend API routes, AI engines (Google Gemini), external APIs (Deepgram, SUNO), and the local storage or SQLite database. Sequence diagrams provide a timeline-based representation of the Engine’s dynamic behavior, ensuring a clear understanding of how complex operations—such as context-aware prompt generation, sequential text-to-speech synthesis, memory retrieval, and secure authentication—are executed from start to finish.
+Contribution: 
+Sequence diagrams contribute to the Omni-Narrative Engine system design by:
+Demonstrating the order of interactions between the browser client, Next.js server actions, external AI APIs, and vector storage layers.
+Clarifying the responsibilities of each component during multi-step workflows, such as parsing raw LLM JSON outputs into structured movie scripts.
+Helping developers understand request propagation, showing how a user’s custom text input is validated, enriched with RAG memory data, processed by Gemini, checked for coherence, and finally rendered to the screen.
+Providing a clear reference for mapping user actions (like clicking "Generate Voice" or "Login") to specific API endpoint executions, asynchronous task processing, and database updates. 
+Sequence diagrams are especially valuable for the Omni-Narrative Engine because major features—like the Video Studio pipeline and Custom Story Generation—require tightly coordinated interactions across multiple system layers, where timing, data structuring, and fallback mechanisms are critical to system stability.
+3.4.3.1 Sequence Diagram – SD-01 Custom Story Request 
+Purpose: The purpose of this sequence diagram is to illustrate the complete round-trip workflow when a user submits a custom text action during an active story. It maps the timeline of the request moving from the UI to the Custom Input Handler, querying ChromaDB for relevant memory context, and packaging the prompt for the Narrative Engine. The diagram highlights the interaction with the Google Gemini API and the subsequent validation loop by the Coherence Engine, ensuring that developers understand how contradictions are caught and regenerated before the final scene is returned to the user.
+Figure 9: SD-01 Custom Story Request
+3.4.3.2 Sequence Diagram – SD-02 Video Generation and TTS 
+Purpose: The purpose of this sequence diagram is to illustrate the sequential execution of the core Video Studio generative pipeline. It demonstrates how user-selected genres and tones are passed to the /api/video/generate route, processed by Gemini into a structured script, and saved to localStorage. Furthermore, it maps the subsequent audio phase, showing how character dialogue lines are iterated over and sent sequentially to the Deepgram API via the /api/video/tts route, illustrating the complex loop required to synthesize multiple unique character voices in a single scene.
+Figure 10: SD-02 Video Generation and TTSFigure 10: SD-02 Video Generation and TTS
+Figure 10: SD-02 Video Generation and TTS
+Figure 10: SD-02 Video Generation and TTS
+3.4.3.3 Sequence Diagram – SD-03 Background Music Request 
+Purpose: The purpose of this sequence diagram is to illustrate the interaction required to generate mood-specific background music for the final video output. It details the flow from the Video Studio Page to the /api/background-music endpoint, showing the conditional logic where the system either makes an external call to the SUNO API or falls back to a local mock provider based on environment configurations, ensuring developers understand how external service dependencies are managed.
+Figure 11: SD-03 Background Music Request
+3.4.3.4 Sequence Diagram – SD-04 User Authentication Sequence 
+Purpose: The purpose of this sequence diagram is to illustrate the secure lifecycle of user authentication within the Omni-Narrative Engine. It maps the interactions between the user's browser, the Next.js Middleware acting as a session guard, the backend /api/auth routes, and the Prisma ORM communicating with the SQLite database. By tracking the timeline of login, signup, and password reset flows, the diagram provides a clear blueprint for how credentials are encrypted, verified, and managed via secure httpOnly session cookies.
+Figure 12: SD-04 User Authentication
+3.4.4 State Transition Diagrams
+Purpose: The purpose of state transition diagrams in the Omni-Narrative Engine system is to represent how each core module behaves as it moves through different states based on user actions, background processes, and system events. These diagrams visually capture the lifecycle of central features such as the interactive story session, the multi-stage video generation pipeline, and user authentication. By mapping out states and transitions, the diagrams clarify how the Engine responds to user inputs, AI-generated outputs (from Gemini or Deepgram), network errors, and frontend UI validations.
+Contribution: State transition diagrams contribute to the design and understanding of the Omni-Narrative Engine by:
+Visualizing module lifecycles: They outline all possible aggregate states—such as Setup, Generating Story, Scene Active, Processing Input, and Completed—and demonstrate how modules move between them.
+Clarifying event-driven behavior: They show which triggers—like submitting a custom narrative choice, clicking "Generate Voice," or receiving an AI payload—cause immediate state transitions.
+Ensuring predictable behavior: They help verify that complex workflows, like ensuring a story script is fully accepted before allowing voice generation, behave consistently across all edge cases.
+Supporting synchronization across systems: They ensure smooth coordination between the Next.js React frontend state, local browser storage (localStorage), backend asynchronous API tasks, and database session updates.
+3.4.4.1 State Transition Diagram – STD-01 Story Session State Transition 
+Purpose: This state transition diagram illustrates the lifecycle of a single interactive story session. It shows how the system progresses from the initial Setup Wizard (where genres and difficulty are selected) into the core Scene Active state. The diagram highlights how user interactions—such as making guided choices, submitting custom text, or opening memory/history modals—trigger transitions into temporary processing or viewing states before returning the user to the active narrative loop. This ensures a clear understanding of how local application state handles LLM loading delays and network errors gracefully.
+Figure 13: STD-01 Story Session State Transition
+3.4.4.2 State Transition Diagram – STD-02 Video Studio State Transition 
+Purpose: This state transition diagram illustrates the strict, sequential workflow of the Video Studio pipeline. It maps the progression from an initial rough story idea through script generation, scene review, text-to-speech synthesis, and background music creation. The diagram highlights the guardrails implemented in the system, detailing how editing a previously generated scene transitions the state to Scenes Outdated, thereby forcing the user to acknowledge the change or regenerate the associated audio. This ensures the complex state machine prevents mismatched audio and visual assets during final video preview.
+Figure 14: STD-02 Video Studio State Transition
+3.4.4.3 State Transition Diagram – STD-03 Authentication State Transition 
+Purpose: This state transition diagram illustrates the secure lifecycle of user access within the Omni-Narrative Engine. It shows how users transition from an unauthenticated state through various forms (Login, Signup, Forgot Password) to reach a fully authenticated dashboard state. The diagram highlights conditional routing governed by the Next.js Middleware, demonstrating how expired cookies or unauthorized access attempts automatically transition the system back to secure login states, ensuring a clear blueprint for the platform's security logic.
+Figure 15: STD-03 Authentication State Transition
+3.5 Data Design
+3.5.1 Data Storage and Organization
+The system uses server-side persistence for user accounts and activity history through Prisma and SQLite. It uses client-side draft persistence for active guided and custom story workflows in localStorage so the user can refresh the browser or move backward without losing generated text, dialogues, audio status, or current stage.
+3.5.2 Major Data Entities
+Entity
+Key Fields
+Purpose
+User
+id, name, email, passwordHash, createdAt
+Stores registered user account information.
+Activity
+id, userId, type, metadata, createdAt
+Stores user activity events.
+StorySetupData
+storyTitle, mode, genres, moods, characters, numberOfScenes
+Stores guided/custom setup information.
+PersistedStoryState
+currentScene, pastScenes, memoryTimeline, selectedChoice, inventory, healthStatus
+Stores guided interactive story state.
+CreateStoryDraft
+storyTitle, genres, tones, characters, scenes, audio, video
+Stores AI Story Studio custom story draft.
+CreateStoryScene
+id, sceneNumber, title, storyDescription, suggestions, dialogues
+Stores custom scene writing and dialogue inputs.
+VideoStudioFlowState
+stage, roughIdea, generatedStory, script, voiceResult, music
+Stores guided video studio progress.
+MovieScene
+sceneNumber, title, narration, sceneTone, imagePrompt, soundDesign, dialogues
+Stores generated guided film scene data.
+MovieDialogueLine
+character, line, delivery, voiceProfile, audioUrl
+Stores per-character dialogue and generated audio reference.
+Table 3: Major Data Entities
+Entity Relationship Diagram:
+Figure 16: ER Diagram: Data Design
+3.5.3 Data Flow and Processing
+Process / Action
+Source
+Destination
+Data Stored / Processed
+Data Entry & Input
+Form fields, genre/tone selectors, scene text areas, dialogue editors
+Frontend State
+Raw user input captured from selectors and editors
+API Validation & Routing
+Frontend State
+API Routes (/api/*)
+Structured JSON requests validated for required fields before AI provider calls
+AI Response Parsing
+AI Providers: Gemini, Deepgram
+API Routes / Frontend
+AI responses are parsed into typed story, scene, dialogue, and audio objects
+UI Rendering
+API Routes
+User Interface (UI)
+Generated results and AI objects are returned to the UI for display
+Session Persistence
+Frontend State / UI
+Browser localStorage
+State is saved through helper modules after every major update so back/edit operations do not lose work
+Table 4: Data Flow and Processing
+3.5.4 Data Security
+The Omni-Narrative Engine ensures full protection of sensitive user data, authentication credentials, AI provider keys, and generated storytelling media through the following security mechanisms:
+Data Security
+The system protects user account information and authentication data by applying secure password handling and encrypted communication practices.
+Passwords are hashed using bcryptjs before storage. 
+bcryptjs automatically applies salting, which helps prevent attackers from easily reversing stored passwords. 
+The system never stores plain-text passwords in the database. 
+Secure communication is maintained through HTTPS/TLS, ensuring that data exchanged between the client, Next.js server, and external AI APIs remains protected during transmission. 
+Authentication
+The system uses token-based authentication to verify users and manage secure sessions.
+JWT authentication is implemented using the jose library. 
+After successful login, the session token is stored in a secure httpOnly cookie. 
+httpOnly cookies help prevent client-side scripts from directly accessing session tokens. 
+Next.js Middleware acts as a strict session guard for private pages. 
+Time-limited cryptographic hashes are used for password reset tokens to reduce the risk of replay attacks. 
+Access Control
+Access control is applied to ensure that only authorized users can access private workflow pages and protected system features.
+ProtectedRoute prevents unauthorized users from opening private frontend pages. 
+Next.js Middleware protects important routes such as dashboard, setup, story, audio generation, and video preview pages. 
+Server-side API route protection helps prevent unauthorized access to costly AI generation endpoints. 
+Prisma ORM is used for safe database operations and helps isolate user account-related queries. 
+API Key and Provider Security
+The system keeps all external AI service credentials secure by handling them only on the server side.
+Provider keys for Gemini, Groq, Deepgram, and background music services are read only from server environment variables. 
+Sensitive credentials are stored in .env.local and are not exposed to the frontend. 
+Frontend pages never call third-party AI providers directly. 
+All AI requests are routed through secure Next.js API routes such as /api/video/generate, /api/video/tts, /api/tts, and /api/background-music. 
+Privacy and Infrastructure Security
+The project reduces unnecessary exposure of user creative data by keeping active drafts on the client side where appropriate.
+Active story drafts, video drafts, scenes, dialogues, and generation statuses are stored using browser localStorage. 
+This approach reduces unnecessary server-side storage of the user’s personal creative work. 
+Only required data is sent to API routes during AI generation requests. 
+Environment isolation ensures that API keys and private configuration values remain separate from public frontend code.
+Chapter 4: Implementation
+4.1 Project Methodology & Algorithms
+4.1.1 Project Methodology
+The implementation follows an iterative prototype methodology. Core workflows were built and refined in stages: frontend navigation, authentication, guided story generation, custom story builder, dialogue generation, voice generation, background music, video preview placeholder, fallback reliability, and state persistence.
+4.1.2 Methodology Phases (Detailed Workflow)
+The Omni-Narrative Engine development workflow is organized into the following major stages:
+Requirement Analysis: 
+Functional and non-functional requirements were identified for an AI-powered multimedia storytelling system. The main requirements included user authentication, guided story creation, custom story building, AI-generated narrative scenes, character dialogues, voice generation, background music generation, story memory, history tracking, draft persistence, and video preview flow.
+Frontend and UI/UX Development: 
+The cinematic frontend of the system was developed using Next.js, React, TypeScript, and Tailwind CSS. The interface was designed with a dark cinematic theme to match the storytelling purpose of the system. Major screens were developed, including:
+Landing page 
+Dashboard 
+Story mode selection screen 
+Story setup screen 
+Story play screen 
+Story memory screen 
+Story history screen 
+Story export screen
+The purpose of this phase was to provide users with a smooth and immersive storytelling experience.
+Authentication and Route Protection:
+The login and signup backend was implemented using Prisma SQLite, bcryptjs password hashing, JWT sessions, and protected routes. The authentication module allows users to create accounts, log in securely, maintain sessions, and access only authorized workflow pages.
+This phase included:
+User signup 
+User login 
+Password hashing using bcryptjs 
+JWT-based session handling using jose 
+Middleware-based route protection 
+ProtectedRoute handling for private frontend pages 
+Guided Video Studio Development: 
+The Guided Video Studio module was implemented to allow users to generate a story-based video workflow through guided steps. In this mode, the user provides a story idea and the system generates structured story content using AI.
+This phase included:
+Story idea input 
+Gemini-based story generation 
+Scene and dialogue review 
+Character dialogue organization 
+Deepgram voice generation 
+Background music generation 
+Preview screen for generated story content 
+The purpose of this phase was to support users who want the system to guide the storytelling process automatically.
+AI Story Studio Custom Mode Development: 
+The AI Story Studio custom mode was implemented for users who want more creative control over their story. In this workflow, users can define their own story structure, characters, scenes, dialogues, and scene progression.
+This phase included:
+Multi-character setup 
+Character name, role, personality, and voice style input 
+Scene-by-scene story builder 
+AI scene suggestions 
+AI dialogue generation 
+Editable character dialogues 
+Audio generation controls 
+Custom preview routing
+This module gives users more freedom compared to Guided Mode because they can edit and shape the story manually before generating audio and preview content.
+AI Provider Integration and Fallback Handling:
+AI provider integration was added to support story generation and dialogue generation. Gemini was used as the main provider for story-related AI generation. Fallback logic was also added using Groq when Gemini returns high-demand errors such as 503 service unavailable or when Gemini does not return usable output.
+This phase included:
+Gemini provider integration 
+Groq fallback handling 
+Response validation 
+Error handling for unavailable AI services 
+User-friendly fallback messages
+The purpose of this phase was to improve system reliability and prevent the workflow from stopping when one AI provider fails.
+Draft Persistence and Regeneration Handling: 
+Draft persistence was added to prevent users from losing progress during the story creation process. The system saves active story drafts, video drafts, dialogue edits, audio status, and preview status using browser localStorage.
+This phase included:
+Story draft saving 
+Video studio draft saving 
+Back and edit controls 
+Regeneration warnings after story or dialogue edits 
+Audio status tracking 
+Music generation status tracking 
+Preview routing after completion
+This ensures that users can move backward, edit previous content, and continue the workflow without losing their work.
+Testing and Validation: 
+Manual testing was performed to verify that the major system workflows function correctly. The system was tested across authentication, protected routes, story setup, guided video generation, custom story building, AI fallback handling, audio generation, music generation, and draft persistence.
+Testing included:
+Unit testing of validation functions 
+Authentication workflow testing 
+Protected route testing 
+Story setup validation 
+Guided Video Studio workflow testing 
+AI Story Studio workflow testing 
+API response validation 
+Draft persistence testing
+Back/edit workflow testing 
+Deployment Preparation:
+The project is currently prepared for local development and testing using the Next.js development server. Production deployment has not been fully performed yet. In future deployment, the application can be hosted on platforms such as Vercel, with provider API keys stored securely in server-side environment variables
+Future deployment may include:
+Vercel deployment for Next.js frontend and API routes 
+Cloud database replacement for SQLite \
+Secure production environment variables 
+Scalable AI API route handling 
+Video rendering backend integration using tools such as Remotion or FFmpeg
+4.1.3 Algorithms
+The algorithms presented below are aligned with the implemented SDS phase and focus on the core system operations.
+4.2.1 Algorithm 1 – Custom Story Generation Routing
+PROCEDURE HandleStoryStart(setup)
+1.  IF setup.mode = "custom" THEN
+2.      rawIdea <- setup.startingIdea
+3.      Validate(rawIdea)
+4.      prompt <- BuildStoryPrompt(rawIdea, setup.genre, setup.mood)
+5.      scene <- GenerateSceneWithLLM(prompt)
+6.  ELSE
+7.      scene <- GenerateGuidedOpening(setup)
+8.  END IF
+9.  SaveCurrentScene(scene)
+10. RenderStoryScreen(scene)
+END PROCEDURE
+4.2.2 Algorithm 2 – Scenario-to-Video Generation
+PROCEDURE GenerateVideoScenario(request)
+1.  scenario <- Validate(request.scenario)
+2.  genres <- NormalizeList(request.genre)
+3.  tones <- NormalizeList(request.tone)
+4.  prompt <- BuildGeminiMoviePrompt(scenario, genres, tones)
+5.  script <- CallGemini(prompt)
+6.  scenes <- NormalizeScenes(script.scenes)
+7.  voices <- AssignCharacterVoices(scenes)
+8.  IF request.includeAudio = TRUE THEN
+9.      FOR each dialogueLine IN scenes
+10.         audio <- GenerateDeepgramAudio(dialogueLine)
+11.         AttachAudio(dialogueLine, audio)
+12.     END FOR
+13. END IF
+14. Return VideoGenerationResponse
+END PROCEDURE
+4.2.3 Algorithm 3 – Background Music Context Generation
+PROCEDURE GenerateBackgroundMusic(scene)
+1.  mood <- scene.backgroundMusicMood OR scene.mood
+2.  prompt <- scene.soundDesign OR scene.audioMoodPrompt
+3.  IF BG_MUSIC_API_KEY and BG_MUSIC_API_URL exist THEN
+4.      track <- CallMusicProvider(mood, prompt)
+5.  ELSE
+6.      track <- ReturnConfiguredFallbackTrack()
+7.  END IF
+8.  RenderMusicPlayer(track)
+END PROCEDURE
+4.2 AI Model and Prompting Setup
+Provider
+Use in System
+Model / Route
+Fallback / Notes
+Google Gemini
+Primary story, scene, and dialogue generation
+gemini-2.5-flash by default
+Returns structured JSON prompts.
+Groq
+Fallback LLM when Gemini is unavailable
+llama-3.3-70b-versatile by default
+Uses GROQ_FALLBACK_API from .env.local.
+Deepgram
+Text-to-speech for characters and narration
+Aura voice models
+Different voice profiles per character.
+Background Music Provider / SUNO route
+Background music generation or mock status
+/api/background-music
+Real provider can be configured later.
+Future Video Renderer
+Video composition and export
+Pending backend
+Download disabled until integration.
+4.3 Authentication and Security
+4.3.1 Authentication
+Users register and log in using backend API routes. Credentials are validated, stored with hashed passwords, and authenticated sessions are maintained through JWT tokens. Protected pages are guarded so unauthenticated users are redirected to login.
+4.3.2 Encryption
+The application hashes passwords using bcryptjs. API keys are kept in .env.local and used only inside server-side API routes. Deployment should use HTTPS/TLS to protect tokens and requests in transit.
+4.3.3 Attack Prevention
+- Password hashing prevents plaintext password exposure.
+- Server-side API routes prevent direct exposure of AI provider keys.
+- Input validation blocks incomplete generation requests.
+- JWT middleware reduces unauthorized access to dashboard and studio pages.
+- Fallback errors are reported without exposing secrets.
+4.3.4 Additional Security Measures
+Recommended production measures include rate limiting AI endpoints, CSRF-aware cookie settings, audit logging, database backups, stricter request schemas using Zod, and deployment secret management.
+4.3.5 Security Testing Results
+Current verification includes TypeScript build validation, successful route compilation, login/signup correction, and protection of private routes through the implemented middleware. Formal penetration testing is pending.
+4.4 External APIs / SDKs
+API / SDK
+Purpose
+Environment Key
+Current Status
+Gemini API
+Primary LLM story/dialogue generation
+GEMINI_API_KEY
+Integrated
+Groq API
+Fallback LLM generation
+GROQ_FALLBACK_API
+Integrated for video story and dialogue fallback
+Deepgram TTS
+Character and narration voice generation
+DEEPGRAM_TTS_API_KEY / deepgramtts
+Integrated
+Background Music / SUNO
+Mood-based background music
+BACKGROUND_MUSIC_PROVIDER_KEY
+Route integrated; provider/mock depends on env
+Prisma Client
+Database ORM for auth/activity
+DATABASE_URL
+Integrated with SQLite
+bcryptjs
+Password hashing
+N/A
+Integrated
+jose
+JWT handling
+JWT_SECRET
+Integrated
+Table 5: External APIs / SDKs
+4.5 User Interfaces
+4.5.1 Landing Page
+Premium dark cinematic page introducing Omni-Narrative Engine with clear CTAs for guided story and AI Story Studio.
+Figure 17: Landing Page
+4.5.2 Signup Screen
+User registration form connected to backend account creation.
+Figure 18: Signup Screen
+4.5.3 Login Screen
+Secure login page that authenticates users before dashboard access.
+Figure 19: Login Screen
+4.5.4 Dashboard
+Narrative command center with continue story, start new story, AI Story Studio, Video Studio, saved stories, and usage statistics.
+Figure 20: Dashboard
+4.5.5 Story Mode Selection
+Allows the user to choose Guided Mode or AI Story Studio. Fresh story selection resets the selected workflow from step 1.
+Figure 21: Story Mode Selection
+4.5.6 Guided Video Studio
+Seven-stage guided flow: setup, story idea, review, scenes/dialogues, voice audio, music, and preview.
+Figure 22: Guided Video Studio
+4.5.7 AI Story Studio/Custom mode
+Custom story setup with title, multiple genres, tones, scene count, and multi-character voice placeholders.
+Figure 23: AI Story Studio/Custom mode
+4.5.8 Play Story
+Final all in one screen showing character traits, character attributes, scenes casted, image prompt, video prompt and continuity. Basically, it’s for the Director Video Player where he can see all the important features in one screen and can move forward or edit any scene.
+Figure 24: Play Story
+4.5.9 Story Memory Board
+Stores memory about key events, locations, characters, and active threads.
+Figure 25: Story Memory Board
+4.5.13 Forgot Password
+Figure 26: Forgot Password
+4.6 Deployment
+4.6.1 Web Application Deployment
+The project is built as a Next.js application and can be deployed to a Node-compatible platform such as Vercel, Render, Railway, or a VPS. Production build is generated through npm run build and served with npm run start.
+4.6.2 Database Deployment
+The current development database is SQLite through Prisma. For production, PostgreSQL is recommended so authentication and activity logs can scale beyond a local file database.
+4.6.3 External API Integrations
+Gemini, Groq, Deepgram, and music provider keys must be configured as environment variables on the deployment platform. No keys should be placed in frontend code or public repositories.
+4.6.4 Server Configuration & Software Stack
+Table 6: Server Configuration & Software Stack
+Layer
+Technology
+Runtime
+Node.js
+Framework
+Next.js 15 App Router
+Language
+TypeScript
+Frontend
+React 19 + Tailwind CSS
+Database
+SQLite development / PostgreSQL deployment
+ORM
+Prisma
+Auth
+JWT + bcryptjs
+AI
+Gemini + Groq fallback
+Audio
+Deepgram TTS + background music route
+Chapter 5: Testing and Evaluation
+5.1 Unit Testing
+5.1.1 Authentication and Input Validation
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Call email validation function with valid email
+ali@gmail.com
+Email accepted as valid
+Email accepted successfully
+Pass
+2
+Call email validation function with invalid email
+ali.gmail.com
+Email rejected as invalid
+Validation error displayed
+Pass
+3
+Call password validation with weak password
+abc123
+Password rejected due to weak strength
+Password rejected
+Pass
+4
+Call password validation with strong password
+Test@1234
+Password accepted
+Password accepted successfully
+Pass
+5
+Call signup validation with mismatched passwords
+Password: Test@1234, Confirm: Test@123
+Signup blocked until passwords match
+Password mismatch error displayed
+Pass
+Table 7: Authentication and Input Validation
+5.1.2 Story Setup Validation
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Validate genre selection
+Genre selected: Fantasy
+Genre stored in story setup state
+Genre saved successfully
+Pass
+2
+Validate missing genre before continue
+Genre: empty
+Continue button remains disabled or shows validation message
+User cannot proceed
+Pass
+3
+Validate tone and difficulty selection
+Tone: Dark, Difficulty: Adaptive
+Tone and difficulty saved in setup state
+Values saved successfully
+Pass
+4
+Validate character creation form
+Name: Arion, Role: Warrior, Traits: Brave, Loyal
+Character profile saved
+Character created successfully
+Pass
+5
+Validate trait selection limit
+Selected traits: 4
+System prevents selecting more than allowed traits
+Extra trait selection blocked
+Pass
+Table 8: Story Setup Validation
+5.1.3 Story Storage and Memory Functions
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Save active story draft
+Scene text, choices, character state
+Draft saved in browser localStorage
+Draft saved successfully
+Pass
+2
+Retrieve saved story draft
+Existing saved draft
+Previous story state restored
+Story state restored correctly
+Pass
+3
+Add user choice to memory
+Choice: “Enter the hidden cave”
+Choice stored as memory item
+Choice added to memory timeline
+Pass
+4
+Retrieve memory records
+Current story session
+Relevant key events, characters, and choices shown
+Memory records displayed
+Pass
+5
+Clear invalid or outdated draft
+Corrupted draft data
+System avoids crash and starts clean state
+Invalid draft ignored safely
+Pass
+Table 9: Story Storage and Memory
+5.1.4 AI Response and Media Validation
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Parse valid Gemini story response
+AI response contains scenes and dialogues
+Story object parsed successfully
+Story parsed correctly
+Pass
+2
+Parse empty AI response
+AI response: empty/null
+System shows fallback or error message
+Fallback message displayed
+Pass
+3
+Validate Groq fallback
+Gemini returns 503 error
+Groq fallback is triggered
+Fallback provider used
+Pass
+4
+Validate TTS request body
+Dialogue line and character voice provided
+Voice generation request accepted
+TTS request processed
+Pass
+5
+Validate background music request
+Mood: Suspenseful
+Music generation request accepted
+Music status updated
+Pass
+Table 10: AI Response and Media Validation
+5.2 Functional Testing
+5.2.1 User Account and Authentication
+No.
+Test Case
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+User Registration
+New user enters name, email, password, confirm password
+Account created and user can log in
+Account created successfully
+Pass
+2
+User Login
+Registered email and correct password
+JWT session created and user redirected to dashboard/story hub
+Login successful
+Pass
+3
+Invalid Login
+Wrong password entered
+Login rejected with error message
+Error message displayed
+Pass
+4
+Forgot Password
+Registered email entered
+Reset request generated and user receives recovery instruction
+Reset flow triggered
+Pass
+5
+Logout
+User clicks confirm logout
+Session cleared and user redirected to public/login page
+Logout successful
+Pass
+Table 11: User Account and Authentication
+5.2.2 Story Setup and Story Hub
+No.
+Test Case
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Open Story Hub
+Authenticated user
+Story Hub displays create story, recent sessions, and user statistics
+Story Hub loaded
+Pass
+2
+Start New Story
+Click “Create New Story”
+User moves to story setup flow
+Setup flow opened
+Pass
+3
+Select Genre
+Genre: Fantasy
+Selected genre is highlighted and saved
+Genre saved
+Pass
+4
+Select Scenario
+Scenario selected after genre
+Scenario is saved and user proceeds to tone/difficulty
+Scenario saved
+Pass
+5
+Create Character
+Name, role, traits, attributes entered
+Character configuration saved and used for story generation
+Character saved
+Pass
+Table 12: Story Setup and Story Hub
+5.2.3 Active Story, Memory, History, and Player State
+No.
+Test Case
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Generate Opening Scene
+Completed setup data
+Initial story scene is generated and displayed
+Scene displayed successfully
+Pass
+2
+Select Story Choice
+User selects one available choice
+Choice is stored and next scene generation starts
+Choice processed
+Pass
+3
+View Story History
+User opens History page
+Previous scenes and selected choices are displayed
+History displayed correctly
+Pass
+4
+View Story Memory
+User opens Memory page
+Key events, characters, locations, and active threads are displayed
+Memory displayed correctly
+Pass
+5
+View Player State
+User opens Player page
+Character health, attributes, inventory, and progress are displayed
+Player state displayed
+Pass
+Table 13: Active Story Workflow
+5.2.4 Guided Video Studio and AI Story Studio
+No.
+Test Case
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Generate Guided Story
+Story idea entered in Video Studio
+Gemini generates scenes and dialogues
+Story generated
+Pass
+2
+Provider Fallback
+Gemini fails with 503 or unusable output
+Groq fallback generates usable response
+Fallback response returned
+Pass
+3
+Generate Character Voices
+Dialogue lines available
+Deepgram/TTS voice generation starts and status becomes ready
+Voices generated/status updated
+Pass
+4
+Generate Background Music
+Story mood/tone available
+Music generation starts and status becomes ready
+Music status updated
+Pass
+5
+Open Video Preview
+Story, audio, and music status available
+Preview page shows story summary and generation status
+Preview displayed
+Pass
+Table 14: Video Studio and AI Story Studio
+5.3 Business Rules Testing
+5.3.1 Decision Table 1: Password Validation Rules
+Business Rule:The system shall allow account creation only when the password satisfies minimum security rules.
+Conditions:
+Password length must be at least 8 characters. 
+Password must contain letters. 
+Password must contain numbers. 
+Password should contain a special character for strong validation.
+Rule ID
+R1
+R2
+R3
+R4
+R5
+Length ≥ 8
+N
+Y
+Y
+Y
+Y
+Contains Letters
+-
+N
+Y
+Y
+Y
+Contains Numbers
+-
+Y
+N
+Y
+Y
+Contains Special Character
+-
+-
+-
+N
+Y
+Validation Result
+Fail
+Fail
+Fail
+Pass
+Pass
+Allow Signup
+N
+N
+N
+Y
+Y
+Table 15: Password Validation Rules
+Test Case ID
+Rule
+Password
+Expected Result
+Actual Result
+Status
+DT1-TC01
+R1
+abc12
+Fail: password too short
+Error displayed
+Pass
+DT1-TC02
+R2
+12345678
+Fail: letters required
+Error displayed
+Pass
+DT1-TC03
+R3
+password
+Fail: number required
+Error displayed
+Pass
+DT1-TC04
+R4
+Password123
+Pass: acceptable password
+Password accepted
+Pass
+DT1-TC05
+R5
+Password@123
+Pass: strong password
+Password accepted
+Pass
+Table 16: Password Validation Test Cases
+5.3.2 Decision Table 2: Story Setup Completion Rules
+Business Rule:The system shall allow story generation only when required setup steps are completed.
+Conditions:
+Genre selected. 
+Scenario selected. 
+Tone and difficulty selected. 
+Character profile completed.
+Rule ID
+R1
+R2
+R3
+R4
+R5
+Genre Selected
+N
+Y
+Y
+Y
+Y
+Scenario Selected
+-
+N
+Y
+Y
+Y
+Tone & Difficulty Selected
+-
+-
+N
+Y
+Y
+Character Completed
+-
+-
+-
+N
+Y
+Allow Story Generation
+N
+N
+N
+N
+Y
+Action
+Show error
+Show error
+Show error
+Show error
+Generate story
+Table 17: Story Setup Completion Rules
+Test Case ID
+Rule
+Input State
+Expected Result
+Actual Result
+Status
+DT2-TC01
+R1
+No genre selected
+User cannot continue
+Continue blocked
+Pass
+DT2-TC02
+R2
+Genre selected, no scenario
+User cannot continue
+Continue blocked
+Pass
+DT2-TC03
+R3
+Scenario selected, no tone/difficulty
+User cannot continue
+Continue blocked
+Pass
+DT2-TC04
+R4
+Character name/role missing
+Story generation blocked
+Validation shown
+Pass
+DT2-TC05
+R5
+All setup fields completed
+Opening scene generation starts
+Scene generation started
+Pass
+Table 18: Story Setup Test Cases
+5.3.3 Decision Table 3: AI Provider Fallback Rules
+Business Rule:The system shall use fallback provider logic when the primary AI provider fails or returns unusable output.
+Conditions:
+Gemini response available. 
+Gemini response usable. 
+Gemini returns 503/high-demand error. 
+Groq fallback available.
+Rule ID
+R1
+R2
+R3
+R4
+Gemini Response Available
+Y
+Y
+N
+N
+Gemini Response Usable
+Y
+N
+-
+-
+Gemini 503 / High Demand
+N
+N
+Y
+Y
+Groq Available
+-
+Y
+Y
+N
+Final Action
+Use Gemini
+Use Groq
+Use Groq
+Show error
+Generate Story
+Y
+Y
+Y
+N
+Table 19: AI Provider Fallback Rules
+Test Case ID
+Rule
+Input Condition
+Expected Result
+Actual Result
+Status
+DT3-TC01
+R1
+Gemini returns valid story
+Gemini output used
+Story generated
+Pass
+DT3-TC02
+R2
+Gemini returns incomplete output
+Groq fallback triggered
+Fallback used
+Pass
+DT3-TC03
+R3
+Gemini returns 503 error
+Groq fallback generates response
+Story generated by fallback
+Pass
+DT3-TC04
+R4
+Gemini fails and Groq unavailable
+Error shown to user
+Friendly error displayed
+Pass
+Table 20: AI Provider Fallback Test Cases
+5.3.4 Decision Table 4: Audio Generation Rules
+Business Rule:The system shall generate character voices only when dialogue exists and provider configuration is available.
+Conditions:
+Dialogue lines exist. 
+Character voice style exists. 
+TTS provider key exists.
+Rule ID
+R1
+R2
+R3
+R4
+Dialogue Lines Exist
+N
+Y
+Y
+Y
+Voice Style Exists
+-
+N
+Y
+Y
+TTS API Key Exists
+-
+-
+N
+Y
+Generate Audio
+N
+N
+N
+Y
+Action
+Show missing dialogue
+Show missing voice warning
+Show provider error
+Generate voice
+Table 21: Audio Generation Rules
+Test Case ID
+Rule
+Input Condition
+Expected Result
+Actual Result
+Status
+DT4-TC01
+R1
+No dialogue entered
+Audio generation blocked
+Warning displayed
+Pass
+DT4-TC02
+R2
+Dialogue exists, no voice style
+User asked to select/add voice style
+Warning displayed
+Pass
+DT4-TC03
+R3
+API key missing
+Provider error shown safely
+Error displayed
+Pass
+DT4-TC04
+R4
+Dialogue and TTS provider available
+Voice generation starts
+Audio status updated
+Pass
+Table 22: Audio Generation Test Cases
+5.4 Integration Testing
+5.4.1 User Registration with Authentication Session
+Testing Objective:To ensure that user registration creates a secure account, stores the user in the database, hashes the password, and allows authenticated access to protected pages.
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Create User Account
+Name, email, strong password
+User stored in SQLite through Prisma and password hashed using bcryptjs
+User created successfully
+Pass
+2
+Login After Registration
+Registered email and password
+JWT session created using jose and stored in httpOnly cookie
+Session created
+Pass
+3
+Access Protected Page
+Open dashboard/story setup
+Middleware allows access only if session exists
+Protected page opened
+Pass
+Table 23: User Registration with Authentication
+5.4.2 Story Setup with Scene Generation
+Testing Objective:To ensure that story setup data flows correctly from frontend screens to story state, storage, and AI generation route.
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Complete Story Setup
+Genre, scenario, tone, difficulty, character
+Setup data stored in StoryContext/localStorage
+Setup saved
+Pass
+2
+Start Scene Generation
+Completed setup data
+API route receives structured request for AI generation
+Request processed
+Pass
+3
+Display Generated Scene
+AI response contains scene text and choices
+Scene displayed on active story page
+Scene shown successfully
+Pass
+Table 24: Story Setup with Scene Generation
+5.4.3 Active Story with Memory, History, and Player State
+Testing Objective:To verify that user choices update story history, story memory, and player state consistently.
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Submit Story Choice
+Choice selected from active story page
+Choice stored and next scene generation begins
+Choice saved
+Pass
+2
+Update Story History
+Scene completed with selected choice
+History page displays completed scene and choice
+History updated
+Pass
+3
+Update Story Memory
+New event, character, or location introduced
+Memory page displays updated context
+Memory updated
+Pass
+4
+Update Player State
+Story event affects health, XP, or inventory
+Player state page reflects latest values
+Player state updated
+Pass
+Table 25: Active Story Context Integration
+5.4.4 Video Studio with AI, Voice, Music, and Preview
+Testing Objective:To ensure that the Video Studio workflow connects story generation, dialogue review, TTS voice generation, background music generation, and preview routing.
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Generate Story from Idea
+Story idea entered
+Gemini/Groq returns structured scenes and dialogues
+Story generated
+Pass
+2
+Generate Character Voices
+Dialogue lines available
+TTS route generates or updates voice status
+Voice status ready
+Pass
+3
+Generate Background Music
+Tone/mood available
+Music route updates background music status
+Music status ready
+Pass
+4
+Open Preview
+Story, voice, and music status available
+Preview page displays final summary and media status
+Preview opened
+Pass
+Table 26: Video Studio Integration
+5.4.5 Draft Persistence and Back/Edit Workflow
+Testing Objective:To ensure that users can go back, edit story content, and continue without losing progress.
+No.
+Test Case / Test Script
+Attribute and Value
+Expected Result
+Actual Result
+Result
+1
+Save Draft Automatically
+User edits story scene/dialogue
+Draft saved in localStorage
+Draft saved successfully
+Pass
+2
+Refresh Browser
+Existing draft available
+Story/video draft restored
+Draft restored
+Pass
+3
+Edit Existing Dialogue
+Previously generated audio exists
+System warns user to regenerate audio
+Warning displayed
+Pass
+4
+Continue After Editing
+Updated story content
+User can continue to audio/preview flow
+Workflow continued
+Pass
+Table 27: Draft Persistence Integration

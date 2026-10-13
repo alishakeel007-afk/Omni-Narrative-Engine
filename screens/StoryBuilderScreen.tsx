@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { AiStoryStudioStepper } from "@/components/ai-story-studio-stepper";
 import {
-  createEmptyScene, createId, createMockDialogue, loadCreateStoryDraft, saveCreateStoryDraft
+  createEmptyScene, createId, loadCreateStoryDraft, saveCreateStoryDraft
 } from "@/lib/create-story-storage";
 import type { CreateStoryDialogue, CreateStoryDraft, CreateStoryScene } from "@/types/create-story";
 import { logActivity } from "@/lib/log-activity";
@@ -410,16 +410,7 @@ export default function StoryBuilderScreen() {
 
       const data = await res.json();
       if (!res.ok || !data.dialogues) {
-        // Fallback to mock
-        persistDraft({
-          ...draft,
-          scenes: draft.scenes.map((s) =>
-            s.id === scene.id
-              ? { ...s, dialogues: createMockDialogue({ characters: draft.characters, scene: s, tones: draft.tones }) }
-              : s
-          )
-        });
-        setError((data.error || "AI dialogue failed") + " — used local fallback.");
+        setError(data.error || "AI dialogue generation failed. Please try again.");
         return;
       }
 
@@ -466,18 +457,7 @@ export default function StoryBuilderScreen() {
 
       await logActivity("dialogue_generated", { sceneNumber: scene.sceneNumber, storyTitle: draft.storyTitle });
     } catch {
-      // Fallback silently
-      if (draft) {
-        persistDraft({
-          ...draft,
-          scenes: draft.scenes.map((s) =>
-            s.id === scene.id
-              ? { ...s, dialogues: createMockDialogue({ characters: draft.characters, scene: s, tones: draft.tones }) }
-              : s
-          )
-        });
-      }
-      setError("AI unavailable — used local dialogue fallback.");
+      setError("Failed to reach the AI service. Check your connection.");
     } finally {
       setLoadingDialogue(false);
     }

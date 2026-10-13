@@ -51,9 +51,11 @@ type DatabaseProject = {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { saveSetupOnly, setup, state, updateSetup } = useStory();
+  const { saveSetupOnly, setup, state, updateSetup, loadFromDatabase } = useStory();
   const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
   const [databaseProjects, setDatabaseProjects] = useState<DatabaseProject[]>([]);
+  const [continuingProjectId, setContinuingProjectId] = useState<string | null>(null);
+  const [continueError, setContinueError] = useState<string | null>(null);
   const currentScene = state.currentScene.sceneNumber;
   const hasProgress = state.memoryTimeline.length > 0 || state.currentScene.sceneNumber > 1;
   const customChoiceCount = countCustomChoices(state);
@@ -215,6 +217,18 @@ export default function DashboardScreen() {
     setDatabaseProjects(data.projects ?? []);
   };
 
+  const continueFromDatabase = async (projectId: string) => {
+    setContinuingProjectId(projectId);
+    setContinueError(null);
+    const result = await loadFromDatabase(projectId);
+    setContinuingProjectId(null);
+    if (result.success) {
+      router.push("/story/play");
+    } else {
+      setContinueError(result.error ?? "Failed to load story.");
+    }
+  };
+
   return (
     <ProtectedRoute>
       <ScreenLayout eyebrow="User Dashboard" title="Narrative Command Center" description="Quick access to saved progress, genre preferences, and usage analytics for the AI story experience." maxWidth="max-w-7xl">
@@ -321,6 +335,11 @@ export default function DashboardScreen() {
             </div>
 
             <div className="mt-5 grid gap-4">
+              {continueError ? (
+                <div className="rounded-[1rem] border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {continueError}
+                </div>
+              ) : null}
               {databaseProjects.length > 0 ? (
                 databaseProjects.map((project) => (
                   <div key={project.id} className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4">
@@ -331,13 +350,23 @@ export default function DashboardScreen() {
                           {project.drafts.length} saved version{project.drafts.length === 1 ? "" : "s"} of this story.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => createNewDraftVersion(project.id)}
-                        className="rounded-full border border-gold/25 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15"
-                      >
-                        Save as New Version
-                      </button>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          disabled={continuingProjectId === project.id}
+                          onClick={() => continueFromDatabase(project.id)}
+                          className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-4 py-2 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {continuingProjectId === project.id ? "Loading..." : "Continue Story"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => createNewDraftVersion(project.id)}
+                          className="rounded-full border border-gold/25 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15"
+                        >
+                          Save as New Version
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -350,7 +379,7 @@ export default function DashboardScreen() {
                               : "border-white/10 bg-white/5 text-white/90"
                           }`}
                         >
-                          Version {draft.versionNumber} {draft.isActive ? "Current" : draft.status.toLowerCase()}
+                          Version {draft.versionNumber} {draft.isActive ? "● Active" : draft.status.toLowerCase()}
                         </span>
                       ))}
                     </div>

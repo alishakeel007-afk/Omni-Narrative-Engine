@@ -36,6 +36,10 @@ export function createDefaultDraft(): CreateStoryDraft {
       voiceMessage: "Character voices have not been generated yet.",
       voiceStatus: "idle"
     },
+    visuals: {
+      message: "Scene visuals have not been generated yet.",
+      status: "idle"
+    },
     characters: defaultCharacters,
     genres: ["Fantasy"],
     includeNarration: true,
@@ -124,36 +128,6 @@ export function createEmptyScene(params: {
   };
 }
 
-export function createMockDialogue(params: {
-  characters: CreateStoryCharacter[];
-  scene: CreateStoryScene;
-  tones: string[];
-}) {
-  const sceneText =
-    params.scene.storyDescription.trim() ||
-    params.scene.selectedSuggestion.trim() ||
-    "this moment changes the direction of the story";
-
-  return params.characters.map<CreateStoryDialogue>((character, index) => {
-    const tone = params.tones[index % Math.max(params.tones.length, 1)] || "cinematic";
-    const isVillain = /villain|enemy|shadow|antagonist/i.test(character.role);
-    const isComic = /funny|comic|humor|playful/i.test(`${tone} ${character.personalityTone}`);
-    const line = isVillain
-      ? `You still think this is your story, but ${sceneText.slice(0, 92).toLowerCase()} will prove otherwise.`
-      : isComic
-        ? `I know this is serious, but if ${sceneText.slice(0, 86).toLowerCase()}, we should at least look confident.`
-        : `I can feel the ${tone.toLowerCase()} weight of this moment. ${sceneText.slice(0, 96)}`;
-
-    return {
-      characterId: character.id,
-      characterName: character.name || `Character ${index + 1}`,
-      id: createId("dialogue"),
-      text: line,
-      voiceStyle: character.voiceStyle || "Voice style placeholder"
-    };
-  });
-}
-
 export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | null | undefined) {
   const fallback = createDefaultDraft();
   const savedGenres = Array.isArray(value?.genres)
@@ -211,7 +185,11 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
                     storyTitle,
                     tones
                   }),
-            title: scene.title || `Scene ${index + 1}`
+            title: scene.title || `Scene ${index + 1}`,
+            generatedImageUrl: scene.generatedImageUrl,
+            generatedImagePrompt: scene.generatedImagePrompt,
+            generatedImageStatus: scene.generatedImageStatus,
+            generatedImageError: scene.generatedImageError
           };
         })
       : [];
@@ -222,6 +200,10 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
     audio: {
       ...fallback.audio,
       ...value?.audio
+    },
+    visuals: {
+      ...fallback.visuals,
+      ...value?.visuals
     },
     characters,
     genres,

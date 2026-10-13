@@ -1,5 +1,4 @@
-import { AudioPlayerMock } from "@/components/audio-player-mock";
-import BackgroundMusicPlayer from "@/components/background-music-player";
+import { SceneMedia } from "@/components/scene-media";
 
 type MediaPanelProps = {
   backgroundMusicMood: string;
@@ -9,6 +8,17 @@ type MediaPanelProps = {
   sceneMood: string;
   imagePrompt: string;
   audioPrompt: string;
+  narrationText: string;
+  location?: string;
+  sceneNumber: number;
+  draftId?: string;
+  projectId?: string;
+  characterNames?: string[];
+  characterAppearances?: string[];
+  existingImageUrl?: string;
+  existingNarrationUrl?: string;
+  existingMusicUrl?: string;
+  onMediaUpdate?: (patch: { imageUrl?: string; narrationAudioUrl?: string; musicUrl?: string }) => void;
 };
 
 export function MediaPanel({
@@ -18,7 +28,18 @@ export function MediaPanel({
   narrationLabel,
   sceneMood,
   imagePrompt,
-  audioPrompt
+  audioPrompt,
+  narrationText,
+  location,
+  sceneNumber,
+  draftId,
+  projectId,
+  characterNames,
+  characterAppearances,
+  existingImageUrl,
+  existingNarrationUrl,
+  existingMusicUrl,
+  onMediaUpdate
 }: MediaPanelProps) {
   return (
     <section className="glass-panel rounded-[2rem] p-6">
@@ -34,32 +55,29 @@ export function MediaPanel({
         </span>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_0.95fr]">
-        <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-4">
-          <div className="flex h-72 items-end rounded-[1.25rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(141,183,255,0.22),transparent_30%),linear-gradient(180deg,#161b39,#0a1022)] p-4">
-            <p className="text-sm text-white/85">{imageLabel}</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.26em] text-white/75">Narration Audio</p>
-            <div className="mt-4">
-              <AudioPlayerMock />
-            </div>
-            <p className="mt-3 text-sm text-white/90">
-              {narrationLabel} • {narrationDuration}
-            </p>
-          </div>
-          <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.26em] text-white/75">Background Music</p>
-            <div className="mt-3">
-              <BackgroundMusicPlayer sceneMood={backgroundMusicMood} sceneTitle={imageLabel} audioPrompt={audioPrompt} />
-            </div>
-          </div>
-          <PromptBlock label="Image Prompt Preview" text={imagePrompt} />
-          <PromptBlock label="Audio Mood Prompt Preview" text={audioPrompt} />
-        </div>
+      <div className="grid gap-5">
+        <SceneMedia
+          imagePrompt={imagePrompt}
+          imageLabel={imageLabel}
+          location={location}
+          sceneMood={sceneMood}
+          narrationText={narrationText}
+          narrationLabel={narrationLabel}
+          narrationDuration={narrationDuration}
+          audioMoodPrompt={audioPrompt}
+          backgroundMusicMood={backgroundMusicMood}
+          sceneNumber={sceneNumber}
+          draftId={draftId}
+          projectId={projectId}
+          characterNames={characterNames}
+          characterAppearances={characterAppearances}
+          existingImageUrl={existingImageUrl}
+          existingNarrationUrl={existingNarrationUrl}
+          existingMusicUrl={existingMusicUrl}
+          onUpdate={onMediaUpdate}
+        />
+        <PromptBlock label="Image Prompt Preview" text={imagePrompt} />
+        <PromptBlock label="Audio Mood Prompt Preview" text={audioPrompt} />
       </div>
     </section>
   );

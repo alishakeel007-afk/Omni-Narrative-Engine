@@ -22,6 +22,15 @@ pnpm-debug.log*
 *.db
 *.db-journal
 
+# Local data backups (may contain real story content)
+/backups
+
+# Local run-verification screenshots
+/.run-screenshots
+
+# Local Claude Code harness state
+/.claude
+
 
 /lib/generated/prisma
 

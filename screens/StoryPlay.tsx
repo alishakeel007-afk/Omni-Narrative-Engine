@@ -48,7 +48,8 @@ export default function StoryPlay() {
     generateAlternativeOptions,
     selectSuggestedChoice,
     selectCustomChoice,
-    setCustomChoiceInput
+    setCustomChoiceInput,
+    updateCurrentSceneMedia
   } = useStory();
 
   const scene = state.currentScene;
@@ -102,10 +103,24 @@ export default function StoryPlay() {
               </div>
             </div>
             <div className="mt-4 space-y-3">
-              {setup.characters.map((character, index) => (
+              {(state.dynamicCast?.length > 0 ? state.dynamicCast : setup.characters).map((character, index) => (
                 <div key={`${character.name}-${index}`} className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
-                  <p className="text-sm font-semibold text-white">{character.name || "Unnamed"}</p>
-                  <p className="mt-1 text-xs text-starlight">{character.role || "No role"}</p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{character.name || "Unnamed"}</p>
+                      <p className="mt-1 text-xs text-starlight">{character.role || "No role"}</p>
+                    </div>
+                    {("emotionalState" in character) && character.emotionalState && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/90">
+                        {character.emotionalState}
+                      </span>
+                    )}
+                  </div>
+                  {("visualAppearance" in character) && character.visualAppearance && (
+                    <p className="mt-2 text-xs italic text-white/60">
+                      {character.visualAppearance}
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {character.traits.map((trait) => (
                       <span key={`${character.name}-${trait}`} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
@@ -155,6 +170,22 @@ export default function StoryPlay() {
             mood={scene.mood}
             location={scene.location}
             imageLabel={state.generatedMedia?.imageLabel}
+            imagePrompt={state.generatedMedia?.imagePrompt}
+            narrationLabel={state.generatedMedia?.narrationLabel}
+            narrationDuration={state.generatedMedia?.narrationDuration}
+            audioMoodPrompt={state.generatedMedia?.audioMoodPrompt}
+            backgroundMusicMood={state.generatedMedia?.backgroundMusicMood}
+            sceneNumber={scene.sceneNumber}
+            draftId={setup.draftId}
+            projectId={setup.projectId}
+            characterNames={(state.dynamicCast?.length > 0 ? state.dynamicCast : setup.characters).map((c) => c.name).filter(Boolean)}
+            characterAppearances={(state.dynamicCast ?? [])
+              .map((c) => ("visualAppearance" in c ? c.visualAppearance : ""))
+              .filter((v): v is string => Boolean(v))}
+            existingImageUrl={state.generatedMedia?.imageUrl}
+            existingNarrationUrl={state.generatedMedia?.narrationAudioUrl}
+            existingMusicUrl={state.generatedMedia?.musicUrl}
+            onMediaUpdate={updateCurrentSceneMedia}
           />
 
           {isCustomMode ? (
@@ -290,6 +321,16 @@ export default function StoryPlay() {
                       {character.emotionalState}
                     </span>
                   </div>
+                  {("relationships" in character) && Array.isArray(character.relationships) && character.relationships.length > 0 && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <p className="text-[10px] uppercase tracking-wider text-starlight/75 mb-1">Dynamics</p>
+                      <ul className="space-y-1">
+                        {character.relationships.map((rel, idx) => (
+                          <li key={idx} className="text-xs text-white/70 before:content-['-'] before:mr-1 before:text-white/30">{rel}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

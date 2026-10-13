@@ -9,6 +9,7 @@ export type CreateStoryCharacter = {
 };
 
 export type CreateStoryDialogue = {
+  audioUrl?: string;
   characterId: string;
   characterName: string;
   id: string;
@@ -27,6 +28,10 @@ export type CreateStoryScene = {
   storyDescription: string;
   suggestions: string[];
   title: string;
+  generatedImageUrl?: string;
+  generatedImagePrompt?: string;
+  generatedImageStatus?: CreateStoryGenerationStatus;
+  generatedImageError?: string;
 };
 
 export type CreateStoryAudioState = {
@@ -37,6 +42,11 @@ export type CreateStoryAudioState = {
   voiceMessage: string;
 };
 
+export type CreateStoryVisualsState = {
+  status: CreateStoryGenerationStatus;
+  message: string;
+};
+
 export type CreateStoryVideoState = {
   message: string;
   status: CreateStoryGenerationStatus;
@@ -44,6 +54,7 @@ export type CreateStoryVideoState = {
 
 export type CreateStoryDraft = {
   audio: CreateStoryAudioState;
+  visuals: CreateStoryVisualsState;
   characters: CreateStoryCharacter[];
   genres: string[];
   includeNarration: boolean;

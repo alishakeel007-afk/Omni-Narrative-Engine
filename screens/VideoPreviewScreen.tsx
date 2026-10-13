@@ -158,6 +158,11 @@ export default function VideoPreviewScreen() {
                     {scene.sceneTone}
                   </span>
                 </div>
+                {scene.generatedImageUrl && (
+                  <div className="mb-3 overflow-hidden rounded-xl border border-white/10 h-36 w-full">
+                    <img src={scene.generatedImageUrl} alt={scene.title} className="h-full w-full object-cover" />
+                  </div>
+                )}
                 <h3 className="text-lg font-semibold text-white">{scene.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-white/90">{scene.narration}</p>
               </article>
@@ -233,7 +238,7 @@ function CreateStoryPreview({
               onClick={() =>
                 setNotice("Video download will be available after backend integration.")
               }
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-5 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01]"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/85"
             >
               <Download className="h-4 w-4" />
               Download Video
@@ -268,15 +273,20 @@ function CreateStoryPreview({
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
           {draft.scenes.map((scene) => (
             <article
-              key={scene.id}
+              key={scene.sceneNumber}
               className="glass-panel rounded-[1.4rem] p-5"
             >
-              <div className="mb-3 flex items-center gap-2">
-                <Clapperboard className="h-4 w-4 text-gold" />
-                <p className="text-xs uppercase tracking-[0.24em] text-gold">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.24em] text-starlight/80">
                   Scene {scene.sceneNumber}
                 </p>
+                <span className="text-xs text-white/70">{(scene as any).estimatedDuration || ""}</span>
               </div>
+              {(scene as any).generatedImageUrl && (
+                <div className="mb-3 overflow-hidden rounded-xl border border-white/10 h-36 w-full">
+                  <img src={(scene as any).generatedImageUrl} alt={scene.title} className="h-full w-full object-cover" />
+                </div>
+              )}
               <h3 className="text-lg font-semibold text-white">{scene.title}</h3>
               <p className="mt-3 text-sm leading-7 text-white/90">
                 {scene.storyDescription || scene.selectedSuggestion}
@@ -289,10 +299,13 @@ function CreateStoryPreview({
   );
 }
 
-function VideoFrame() {
+function VideoFrame({ imageUrl }: { imageUrl?: string }) {
   return (
-    <div className="mx-auto flex min-h-[22rem] max-w-4xl items-center justify-center rounded-[1.6rem] border border-white/10 bg-black/35 p-8 text-center">
-      <div>
+    <div className="relative mx-auto flex min-h-[22rem] max-w-4xl items-center justify-center overflow-hidden rounded-[1.6rem] border border-white/10 bg-black/35 p-8 text-center">
+      {imageUrl && (
+        <img src={imageUrl} alt="Video preview background" className="absolute inset-0 h-full w-full object-cover opacity-40 blur-xs" />
+      )}
+      <div className="relative z-10">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.2rem] border border-gold/20 bg-gold/10 text-gold">
           <Film className="h-8 w-8" />
         </div>

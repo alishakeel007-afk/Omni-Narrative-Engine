@@ -7,6 +7,7 @@ import { useStory } from "@/context/StoryContext";
 
 export default function StoryMemoryScreen() {
   const { setup, state } = useStory();
+  const hasActiveStory = state.currentScene.sceneNumber > 0;
   const scenes = [...state.pastScenes, state.currentScene];
   const locations = Array.from(new Set(scenes.map((scene) => scene.location)));
   const characters = Array.from(
@@ -21,12 +22,15 @@ export default function StoryMemoryScreen() {
       ].map((character) => [character.name, character])
     ).values()
   );
-  const activeThreads = [
-    setup.scenarioTitle,
-    state.selectedChoice || "Next decision pending",
-    `${setup.difficulty} difficulty path`,
-    `${setup.mood} tone baseline`
-  ];
+  const activeThreads = scenes
+    .filter((scene) => scene.sceneNumber > 0 && scene.text && scene.text !== "Generating scene...")
+    .slice(-4)
+    .reverse()
+    .map((scene) => ({
+      key: `thread-scene-${scene.sceneNumber}`,
+      label: `Scene ${scene.sceneNumber}: ${scene.title}`,
+      summary: scene.text.length > 220 ? `${scene.text.slice(0, 220).trim()}...` : scene.text
+    }));
 
   return (
     <ScreenLayout
@@ -47,6 +51,21 @@ export default function StoryMemoryScreen() {
         </Link>
       </div>
 
+      {!hasActiveStory ? (
+        <div className="glass-panel rounded-[1.5rem] p-8 text-center">
+          <p className="text-sm font-semibold text-white">No active story yet</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-white/72">
+            The continuity board tracks key events, characters, locations, and active threads as you
+            play a guided story. Start one to begin filling it in.
+          </p>
+          <Link
+            href="/setup"
+            className="mt-5 inline-block rounded-full border border-gold/25 bg-gold/10 px-6 py-3 text-sm font-semibold text-gold"
+          >
+            Start a Guided Story
+          </Link>
+        </div>
+      ) : (
       <div className="grid gap-5 lg:grid-cols-2">
         <MemoryPanel title="Key Events">
           {state.memoryTimeline.length === 0 ? (
@@ -82,13 +101,19 @@ export default function StoryMemoryScreen() {
         </MemoryPanel>
 
         <MemoryPanel title="Active Threads">
-          {activeThreads.map((thread) => (
-            <article key={thread} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
-              <p className="text-sm leading-7 text-white/72">{thread}</p>
-            </article>
-          ))}
+          {activeThreads.length === 0 ? (
+            <Empty text="No active plot threads yet." />
+          ) : (
+            activeThreads.map((thread) => (
+              <article key={thread.key} className="rounded-[1rem] border border-white/10 bg-black/20 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-gold">{thread.label}</p>
+                <p className="mt-2 text-sm leading-7 text-white/72">{thread.summary}</p>
+              </article>
+            ))
+          )}
         </MemoryPanel>
       </div>
+      )}
     </ScreenLayout>
   );
 }

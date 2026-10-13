@@ -1,0 +1,2350 @@
+COMSATS University, Islamabad Pakistan
+Omni-Narrative Engine
+By
+Imran Nadeem      CIIT/SP23-BDS-020/ISB
+Muhammad Ali Shakeel      CIIT/SP23-BDS-007/ISB
+Supervisor
+Sir Amir Sabbir Pare
+Bachelor of Science in Data Science (2023-2027)
+Table of Contents
+Chapter 2: Requirement Analysis6
+2.1 User Classes and Characteristics6
+2.1.1 Use case Diagram8
+2.1.2 Requirement Identifying Technique11
+2.2 Backend Process Requirements12
+2.3 Functional Requirements15
+2.3.1 Mockup M1 - Landing Page15
+2.3.2 Mockup M2 - Login Screen18
+2.3.3 Mockup M3 - Signup Page23
+2.3.4 Mockup M4 - Continue Session Page28
+2.3.5 Mockup M5 - Story Hub Page32
+2.3.6 Mockup M6 - Genre Selection Page37
+2.3.7 Mockup M7 - Scenario Selection Page41
+2.3.8 Mockup M8 - Tone Difficulty Page45
+2.3.9 Mockup M9 - Character Creation Page51
+2.3.10 Mockup M10 - Scene Loading Page58
+2.3.11 Mockup M11 - Active Story Page63
+2.3.12 Mockup M12 - Story History Page69
+2.3.13 Mockup M13 - Story Memory Page73
+2.3.14 Mockup M14 - Player State Screen79
+2.3.15 Mockup M15 - Profile and Settings86
+2.3.16 Mockup M16 - Forgot Password91
+2.3.17 Mockup M17 – Logout95
+2.3 Non-Functional Requirements99
+2.3.2 Accuracy and Consistency99
+2.3.3 Usability99
+2.3.4 Reliability99
+2.3.5 Security & Privacy100
+2.3.6 Portability100
+2.3.7 Maintainability100
+2.3.8 Accessibility100
+2.4 External Interface Requirements101
+2.4.1 User Interfaces Requirements101
+2.4.2 Software interfaces101
+2.4.3 Hardware interfaces102
+2.4.4 Communications interfaces102
+List of  Tables
+Table 1 User Classes and Characteristics6
+Table 2 Event Response Table12
+Table 3 Functional Requirements Derived from Mockup M1-Landing Page15
+Table 4 Functional Requirements Derived from Mockup M2-Login Screen18
+Table 5 Functional Requirements Derived from Mockup M3-Signup page23
+Table 6 Functional Requirements Derived from Mockup M4-Continue Session Page28
+Table 7 Functional Requirements Derived from Mockup M5-Story Hub Page32
+Table 8 Functional Requirements Derived from Mockup M6 - Genre Selection Page37
+Table 9 Functional Requirements Derived from Mockup M7 - Scenario Selection Page41
+Table 10 Functional Requirements Derived from Mockup M8 - Tone Difficulty Page45
+Table 11 Functional Requirements Derived from Mockup M9 - Character Creation Page51
+Table 12 Functional Requirements Derived from Mockup M10 - Scene Loading Page58
+Table 13 Functional Requirements Derived from Mockup M11 - Active Story Page63
+Table 14 Functional Requirements Derived from Mockup M12 - Story History Page69
+Table 15 Functional Requirements Derived from Mockup M13 - Story Memory Page73
+Table 16 Functional Requirements Derived from Mockup M14 - Player State Screen79
+Table 17 Functional Requirements Derived from Mockup M15 - Profile and Settings86
+Table 18 Functional Requirements Derived from Mockup M16 - Forgot Password91
+Table 19 Functional Requirements Derived from Mockup M17 - Logout95
+List Of Figures
+Figure 1 Use Case Diagram of User8
+Figure 2 Use Case Diagram of User9
+Figure 3 Use Case Diagram of User10
+Figure 4 Use Case Diagram of Administrator10
+Figure 5 Mockup M1 For Landing Page15
+Figure 6 Mockup M2 for Login Screen18
+Figure 7 Mockup M3 for Signup Page23
+Figure 8 Mockup M4 for Continue Session Page28
+Figure 9 Mockup M5 for Story Hub Page32
+Figure 10 Mockup M6 for Genre Selection Page37
+Figure 11 Mockup M7 for Scenario Selection Page41
+Figure 12 Mockup M8 for Tone Difficulty45
+Figure 14 Mockup M9 for Character Creation Page51
+Figure 15 Mockup M10 for Scene Loading Page58
+Figure 16 Mockup M11 for Active Story Page63
+Figure 17 Mockup M12 for Story History Page69
+Figure 18 Mockup M13 for Story Memory Page73
+Figure 19 Mockup M14 for Player State Screen79
+Figure 20 Mockup M15 for Profile and Settings86
+Figure 21 Mockup M16 for Forgot Password91
+Figure 22 Mockup M17 for Logout95
+Chapter 2: Requirement Analysis
+This chapter presents a detailed analysis of the functional and non-functional requirements of the Omni-Narrative Engine system. It explains the user needs, system goals, operational expectations, and technical limitations identified during the problem analysis and scope definition stages. This analysis provides the basis for the design and development of the proposed system, ensuring that each module and feature contributes effectively to the main objective of the project - to generate an interactive, AI-driven multimedia storytelling experience in which narrative text, visuals, sound, and user decisions work together in a coherent and engaging manner. The chapter also helps define what the system must do, how it should perform, and what constraints must be considered to make the final product practical, usable, and academically achievable.
+2.1 User Classes and Characteristics
+The Omni-Narrative Engine is designed to serve multiple categories of users, each with different roles, responsibilities, permissions, and levels of interaction with the system. The following table describes the main user classes expected for this application and explains their relevant characteristics.
+Table 1 User Classes and Characteristics
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+User Class
+Description
+User / Player
+A User or Player represents the primary individual who accesses and uses the Omni-Narrative Engine to create, experience, and interact with AI-generated stories. This user starts a new story session by selecting inputs such as genre, world setting, narrative style, character profile, difficulty level, emotional tone, and other story preferences. During the session, the user reads generated narrative text, views scene images, listens to generated or selected audio, and makes decisions that influence the next events in the story. The user may also manage inventory, track character state, review story memory, view past scenes, save progress, and continue incomplete sessions later. This class is expected to have minimal technical knowledge and should be able to use the system through a clear, engaging, and easy-to-understand interface. Since the system is mainly built for this class, the user interacts with most functional modules, including story generation, multimedia rendering, choice management, memory tracking, and session persistence.
+Administrator
+The Administrator is responsible for supervising the overall operation and maintenance of the Omni-Narrative Engine. This user manages system settings, monitors generated content quality, checks system performance, reviews user activity, handles account-related issues, and ensures that the system remains functional and reliable. The administrator may also manage content rules, review logs, oversee data storage, maintain service availability, and coordinate with developers when technical problems occur. This role requires moderate technical knowledge, especially in areas related to configuration management, system monitoring, database handling, and operational support. Although a fully developed administrative dashboard may be considered as future work, this role remains important for controlling and maintaining the system environment.
+2.1.1 Use case Diagram
+Use case diagrams representing the requirements of each user are given below.
+2.1.1.1 Actor: User
+Figure 1 Use Case Diagram of User
+2.1.1.2 Actor: Admin
+Figure 4 Use Case Diagram of Administrator
+2.1.2 Requirement Identifying Technique
+The Mockup-Based Requirement Analysis technique has been used to identify and document the functional requirements of the Omni-Narrative Engine. This technique is based on a user-centered approach in which system requirements are extracted by studying the expected user interface screens and the interactions that take place on them. It allows early understanding of system behavior by representing how users will move through the platform and how each module should respond to user input. Since the Omni-Narrative Engine is an interactive multimedia storytelling system, this technique is especially suitable because many of its requirements are directly linked to user actions such as selecting story settings, starting a session, making choices, viewing generated scenes, listening to audio, managing story memory, and saving progress. Each mockup represents a meaningful user interaction point, and from each screen, the related system functions can be identified and documented clearly.
+2.1.2.1 Steps Followed
+1. Key system features were identified and divided into specific mockup screens. The main features of the Omni-Narrative Engine were first identified from the approved project scope and then separated into individual interface screens. These screens represent the actual flow of user interaction, such as login or access, story setup, genre selection, scenario selection, character customization, story confirmation, active story session, choice selection, story history, memory view, and save or resume options.
+2. Each screen was designed to visualize the interface layout and user workflow. Every mockup was prepared to show how the user would interact with the system at that stage. The purpose of this step was to map the navigation flow, input controls, displayed information, and transitions between one part of the story process and the next. This helped in understanding how the storytelling experience would be structured from beginning to end.
+3. Each interactive element was examined to derive expected system behavior. All important interactive elements on the mockups, such as buttons, text areas, dropdowns, selection panels, media controls, progress indicators, save options, and choice cards, were analyzed carefully. From this analysis, the expected response of the system was determined.
+4. Each identified behavior was documented as a Functional Requirement with a unique identifier. After identifying the expected behavior of each interaction, the behavior was converted into formal functional requirements. Each requirement was assigned a unique identifier, such as FR-1.1, FR-1.2, and so on, to make the requirements easier to reference in later sections of the SRS, during design, and during implementation.
+5. All derived requirements were organized into structured requirement tables. The identified functional requirements were then arranged in clear and systematic tables so that each system behavior could be presented in an organized way. This structure improves readability and makes it easier to connect each requirement with the relevant user action or system module.
+6. Business rules and system constraints were added where necessary. Wherever required, additional rules were included to define validation conditions, access restrictions, system limitations, session handling conditions, and consistency requirements. In the case of the Omni-Narrative Engine, these rules may include input validation for story settings, restrictions on guest access, conditions for saving sessions, content generation constraints, and continuity rules to maintain story coherence across scenes.
+2.2 Backend Process Requirements
+While mockups are useful for representing the frontend behavior of the Omni-Narrative Engine, the system also contains several important backend processes that are not directly visible through interface screens. These processes are necessary for handling story generation, session continuity, multimedia synchronization, state tracking, memory management, authentication, and system reliability. To properly represent these internal operations, an event-response table has been developed. This table explains how the system responds to key events under specific conditions and helps document non-UI requirements that are essential for the correct functioning of the platform.
+Table 2 Event Response Table
+Event
+System State
+Response
+User starts a new story session.
+Story generation modules, session manager, and user input handler are active.
+The system collects the selected genre, scenario, character settings, and narrative preferences, initializes a new session, creates a unique session record, and prepares the first prompt for story generation.
+User confirms story setup and clicks to begin.
+User selections are validated and generation pipeline is available.
+The system processes the input configuration, sends it to the narrative engine, generates the opening scene, and initializes related multimedia components such as scene image and audio generation requests where applicable.
+User selects a story choice or action.
+Active story session is running and narrative state is available.
+The system records the selected action, updates the current story state, generates the next scene based on user choice and stored context, and presents the updated narrative output while maintaining continuity.
+A new scene is generated.
+Narrative engine, media generation pipeline, and state manager are active.
+The generated text is stored in session history, scene metadata is updated, related image and audio requests are triggered if enabled, and the new scene is displayed to the user.
+User saves the current story session.
+Authenticated or permitted session-saving state is available.
+The system stores the current narrative progress, character state, choices made, memory context, and generated scene history in the database so the session can be resumed later.
+User resumes a previously saved session.
+Saved session data exists and session retrieval service is active.
+The system loads the saved narrative state, restores story memory, inventory or player variables, previous scene history, and current progress, then reopens the story from the last saved point.
+User updates profile or story preferences.
+User session is active and profile management module is available.
+The new data is validated and stored, and relevant personalization settings are updated so future sessions can reflect the revised preferences.
+Story memory or context length approaches the defined limit.
+Memory manager is active and active context size is nearing threshold.
+The system compresses, summarizes, or archives less critical historical details while preserving essential events, character relationships, and continuity information required for the next scenes.
+Multimedia generation request fails or is delayed.
+Narrative scene exists but one or more media services are unavailable or slow.
+The system preserves the generated text output, logs the media generation issue, retries the failed request when appropriate, and may display the scene with partial media until full generation is completed or skipped.
+User logs in or creates a new account.
+Authentication and account management modules are operational.
+Credentials are validated, stored securely, and linked to a user profile. A session is created, and the user's saved stories, preferences, and history are retrieved if available.
+User deletes a saved story or account data.
+Verified deletion request is received and access rights are confirmed.
+The selected story records or user-related stored data are permanently removed or marked for secure deletion according to the project's data handling policy.
+System detects inconsistent character or story continuity.
+Continuity checker or state validation logic is active.
+The system compares the newly generated scene with stored story facts, flags inconsistencies, and attempts to preserve narrative coherence by reusing stored context, correcting state values, or regenerating a scene when necessary.
+Admin reviews system performance or generated session logs.
+Administrative access is verified and monitoring tools are active.
+The backend retrieves usage logs, generation history, error reports, and system statistics so they can be reviewed for maintenance, testing, and evaluation purposes.
+An API call or generation service fails.
+Monitoring and error-handling services are active.
+The error is logged, retry logic is triggered if supported, fallback handling is applied when possible, and the incident is recorded for debugging or administrative review.
+System reaches scheduled backup or maintenance activity.
+Storage and maintenance services are active.
+The system backs up important session data, logs, or configuration data and performs routine maintenance actions to preserve reliability and prevent data loss.
+2.3 Functional Requirements
+This section outlines the functional requirements of Omni-Narrative derived from the designed mockups.
+2.3.1 Mockup M1 - Landing Page
+Figure 5 Mockup M1 For Landing Page
+2.3.1.1 Functional Requirements
+Table 3 Functional Requirements Derived from Mockup M1-Landing Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-1.1: The system shall display the Omni-Narrative Engine logo and brand name on the landing page.
+The logo must appear in a clearly visible position, preferably at the top-left of the page. It must remain consistent with the platform branding across all major screens.
+Features Navigation Link
+FR-1.2: The system shall provide a “Features” navigation link on the landing page to allow users to view the main capabilities of the platform.
+Clicking the link shall navigate the user to the Features section or page. The link must be visible in the top navigation bar and remain responsive on different screen sizes.
+About Navigation Link
+FR-1.3: The system shall provide an “About” navigation link on the landing page to allow users to view information about the platform.
+Clicking the link shall navigate the user to the About section or page. The link must be accessible from the top navigation area.
+Log In Button
+FR-1.4: The system shall provide a “Log In” button that allows existing users to access their accounts.
+Clicking the button shall redirect the user to the login page or authentication form. The button must be visible in the top-right area and usable on desktop and mobile layouts.
+Sign Up Button
+FR-1.5: The system shall provide a “Sign Up” button that allows new users to create an account.
+Clicking the button shall redirect the user to the registration page. The button must be visually highlighted as a primary action and must remain accessible and responsive.
+Welcome Tagline / Intro Label
+FR-1.6: The system shall display a short introductory label indicating that the platform is AI-powered.
+The label must appear near the main heading and should communicate the core nature of the platform in a concise way.
+Main Title / Hero Heading
+FR-1.7: The system shall display the main landing page heading to clearly introduce the Omni-Narrative Engine to the user.
+The heading must be prominent, readable, and centrally positioned so that users can immediately understand the identity of the platform.
+Introductory Description Text
+FR-1.8: The system shall display a short descriptive paragraph explaining the purpose of the platform and the value it provides to users.
+The description must summarize the storytelling experience in simple language and should appear below the main title.
+Begin Your Story Button
+FR-1.9: The system shall provide a “Begin Your Story” button that allows users to start a new storytelling session.
+Clicking the button shall navigate the user to the story setup flow or first required step of story creation. This button must be styled as a primary call-to-action and placed prominently on the landing page.
+I Have an Account Button
+FR-1.10: The system shall provide an “I Have an Account” button that allows returning users to continue through the account access flow.
+Clicking the button shall redirect the user to the login page or account recovery path if required. The button must be placed near the primary action so users can easily choose between new and returning flows.
+Landing Page Layout
+FR-1.11: The system shall present the landing page in a structured layout that clearly separates navigation, introductory content, and action buttons.
+The layout must remain visually balanced and readable across supported devices, including desktop and smaller screen sizes.
+Visual Theme / Background
+FR-1.12: The system shall display a visually engaging background theme that reflects the immersive storytelling nature of the platform.
+The background design must support readability of text and controls. Decorative visuals must not reduce usability or accessibility.
+Responsive Navigation and Actions
+FR-1.13: The system shall ensure that navigation links and primary action buttons remain functional and accessible on different screen sizes.
+The page must adapt to various device widths without hiding critical options such as login, signup, or story start.
+Entry Point for New and Existing Users
+FR-1.14: The system shall support separate entry paths for new users and existing users from the landing page.
+New users shall be guided toward signup or story onboarding, while existing users shall be guided toward login and session access.
+Accessibility of Primary Controls
+FR-1.15: The system shall ensure that all major controls on the landing page are readable, clickable, and easy to understand.
+Buttons and navigation items must use clear labels, sufficient size, and proper contrast for usability and accessibility purposes.
+2.3.2 Mockup M2 - Login Screen
+Figure 6 Mockup M2 for Login Screen
+2.3.2.1 Functional Requirements
+Table 4 Functional Requirements Derived from Mockup M2-Login Screen
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-2.1: The system shall display the Omni-Narrative Engine logo and brand name on the login page.
+The logo must remain visible and consistent with the system branding. It should support easy recognition and may allow navigation back to the landing page if selected.
+Features Navigation Link
+FR-2.2: The system shall provide a “Features” navigation link on the login page.
+Clicking the link shall navigate the user to the Features section or related page without breaking the current application layout.
+About Navigation Link
+FR-2.3: The system shall provide an “About” navigation link on the login page.
+Clicking the link shall navigate the user to the About section or information page. The navigation option must remain accessible from the top bar.
+Log In Navigation Button
+FR-2.4: The system shall display a “Log In” navigation option to indicate that the user is currently on the authentication path.
+The current page state should be visually clear. If selected while already on the login page, the system should keep the user on the same page or refresh the current login view only.
+Sign Up Navigation Button
+FR-2.5: The system shall provide a “Sign Up” button that redirects users to the registration page.
+Clicking the button shall open the sign-up form or registration workflow. The button must be visible in the top-right area and styled as an important action.
+Welcome Back Heading
+FR-2.6: The system shall display a welcome heading for returning users on the login form.
+The heading must clearly indicate that the page is intended for existing users who want to access their accounts.
+Supporting Subtitle
+FR-2.7: The system shall display a short subtitle describing the purpose of the login page.
+The subtitle must guide the user in simple language and appear below the main heading.
+Email Input Field
+FR-2.8: The system shall provide an email input field for the user to enter their registered email address.
+The field must accept valid email format only. Invalid or empty input must trigger validation before sign-in is allowed.
+Password Input Field
+FR-2.9: The system shall provide a password input field for the user to enter their account password securely.
+The password characters must be masked by default. Empty password submission shall not be accepted.
+Email Field Icon / Visual Cue
+FR-2.10: The system shall provide a visual identifier with the email field to improve usability.
+The icon is decorative and supportive only; it must not interfere with typing or accessibility.
+Password Field Icon / Visual Cue
+FR-2.11: The system shall provide a visual identifier with the password field to improve usability.
+The icon should help users recognize the field purpose and must remain visually aligned with the field.
+Remember Me Checkbox
+FR-2.12: The system shall provide a “Remember me” option that allows users to keep their login session active for future visits.
+If selected, the system shall store session persistence according to defined security policies. This option must not bypass authentication security requirements.
+Forgot Password Link
+FR-2.13: The system shall provide a “Forgot password?” link for users who cannot remember their password.
+Clicking the link shall redirect the user to the password recovery flow. The recovery process must require identity verification before password reset is completed.
+Sign In Button
+FR-2.14: The system shall provide a “Sign In” button that submits the login credentials for authentication.
+On click, the system shall validate the input fields, verify the credentials, and grant access only if authentication is successful. Invalid credentials must trigger an appropriate error message.
+Credential Validation
+FR-2.15: The system shall validate the email and password fields before attempting authentication.
+The system must check required fields, input format, and basic completeness before sending data for authentication.
+Authentication Processing
+FR-2.16: The system shall authenticate the user against stored account credentials.
+Valid credentials shall create a secure user session and redirect the user to the appropriate post-login area. Invalid credentials shall not grant access.
+Error Handling on Login Failure
+FR-2.17: The system shall notify the user when login fails due to incorrect or incomplete credentials.
+Error messages must be clear, non-technical, and must not reveal sensitive account details such as whether a specific email is registered unless allowed by security policy.
+Divider for Alternative Login Method
+FR-2.18: The system shall visually separate standard login from alternative sign-in methods.
+The separator must clearly indicate that another login method is available without confusing the main login flow.
+Continue with Google Button
+FR-2.19: The system shall provide a “Continue with Google” option for third-party authentication.
+Clicking the button shall redirect the user to the authorized Google sign-in process. Access shall only be granted after successful external authentication and account mapping.
+External Authentication Handling
+FR-2.20: The system shall support secure third-party authentication for users who choose Google sign-in.
+The system must handle authorization tokens securely and create or match the user account according to system rules.
+Sign Up Link Below Form
+FR-2.21: The system shall provide a sign-up link below the login form for users who do not already have an account.
+Clicking the link shall redirect the user to the registration page. This option must remain visible to support easy onboarding for new users.
+Login Form Container
+FR-2.22: The system shall present the login controls inside a structured and visually focused form container.
+The container must group related login elements clearly and maintain readability and usability across supported devices.
+Responsive Form Layout
+FR-2.23: The system shall ensure that the login page layout remains usable across different screen sizes and devices.
+Input fields, buttons, and links must remain readable, aligned, and accessible on desktop and smaller displays.
+Secure Session Creation
+FR-2.24: The system shall create a secure authenticated session after successful login.
+Session data must be protected and managed according to authentication and security requirements of the system.
+2.3.3 Mockup M3 - Signup Page
+Figure 7 Mockup M3 for Signup Page
+2.3.3.1 Functional Requirements
+Table 5 Functional Requirements Derived from Mockup M3-Signup page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-3.1: The system shall display the Omni-Narrative Engine logo and brand name on the sign-up page.
+The logo must remain visible and consistent with the platform branding. It may allow navigation back to the landing page if selected.
+Features Navigation Link
+FR-3.2: The system shall provide a “Features” navigation link on the sign-up page.
+Clicking the link shall navigate the user to the Features section or page without breaking the current application layout.
+About Navigation Link
+FR-3.3: The system shall provide an “About” navigation link on the sign-up page.
+Clicking the link shall navigate the user to the About section or information page.
+Log In Navigation Button
+FR-3.4: The system shall provide a “Log In” button that redirects existing users to the login page.
+Clicking the button shall open the login page or authentication form. This supports users who reached the sign-up page by mistake.
+Sign Up Navigation Button
+FR-3.5: The system shall display a “Sign Up” navigation option to indicate that the user is currently on the registration path.
+The current page state should be visually clear. If selected while already on the sign-up page, the system should remain on the same page or refresh the registration view only.
+Page Heading
+FR-3.6: The system shall display a heading that clearly indicates that the page is for account creation.
+The heading must be prominent and easy to understand so that users immediately know the purpose of the page.
+Supporting Subtitle
+FR-3.7: The system shall display a short subtitle explaining that account creation is the starting point of the storytelling journey.
+The subtitle must appear below the main heading and guide the user in simple language.
+Name Input Field
+FR-3.8: The system shall provide a name input field for the user to enter their name during account registration.
+The field must not be left empty. The system shall validate that the input is acceptable according to defined naming rules.
+Email Input Field
+FR-3.9: The system shall provide an email input field for the user to enter a valid email address during registration.
+The email must follow proper format rules. Duplicate or already registered email addresses shall not be accepted.
+Password Input Field
+FR-3.10: The system shall provide a password input field for the user to create an account password.
+The password must be masked during entry and must satisfy the minimum password security requirements defined by the system.
+Confirm Password Field
+FR-3.11: The system shall provide a confirm password field to verify the password entered by the user.
+The value in the confirm password field must exactly match the password field before account creation is allowed.
+Name Field Icon / Visual Cue
+FR-3.12: The system shall provide a visual identifier with the name field to improve usability.
+The icon is supportive only and must not interfere with field accessibility or text input.
+Email Field Icon / Visual Cue
+FR-3.13: The system shall provide a visual identifier with the email field to improve usability.
+The icon should help users recognize the field purpose and remain aligned with the field.
+Password Field Icon / Visual Cue
+FR-3.14: The system shall provide a visual identifier with the password and confirm password fields to improve usability.
+The icon should visually indicate secure input fields and must not reduce usability.
+Terms of Service Checkbox
+FR-3.15: The system shall provide a checkbox that allows the user to confirm agreement with the Terms of Service and Privacy Policy before account creation.
+The checkbox must be selected before the account can be created. Registration shall not proceed unless user agreement is recorded.
+Terms of Service Link
+FR-3.16: The system shall provide a clickable “Terms of Service” link on the registration page.
+Clicking the link shall open the Terms of Service document or page for user review.
+Privacy Policy Link
+FR-3.17: The system shall provide a clickable “Privacy Policy” link on the registration page.
+Clicking the link shall open the Privacy Policy document or page for user review.
+Create Account Button
+FR-3.18: The system shall provide a “Create Account” button that submits the registration form to create a new user account.
+On click, the system shall validate all required fields, verify user agreement, and create the account only if all conditions are satisfied.
+Registration Form Validation
+FR-3.19: The system shall validate all registration inputs before processing account creation.
+The system must check required fields, email format, password completeness, password confirmation match, and agreement checkbox selection.
+Password Strength Validation
+FR-3.20: The system shall enforce password security rules during account creation.
+The password must meet minimum length and complexity requirements defined by the project or deployment policy.
+Duplicate Account Prevention
+FR-3.21: The system shall prevent account creation using an email address that already exists in the system.
+If the email is already registered, the system shall reject the request and notify the user with a clear message.
+Account Creation Processing
+FR-3.22: The system shall create a new user account after successful validation of registration details.
+The system shall securely store user credentials, create a user profile, and prepare the account for future authenticated access.
+Secure Credential Storage
+FR-3.23: The system shall store registration credentials securely.
+Passwords must not be stored in plain text and must be protected according to accepted security practices.
+Error Handling for Registration Failure
+FR-3.24: The system shall notify the user when registration fails due to invalid input, duplicate email, or unmet validation requirements.
+Error messages must be clear, non-technical, and must guide the user in correcting the problem without exposing sensitive internal details.
+Successful Registration Outcome
+FR-3.25: The system shall redirect the user to the appropriate next step after successful account creation.
+After successful registration, the user may be redirected to login, onboarding, or directly into the application according to system design.
+Registration Form Container
+FR-3.26: The system shall present all registration controls inside a structured and visually focused form container.
+The container must group all fields and actions clearly to support readability and ease of use.
+Responsive Form Layout
+FR-3.27: The system shall ensure that the sign-up page remains usable across different screen sizes and devices.
+Input fields, labels, links, and buttons must remain readable, aligned, and accessible on desktop and smaller displays.
+Accessibility of Form Controls
+FR-3.28: The system shall ensure that all registration controls are readable, understandable, and easy to interact with.
+Labels, fields, and buttons must use sufficient size, clear naming, and suitable contrast to support usability and accessibility.
+2.3.4 Mockup M4 - Continue Session Page
+Figure 8 Mockup M4 for Continue Session Page
+2.3.4.1 Functional Requirements
+Table 6 Functional Requirements Derived from Mockup M4-Continue Session Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-4.1: The system shall display the Omni-Narrative Engine logo and brand name on the continue session page.
+The logo must remain visible and consistent with the overall branding of the platform. It may allow navigation back to the landing page when selected.
+Features Navigation Link
+FR-4.2: The system shall provide a “Features” navigation link on the continue session page.
+Clicking the link shall navigate the user to the Features section or page without disrupting stored session data.
+About Navigation Link
+FR-4.3: The system shall provide an “About” navigation link on the continue session page.
+Clicking the link shall navigate the user to the About section or information page.
+Log In Navigation Button
+FR-4.4: The system shall provide a “Log In” navigation option for unauthenticated users or users switching accounts.
+If the user is not authenticated, clicking the button shall redirect to the login page. If the user is already authenticated, the system may redirect to account management or remain consistent with the current navigation logic.
+Sign Up Navigation Button
+FR-4.5: The system shall provide a “Sign Up” navigation button for new users who do not have an account.
+Clicking the button shall redirect the user to the registration page.
+Page Heading
+FR-4.6: The system shall display a heading indicating that the page is used to continue previously saved story sessions.
+The heading must be prominent and clearly communicate the page purpose.
+Supporting Description
+FR-4.7: The system shall display a short explanatory text informing the user that they can resume saved adventures.
+The description must appear below the heading and guide the user in simple language.
+Saved Session List
+FR-4.8: The system shall display a list of previously saved story sessions available to the current user.
+Only sessions belonging to the authenticated user shall be displayed. If no saved sessions exist, the system shall show an appropriate empty-state message.
+Session Card Layout
+FR-4.9: The system shall present each saved session in a structured card format.
+Each card must group related session details clearly so the user can easily review and select a session.
+Story Title Display
+FR-4.10: The system shall display the title of each saved story session.
+The title must be prominent within the session card and help the user identify the session quickly.
+Genre Tag Display
+FR-4.11: The system shall display the genre or category of each saved story session.
+The genre tag must be visually distinct and should help users differentiate between story types.
+Last Updated / Time Information
+FR-4.12: The system shall display time-related information for each saved session, such as last updated date or relative time.
+The displayed time must reflect the latest saved progress of that session.
+Story Summary Preview
+FR-4.13: The system shall display a short preview or summary of the saved session to remind the user of the recent narrative context.
+The preview must be concise and readable, helping the user recall the story before resuming it.
+Character Information Display
+FR-4.14: The system shall display the main character information associated with each saved session.
+Character details shown must match the stored state of the corresponding session.
+Scene Number Display
+FR-4.15: The system shall display the current scene number or stage reached in each saved session.
+The displayed scene value must be based on the latest saved state of the story.
+Story Progress Label
+FR-4.16: The system shall display a progress label for each saved story session.
+The progress label must clearly indicate that the shown value represents the completion or advancement level of the session.
+Progress Bar
+FR-4.17: The system shall display a visual progress bar for each saved story session.
+The progress bar must accurately reflect the progress percentage stored for that session and must update when the session advances.
+Progress Percentage
+FR-4.18: The system shall display the numeric progress percentage of each saved session.
+The displayed percentage must remain consistent with the progress bar and current story state.
+Resume Button
+FR-4.19: The system shall provide a “Resume” button for each saved story session to continue that session.
+Clicking the button shall load the selected session’s saved narrative state, memory, choices, character data, and progress, then navigate the user to the active story session screen.
+Delete Button
+FR-4.20: The system shall provide a “Delete” button for each saved story session.
+Clicking the button shall initiate deletion of the selected saved session. The system should request confirmation before permanent deletion is completed.
+Session Deletion Confirmation
+FR-4.21: The system shall confirm the user’s intent before permanently deleting a saved session.
+A saved story session shall not be removed immediately without confirmation, to prevent accidental data loss.
+Session Ownership Validation
+FR-4.22: The system shall verify that only the owner of a saved session can view, resume, or delete that session.
+Access to saved sessions must be restricted to the authenticated user who owns the session data.
+Continue from Latest State
+FR-4.23: The system shall resume the selected session from its most recently saved state.
+The restored state must include narrative context, character data, progress, and relevant session memory to maintain story continuity.
+Multiple Saved Sessions Support
+FR-4.24: The system shall support storage and display of multiple saved story sessions for a user.
+Sessions must be distinguishable from one another using story title, genre, progress, and summary details.
+Empty State Handling
+FR-4.25: The system shall handle the case where the user has no saved sessions to continue.
+In such cases, the system shall display an informative message and may guide the user toward starting a new story.
+Responsive Session Grid Layout
+FR-4.26: The system shall ensure that the saved session cards remain readable and usable across different screen sizes.
+Cards, buttons, and progress indicators must remain properly aligned and accessible on desktop and smaller screens.
+Accessibility of Action Controls
+FR-4.27: The system shall ensure that action controls such as Resume and Delete are clear, readable, and easy to use.
+Buttons and action links must have clear labels, sufficient size, and proper contrast for usability and accessibility.
+2.3.5 Mockup M5 - Story Hub Page
+Figure 9 Mockup M5 for Story Hub Page
+2.3.5.1 Functional Requirements
+Table 7 Functional Requirements Derived from Mockup M5-Story Hub Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-5.1: The system shall display the Omni-Narrative Engine logo and brand name on the Story Hub page.
+The logo must remain consistent with platform branding and may provide navigation to the main dashboard or home area when selected.
+Story Hub Navigation Tab
+FR-5.2: The system shall provide a “Story Hub” navigation tab to indicate the currently active main dashboard page.
+The active tab must be visually highlighted so the user can identify the current location within the system.
+My Sessions Navigation Tab
+FR-5.3: The system shall provide a “My Sessions” navigation tab to allow users to access their saved and ongoing story sessions.
+Clicking this tab shall navigate the user to the session management or saved sessions page.
+User Profile Display
+FR-5.4: The system shall display the currently logged-in user profile indicator on the Story Hub page.
+The profile area must show the user identity label or avatar and allow account-related access if selected.
+Logout / Exit Icon
+FR-5.5: The system shall provide a logout or session exit control on the Story Hub page.
+Clicking the control shall sign the user out securely or open the logout flow according to the system’s authentication design.
+Story Hub Page Heading
+FR-5.6: The system shall display a heading identifying the page as the Story Hub.
+The heading must be prominent and clearly communicate that this page is the central entry point for narrative activity.
+Supporting Description
+FR-5.7: The system shall display a short description explaining that users can start a new story or continue an existing one from this page.
+The description must appear below the main heading and guide the user in simple language.
+Start a New Story Panel
+FR-5.8: The system shall display a highlighted panel for starting a new story session.
+This panel must summarize the purpose of new story creation and remain visually prominent because it is a primary action area.
+New Story Information Text
+FR-5.9: The system shall display explanatory text within the new story panel to inform users that they can choose a genre, build a character, and begin a new adventure.
+The text must help users understand what will happen after they begin the story creation process.
+Create New Story Button
+FR-5.10: The system shall provide a “Create New Story” button that starts the story creation workflow.
+Clicking the button shall navigate the user to the first story setup step, such as genre selection, world selection, or character creation.
+Stories Created Statistic
+FR-5.11: The system shall display the total number of stories created by the current user.
+The value shown must be based on stored user activity data and must update when a new story is created.
+Hours Played Statistic
+FR-5.12: The system shall display the total number of hours played by the current user.
+The value must be calculated from tracked session usage data and updated according to the user’s interaction history.
+Scenes Explored Statistic
+FR-5.13: The system shall display the total number of scenes explored by the current user.
+The value must reflect the cumulative number of generated or visited scenes associated with the user’s sessions.
+Current Streak Statistic
+FR-5.14: The system shall display the current activity streak of the user.
+The streak value must be determined according to the project’s defined activity-tracking rule, such as daily usage continuity.
+User Statistics Summary Section
+FR-5.15: The system shall provide a summary section showing user engagement and activity metrics.
+Statistics must be presented in a clear card-based layout and should reflect actual tracked user data.
+Recent Sessions Section Heading
+FR-5.16: The system shall display a “Recent Sessions” section to show the user’s most recently active stories.
+The section must contain only sessions belonging to the authenticated user.
+Recent Session Cards
+FR-5.17: The system shall display recent story sessions in individual card format.
+Each card must show enough information for the user to identify the session quickly and decide whether to continue it.
+Recent Session Genre Tag
+FR-5.18: The system shall display the genre of each recent session.
+The genre tag must be visually distinct and consistent with the session’s stored category.
+Recent Session Date / Time
+FR-5.19: The system shall display the last updated date or relative time for each recent session.
+The displayed time must represent the most recent saved activity of that session.
+Recent Session Title
+FR-5.20: The system shall display the title of each recent session.
+The title must be prominent enough to help the user recognize the session.
+Recent Session Character and Scene Information
+FR-5.21: The system shall display the active character name and current scene number for each recent session.
+The displayed values must match the latest saved session state.
+Recent Session Progress Bar
+FR-5.22: The system shall display a progress bar for each recent session.
+The progress bar must visually represent the completion or advancement level of the session based on stored data.
+Recent Session Progress Percentage
+FR-5.23: The system shall display the numeric progress percentage for each recent session.
+The percentage must remain consistent with the progress bar and session state.
+View All Sessions Link
+FR-5.24: The system shall provide a “View All” link for the Recent Sessions section.
+Clicking the link shall navigate the user to a complete sessions page where all saved or active sessions can be managed.
+Popular Genres Section Heading
+FR-5.25: The system shall display a “Popular Genres” section to highlight commonly used or recommended genres.
+The section must present genre options in a clear and visually accessible form.
+Genre Category Cards / Chips
+FR-5.26: The system shall display selectable genre items such as Fantasy, Sci-Fi, and Adventure.
+Each genre item must be visually distinct and may show activity count, popularity, or recommendation value.
+Genre Usage Count
+FR-5.27: The system shall display a count value with each genre to indicate popularity or number of uses.
+The displayed count must be derived from tracked system or user activity data.
+Explore All Genres Link
+FR-5.28: The system shall provide an “Explore All” link for the Popular Genres section.
+Clicking the link shall navigate the user to a complete genre exploration or genre selection page.
+Central Dashboard Function
+FR-5.29: The system shall use the Story Hub as the central dashboard for accessing new story creation, recent sessions, and genre discovery.
+The page must act as a consolidated entry point after user login.
+Session Personalization
+FR-5.30: The system shall personalize the Story Hub content according to the currently logged-in user.
+Statistics, recent sessions, and user identity information must be retrieved from that specific user’s stored data only.
+Empty State for Recent Sessions
+FR-5.31: The system shall handle the case where the user has no recent sessions.
+If no sessions exist, the system shall display an informative message and encourage the user to create a new story.
+Empty State for Genre Recommendations
+FR-5.32: The system shall handle the case where popular genre data is unavailable.
+The system may display default genre options or a fallback recommendation list.
+Responsive Dashboard Layout
+FR-5.33: The system shall ensure that the Story Hub layout remains usable across different screen sizes and devices.
+Cards, navigation items, statistics, and action controls must stay aligned, readable, and accessible.
+Accessibility of Controls and Information
+FR-5.34: The system shall ensure that all Story Hub controls, links, and displayed information are readable and easy to interact with.
+Buttons, tabs, and links must use clear labels, suitable size, and sufficient visual contrast.
+2.3.6 Mockup M6 - Genre Selection Page
+Figure 10 Mockup M6 for Genre Selection Page
+2.3.6.1 Functional Requirements
+Table 8 Functional Requirements Derived from Mockup M6 - Genre Selection Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-6.1: The system shall display the Omni-Narrative Engine logo and brand name on the genre selection page.
+The logo must remain consistent with system branding and may allow navigation to the main dashboard when selected.
+Story Hub Navigation Tab
+FR-6.2: The system shall provide a “Story Hub” navigation tab on the genre selection page.
+Clicking the tab shall navigate the user back to the Story Hub without automatically saving incomplete genre selection unless draft-saving is supported.
+My Sessions Navigation Tab
+FR-6.3: The system shall provide a “My Sessions” navigation tab on the genre selection page.
+Clicking the tab shall navigate the user to the sessions page. Unsaved setup progress must be handled according to the project’s navigation policy.
+User Profile Display
+FR-6.4: The system shall display the current user profile indicator on the genre selection page.
+The profile area must show the logged-in user identity and allow account-related access if selected.
+Logout / Exit Control
+FR-6.5: The system shall provide a logout or exit control on the genre selection page.
+Clicking the control shall end the authenticated session securely or start the logout flow according to system rules.
+Setup Step Indicator
+FR-6.6: The system shall display the current progress of story setup using a step indicator such as “Step 1 of 5.”
+The step indicator must accurately reflect the current stage of the multi-step story creation process.
+Page Heading
+FR-6.7: The system shall display a heading that clearly instructs the user to choose a genre.
+The heading must be prominent and easy to understand so the purpose of the page is immediately clear.
+Supporting Description
+FR-6.8: The system shall display a short description explaining that each genre offers a different story structure and atmosphere.
+The description must guide the user in selecting a genre by briefly explaining the role of this step.
+Genre Selection Grid
+FR-6.9: The system shall display available genres in a structured grid or card-based layout.
+Genre cards must remain clearly separated, readable, and easy to select across supported screen sizes.
+Genre Card Display
+FR-6.10: The system shall display each genre as an individual card containing its title and related details.
+Each card must visually represent one genre option only and must be designed to support easy comparison between options.
+Genre Icon
+FR-6.11: The system shall display a visual icon for each genre option.
+The icon must support recognition of the genre theme and should not reduce readability or usability.
+Genre Name
+FR-6.12: The system shall display the name of each available genre.
+The genre name must be prominent within the card so the user can quickly identify each option.
+Genre Description
+FR-6.13: The system shall display a short descriptive summary for each genre.
+The summary must briefly communicate the style, mood, or world type associated with that genre.
+Genre Story Count
+FR-6.14: The system shall display an associated count value, such as available or generated story count, for each genre.
+The count must be based on stored or configured system data and should be presented as supportive information only.
+Genre Card Selection
+FR-6.15: The system shall allow the user to select a genre by clicking or tapping on a genre card.
+A genre shall become selected only through a valid user action on that card.
+Selected Genre Highlighting
+FR-6.16: The system shall visually highlight the currently selected genre card.
+The selected card must be clearly distinguished from unselected cards using border, glow, color change, or another consistent visual indicator.
+Selection Confirmation Mark
+FR-6.17: The system shall display a selection marker or indicator on the currently selected genre.
+The marker must appear only on the actively selected card and must update immediately when the selection changes.
+Single Active Genre Selection
+FR-6.18: The system shall allow only one genre to be selected at a time during this setup step.
+When a new genre is selected, the previously selected genre must be deselected automatically.
+Store Selected Genre
+FR-6.19: The system shall store the user’s selected genre as part of the current story setup configuration.
+The selected genre must remain available for use in later setup steps and in story generation.
+Genre-Based Story Initialization
+FR-6.20: The system shall use the selected genre to influence later narrative generation and content setup.
+The chosen genre must affect story tone, themes, possible scenarios, and related setup options in later stages.
+Setup Continuation Validation
+FR-6.21: The system shall require a valid genre selection before the user can continue to the next story setup step.
+The system shall not allow the setup process to advance unless one genre is selected.
+Genre Change Handling
+FR-6.22: The system shall allow the user to change the selected genre before moving to the next step.
+The system must update the stored selection and interface highlight immediately when the user picks a different genre.
+Personalized or Data-Driven Genre Information
+FR-6.23: The system shall display genre-related counts or popularity values using available system data.
+Displayed values must come from configured or tracked data and should not misrepresent unavailable categories.
+Responsive Card Layout
+FR-6.24: The system shall ensure that the genre selection cards remain readable and usable across different screen sizes and devices.
+Cards, labels, and descriptions must stay aligned, accessible, and visually separated on desktop and smaller screens.
+Accessibility of Genre Controls
+FR-6.25: The system shall ensure that genre cards and selection indicators are easy to understand and interact with.
+Card labels, clickable areas, and visual states must use clear text, sufficient size, and proper contrast for usability and accessibility.
+Multi-Step Story Setup Support
+FR-6.26: The system shall support genre selection as the first stage of a multi-step story creation workflow.
+The genre selected in this step must remain part of the setup state throughout later steps unless changed by the user.
+2.3.7 Mockup M7 - Scenario Selection Page
+Figure 11 Mockup M7 for Scenario Selection Page
+2.3.7.1 Functional Requirements
+Table 9 Functional Requirements Derived from Mockup M7 - Scenario Selection Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-7.1: The system shall display the Omni-Narrative Engine logo and brand name on the scenario selection page.
+The logo must remain consistent with platform branding and may provide navigation to the main dashboard when selected.
+Story Hub Navigation Tab
+FR-7.2: The system shall provide a “Story Hub” navigation tab on the scenario selection page.
+Clicking the tab shall navigate the user back to the Story Hub. Unsaved setup progress must be handled according to the system’s draft or warning policy.
+My Sessions Navigation Tab
+FR-7.3: The system shall provide a “My Sessions” navigation tab on the scenario selection page.
+Clicking the tab shall navigate the user to the sessions page. Any incomplete setup data must be handled according to system rules.
+User Profile Display
+FR-7.4: The system shall display the current user profile indicator on the scenario selection page.
+The profile area must show the logged-in user identity and allow access to account-related options if selected.
+Logout / Exit Control
+FR-7.5: The system shall provide a logout or exit control on the scenario selection page.
+Clicking the control shall end the authenticated session securely or start the logout flow according to system rules.
+Back Navigation Control
+FR-7.6: The system shall provide a “Back” control to allow the user to return to the previous step of story setup.
+Clicking the control shall return the user to the genre selection step while preserving previously selected values where applicable.
+Setup Step Indicator
+FR-7.7: The system shall display the current progress of the story setup process using a step indicator such as “Step 2 of 5.”
+The step indicator must accurately reflect the current setup stage.
+Page Heading
+FR-7.8: The system shall display a heading instructing the user to choose a scenario.
+The heading must clearly communicate the purpose of the page and be prominently visible.
+Supporting Description
+FR-7.9: The system shall display a short description explaining that each scenario defines the initial setting and story premise.
+The description must help the user understand the role of scenario selection in story creation.
+Scenario Selection Layout
+FR-7.10: The system shall display available scenarios in a structured card-based layout.
+Scenario cards must be clearly separated, readable, and easy to compare across supported screen sizes.
+Scenario Card Display
+FR-7.11: The system shall display each scenario as an individual card containing its related information.
+Each card must represent one scenario only and must contain enough detail for informed selection.
+Scenario Preview Area
+FR-7.12: The system shall display a visual preview area for each scenario card.
+The preview area may use color, image, or thematic design to help communicate the tone of the scenario. It must not reduce readability of the card content.
+Scenario Popularity / Status Tag
+FR-7.13: The system shall display a status label such as “Popular” or “New” for relevant scenarios.
+These tags must be based on configured or tracked system data and must not be shown inaccurately.
+Scenario Title
+FR-7.14: The system shall display the title of each available scenario.
+The title must be prominent enough to support quick identification by the user.
+Scenario Description
+FR-7.15: The system shall display a short description for each scenario to explain its setting and opening premise.
+The description must be concise, readable, and relevant to the selected genre context.
+Scenario Attribute Tags
+FR-7.16: The system shall display descriptive tags for each scenario, such as tone, style, or difficulty markers.
+Tags must reflect valid predefined scenario properties and help the user compare available options.
+Scenario Difficulty Tag
+FR-7.17: The system shall display the difficulty level associated with each scenario when available.
+The difficulty shown must match the predefined setting of that scenario and may influence later gameplay or decision complexity.
+Scenario Theme Tag
+FR-7.18: The system shall display thematic tags such as Epic, Mystical, or Dark for each scenario where defined.
+Theme tags must reflect stored scenario metadata and support user understanding of story mood and style.
+Scenario Card Selection
+FR-7.19: The system shall allow the user to select a scenario by clicking or tapping on a scenario card.
+A scenario shall become selected only through a valid user action on that card.
+Single Active Scenario Selection
+FR-7.20: The system shall allow only one scenario to be selected at a time during this setup step.
+When a new scenario is selected, the previous scenario selection must be removed automatically.
+Visual Indication of Selected Scenario
+FR-7.21: The system shall visually distinguish the currently selected scenario from unselected scenarios.
+The selected card must be highlighted using a consistent visual method such as border, glow, accent color, or selection mark.
+Store Selected Scenario
+FR-7.22: The system shall store the selected scenario as part of the current story setup configuration.
+The selected scenario must remain available for later steps and for initializing the generated story.
+Scenario-Based Story Initialization
+FR-7.23: The system shall use the selected scenario to define the initial setting, premise, and context of the story.
+The selected scenario must influence the opening scene, environment details, and possible starting narrative conditions.
+Scenario Filtering by Previous Genre
+FR-7.24: The system shall display scenarios that are relevant to the genre selected in the previous setup step.
+The available scenarios shown must correspond to or be compatible with the user’s selected genre.
+Setup Continuation Validation
+FR-7.25: The system shall require a valid scenario selection before the user can continue to the next setup step.
+The setup flow shall not proceed until one scenario has been selected.
+Scenario Change Handling
+FR-7.26: The system shall allow the user to change the selected scenario before moving to the next step.
+When the user selects a different scenario, the stored setup state must update immediately.
+Responsive Scenario Card Layout
+FR-7.27: The system shall ensure that scenario cards remain readable and usable across different screen sizes and devices.
+Card content, labels, and tags must remain aligned, visible, and accessible on desktop and smaller displays.
+Accessibility of Scenario Controls
+FR-7.28: The system shall ensure that scenario cards, labels, and interactive areas are easy to understand and use.
+Text, clickable areas, and visual states must use clear naming, sufficient size, and proper contrast for usability and accessibility.
+Multi-Step Story Setup Support
+FR-7.29: The system shall support scenario selection as the second stage of the multi-step story creation workflow.
+The selected scenario must remain part of the story setup state throughout later steps unless changed by the user.
+2.3.8 Mockup M8 - Tone Difficulty Page
+Figure 12 Mockup M8 for Tone Difficulty
+2.3.8.1 Functional Requirements:
+Table 10 Functional Requirements Derived from Mockup M8 - Tone Difficulty Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-8.1: The system shall display the Omni-Narrative Engine logo and brand name on the tone and difficulty selection page.
+The logo must remain consistent with platform branding and may provide navigation to the main dashboard when selected.
+Story Hub Navigation Tab
+FR-8.2: The system shall provide a “Story Hub” navigation tab on the tone and difficulty page.
+Clicking the tab shall navigate the user back to the Story Hub. Any incomplete setup progress must be handled according to the system’s save, warning, or discard policy.
+My Sessions Navigation Tab
+FR-8.3: The system shall provide a “My Sessions” navigation tab on the tone and difficulty page.
+Clicking the tab shall navigate the user to the sessions page. Unsaved story setup data must be handled according to defined system behavior.
+User Profile Display
+FR-8.4: The system shall display the current user profile indicator on the tone and difficulty page.
+The profile area must show the logged-in user identity and allow access to account-related functions if selected.
+Logout / Exit Control
+FR-8.5: The system shall provide a logout or exit control on the tone and difficulty page.
+Clicking the control shall securely end the current authenticated session or start the logout flow according to system rules.
+Top Back Navigation
+FR-8.6: The system shall provide a “Back” control at the top of the page to return to the previous story setup step.
+Clicking the control shall return the user to the previous step while preserving already selected setup values where applicable.
+Setup Step Indicator
+FR-8.7: The system shall display the current setup progress using a step indicator such as “Step 3 of 5.”
+The step indicator must accurately reflect the current stage in the story creation process.
+Page Heading
+FR-8.8: The system shall display a heading instructing the user to set the tone and difficulty of the story.
+The heading must be clearly visible and must communicate the purpose of the page.
+Supporting Description
+FR-8.9: The system shall display a short description explaining that the user is defining the atmosphere and challenge level of the story.
+The description must help the user understand how these selections will affect the narrative experience.
+Story Tone Section Heading
+FR-8.10: The system shall display a “Story Tone” section heading.
+The heading must clearly separate tone-related options from other configuration categories on the page.
+Tone Options Layout
+FR-8.11: The system shall display available story tones in a structured card-based layout.
+Tone cards must remain clearly separated, readable, and easy to compare across supported screen sizes.
+Tone Card Display
+FR-8.12: The system shall display each tone option as an individual selectable card.
+Each card must represent one tone option only and must contain its title and short description.
+Tone Icon
+FR-8.13: The system shall display a visual icon for each tone option.
+The icon must support recognition of the tone style and must not reduce readability or usability.
+Tone Name
+FR-8.14: The system shall display the name of each available tone option.
+The tone name must be prominent enough to support quick identification by the user.
+Tone Description
+FR-8.15: The system shall display a short explanation of each tone option.
+The description must communicate the emotional style, narrative feel, or atmosphere associated with the selected tone.
+Tone Selection
+FR-8.16: The system shall allow the user to select a story tone by clicking or tapping on a tone card.
+A tone shall become selected only through a valid user action on that card.
+Single Active Tone Selection
+FR-8.17: The system shall allow only one story tone to be selected at a time.
+When a new tone is selected, the previously selected tone must be deselected automatically.
+Visual Highlight for Selected Tone
+FR-8.18: The system shall visually distinguish the currently selected tone card from unselected tone cards.
+The selected card must be highlighted using a consistent visual method such as border, glow, accent, or selection mark.
+Store Selected Tone
+FR-8.19: The system shall store the selected story tone as part of the current story setup configuration.
+The selected tone must remain available for later setup steps and for use during narrative generation.
+Tone-Based Narrative Influence
+FR-8.20: The system shall use the selected tone to influence generated narrative atmosphere, dialogue style, scene mood, and emotional direction.
+The selected tone must affect how story text and related outputs are produced in later stages.
+Difficulty Section Heading
+FR-8.21: The system shall display a “Difficulty” section heading.
+The heading must clearly separate difficulty-related choices from tone-related options on the page.
+Difficulty Options Layout
+FR-8.22: The system shall display available difficulty levels in a structured card-based layout.
+Difficulty cards must remain readable, distinct, and easy to compare across supported devices.
+Difficulty Card Display
+FR-8.23: The system shall display each difficulty level as an individual selectable card.
+Each card must represent one difficulty option only and must contain its title and descriptive explanation.
+Difficulty Label / Indicator
+FR-8.24: The system shall display a visual indicator or accent on each difficulty option.
+The indicator must help distinguish difficulty options and should remain consistent with the system design.
+Difficulty Name
+FR-8.25: The system shall display the name of each available difficulty level.
+The difficulty name must be prominent enough for easy recognition.
+Difficulty Description
+FR-8.26: The system shall display a short explanation of each difficulty level.
+The description must explain how challenge level, consequences, guidance, or adaptability differ across options.
+Difficulty Selection
+FR-8.27: The system shall allow the user to select a difficulty level by clicking or tapping on a difficulty card.
+A difficulty level shall become selected only through a valid user action on that card.
+Single Active Difficulty Selection
+FR-8.28: The system shall allow only one difficulty level to be selected at a time.
+When a new difficulty level is selected, the previous one must be deselected automatically.
+Visual Highlight for Selected Difficulty
+FR-8.29: The system shall visually distinguish the currently selected difficulty card from unselected difficulty cards.
+The selected card must be highlighted using a consistent visual style such as border, glow, accent, or marker.
+Store Selected Difficulty
+FR-8.30: The system shall store the selected difficulty level as part of the current story setup configuration.
+The selected difficulty must remain available for later setup steps and for the runtime story experience.
+Difficulty-Based Story Control
+FR-8.31: The system shall use the selected difficulty level to influence gameplay challenge, consequence intensity, available guidance, and progression behavior.
+The difficulty setting must affect how choices, risks, resources, or narrative consequences are handled in the story session.
+Adaptive Difficulty Handling
+FR-8.32: The system shall support an Adaptive difficulty option that adjusts challenge level according to user choices or session behavior.
+When Adaptive difficulty is selected, the system must modify challenge conditions dynamically based on predefined adaptation rules.
+Bottom Back Button
+FR-8.33: The system shall provide a “Back” button at the bottom of the page for convenient navigation to the previous setup step.
+Clicking the button shall return the user to the previous step while retaining valid saved selections where applicable.
+Continue Button
+FR-8.34: The system shall provide a “Continue” button to move the user to the next step of story setup.
+Clicking the button shall advance the setup process only if required selections are completed according to validation rules.
+Setup Validation Before Continue
+FR-8.35: The system shall validate that the required configuration options have been selected before allowing progression to the next step.
+The system shall not continue unless one valid tone and one valid difficulty level have been selected.
+Change of Selection Before Continue
+FR-8.36: The system shall allow the user to change the selected tone or difficulty before continuing.
+When the user selects a different option, the stored setup state must update immediately.
+Preserve Prior Setup Context
+FR-8.37: The system shall preserve previously selected setup values from earlier steps while the user configures tone and difficulty.
+Genre and scenario selections must remain stored unless the user explicitly goes back and changes them.
+Responsive Page Layout
+FR-8.38: The system shall ensure that the tone and difficulty selection page remains usable across different screen sizes and devices.
+Cards, headings, descriptions, and navigation controls must remain aligned, readable, and accessible.
+Accessibility of Selection Controls
+FR-8.39: The system shall ensure that tone cards, difficulty cards, and navigation buttons are easy to understand and interact with.
+Clickable areas, text labels, and visual states must use sufficient size, clarity, and contrast for usability and accessibility.
+Multi-Step Story Setup Support
+FR-8.40: The system shall support tone and difficulty selection as the third stage of the multi-step story creation workflow.
+The selected tone and difficulty must remain part of the setup state throughout later steps unless changed by the user.
+2.3.9 Mockup M9 - Character Creation Page
+Figure 14 Mockup M9 for Character Creation Page
+2.3.9.1 Functional Requirements
+Table 11 Functional Requirements Derived from Mockup M9 - Character Creation Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-9.1: The system shall display the Omni-Narrative Engine logo and brand name on the character creation page.
+The logo must remain visually consistent with the platform branding and may allow navigation to the main dashboard if selected.
+Story Hub Navigation Tab
+FR-9.2: The system shall provide a “Story Hub” navigation tab on the character creation page.
+Clicking the tab shall navigate the user to the Story Hub. Any incomplete character setup data must be handled according to the system’s save, warning, or discard policy.
+My Sessions Navigation Tab
+FR-9.3: The system shall provide a “My Sessions” navigation tab on the character creation page.
+Clicking the tab shall navigate the user to the sessions page. Unsaved setup data must be handled according to defined system rules.
+User Profile Display
+FR-9.4: The system shall display the current user profile indicator on the character creation page.
+The profile area must show the logged-in user identity and allow access to account-related functions if selected.
+Logout / Exit Control
+FR-9.5: The system shall provide a logout or exit control on the character creation page.
+Clicking the control shall securely end the authenticated session or start the logout flow according to system rules.
+Top Back Navigation
+FR-9.6: The system shall provide a “Back” control at the top of the page to allow the user to return to the previous story setup step.
+Clicking the control shall return the user to the previous step while preserving previously selected valid setup values where applicable.
+Setup Step Indicator
+FR-9.7: The system shall display the current setup progress using a step indicator such as “Step 4 of 5.”
+The step indicator must accurately reflect the current stage of the multi-step story creation process.
+Page Heading
+FR-9.8: The system shall display a heading instructing the user to create their character.
+The heading must be prominent and must clearly communicate the purpose of the page.
+Supporting Description
+FR-9.9: The system shall display a short description explaining that the character will influence how the narrative unfolds.
+The description must help the user understand the importance of character creation in the story experience.
+Character Name Label
+FR-9.10: The system shall display a label identifying the character name input field.
+The label must clearly indicate that the user is expected to enter the name of the story character.
+Character Name Input Field
+FR-9.11: The system shall provide an input field for the user to enter a character name.
+The field must accept text input and must not proceed with an invalid or empty value if character naming is required by the system.
+Character Name Placeholder Text
+FR-9.12: The system shall display supportive placeholder text in the character name field.
+The placeholder must guide the user without being stored as actual character data.
+Character Name Icon / Visual Cue
+FR-9.13: The system shall provide a visual identifier with the character name field to improve usability.
+The icon is supportive only and must not interfere with text entry or accessibility.
+Role / Class Section Heading
+FR-9.14: The system shall display a “Role / Class” section heading on the character creation page.
+The heading must clearly separate role selection from other character configuration sections.
+Role / Class Card Layout
+FR-9.15: The system shall display available character roles in a structured card-based layout.
+Role cards must remain clearly separated, readable, and easy to compare across supported screen sizes.
+Role / Class Card Display
+FR-9.16: The system shall display each character role as an individual selectable card.
+Each card must represent one role only and must include at least the role name and a short explanation.
+Role Icon
+FR-9.17: The system shall display a visual icon for each role option.
+The icon must support recognition of the role theme and must not reduce readability or usability.
+Role Name
+FR-9.18: The system shall display the name of each available character role.
+The role name must be prominent enough to allow easy recognition by the user.
+Role Description
+FR-9.19: The system shall display a short description for each role to explain its style or strengths.
+The description must help the user compare available roles and understand the narrative or gameplay identity of each option.
+Role Selection
+FR-9.20: The system shall allow the user to select a character role by clicking or tapping on a role card.
+A role shall become selected only through a valid user action on that card.
+Single Active Role Selection
+FR-9.21: The system shall allow only one role to be selected at a time during character creation.
+When a new role is selected, the previously selected role must be deselected automatically.
+Visual Highlight for Selected Role
+FR-9.22: The system shall visually distinguish the currently selected role card from unselected role cards.
+The selected role must be highlighted using a consistent visual method such as border, glow, accent, or marker.
+Personality Traits Section Heading
+FR-9.23: The system shall display a “Personality Traits” section heading on the character creation page.
+The heading must clearly identify the trait selection area.
+Trait Limit Information
+FR-9.24: The system shall display guidance indicating the maximum number of selectable traits, such as “Choose up to 3.”
+The displayed rule must match the actual system validation rule for trait selection.
+Personality Trait Options
+FR-9.25: The system shall display a list of selectable personality traits for the character.
+Each trait must be shown as an individual selectable item and must represent a predefined trait value.
+Personality Trait Selection
+FR-9.26: The system shall allow the user to select one or more personality traits for the character.
+Trait selection must occur only through valid interaction with displayed trait items.
+Maximum Trait Selection Limit
+FR-9.27: The system shall restrict the user to selecting no more than three personality traits.
+If the maximum is reached, the system shall prevent additional trait selection until one selected trait is removed.
+Trait Deselection
+FR-9.28: The system shall allow the user to deselect a previously selected personality trait.
+Clicking an already selected trait shall remove it from the active selection if deselection is allowed by the interaction design.
+Visual Highlight for Selected Traits
+FR-9.29: The system shall visually distinguish selected personality traits from unselected traits.
+Selected traits must use a consistent visual state so the user can immediately identify active choices.
+Store Selected Traits
+FR-9.30: The system shall store the selected personality traits as part of the current character configuration.
+The selected traits must remain part of the story setup state unless changed by the user.
+Attributes Section Heading
+FR-9.31: The system shall display an “Attributes” section heading on the character creation page.
+The heading must clearly identify the numerical attribute configuration area.
+Attribute Labels
+FR-9.32: The system shall display labels for each configurable character attribute, such as Strength, Intelligence, Charisma, Agility, Wisdom, and Endurance.
+Attribute names must be clearly visible and must correspond to the internal character model used by the system.
+Attribute Adjustment Sliders
+FR-9.33: The system shall provide adjustable slider controls for character attributes.
+Each slider must allow the user to modify the assigned value of its corresponding attribute within the allowed range.
+Attribute Value Display
+FR-9.34: The system shall display the current numeric value of each attribute.
+The displayed value must update immediately when the corresponding slider is moved.
+Attribute Range Enforcement
+FR-9.35: The system shall restrict each attribute value to the valid range defined by the system.
+Users must not be able to assign values below the minimum or above the maximum permitted for an attribute.
+Attribute Allocation Rules
+FR-9.36: The system shall enforce defined rules for character attribute allocation during setup.
+If a total point budget or balanced distribution rule is required, the system shall prevent invalid attribute distributions.
+Real-Time Attribute Adjustment
+FR-9.37: The system shall update attribute values in real time as the user adjusts the sliders.
+Slider movement must immediately reflect the new value both in the input control and in any related preview.
+Character Preview Panel
+FR-9.38: The system shall display a character summary panel showing the current character preview.
+The preview panel must summarize the current character state based on user selections.
+Character Avatar / Profile Graphic
+FR-9.39: The system shall display a visual character avatar or placeholder graphic in the preview panel.
+The avatar may remain generic or may change according to selected role or other character settings if supported.
+Character Preview Name
+FR-9.40: The system shall display the current character name in the preview panel.
+If no name has been entered, the system may display a placeholder such as “Unnamed Hero.”
+Character Preview Role Prompt
+FR-9.41: The system shall display the selected role in the preview panel or prompt the user to choose one if none is selected.
+The preview must remain synchronized with the current role selection state.
+Character Preview Attribute Summary
+FR-9.42: The system shall display a summary of character attribute values in the preview panel.
+The values shown in the preview must match the currently configured attribute values exactly.
+Live Preview Synchronization
+FR-9.43: The system shall update the character preview panel dynamically as the user changes name, role, traits, or attributes.
+The preview must remain synchronized with the latest valid inputs without requiring manual refresh.
+Bottom Back Button
+FR-9.44: The system shall provide a “Back” button at the bottom of the page for convenient return to the previous setup step.
+Clicking the button shall return the user to the previous step while preserving valid entered configuration data where applicable.
+Continue Button
+FR-9.45: The system shall provide a “Continue” button to move the user to the next step of story setup.
+Clicking the button shall advance the setup process only if required character creation fields satisfy validation rules.
+Character Creation Validation
+FR-9.46: The system shall validate required character creation inputs before allowing progression to the next step.
+The system shall not continue if mandatory fields such as character name or role selection are missing, according to the project’s validation rules.
+Change of Character Choices Before Continue
+FR-9.47: The system shall allow the user to revise name, role, traits, and attributes before continuing.
+Any modified value must update the stored setup state immediately.
+Role-Based Initial Attribute Behavior
+FR-9.48: The system shall support character roles that influence starting attribute profiles or narrative identity.
+If the selected role affects default attributes or story behavior, the system must apply those predefined rules consistently.
+Character-Based Narrative Influence
+FR-9.49: The system shall use the created character configuration to influence later story generation and interaction.
+Character name, role, traits, and attributes must be available for narrative personalization, decision logic, and state management in later stages.
+Preserve Prior Setup Context
+FR-9.50: The system shall preserve previously selected setup values from earlier steps while the user creates the character.
+Genre, scenario, tone, and difficulty selections must remain stored unless the user explicitly changes them in earlier steps.
+Responsive Page Layout
+FR-9.51: The system shall ensure that the character creation page remains usable across different screen sizes and devices.
+Cards, input fields, sliders, preview panels, and buttons must remain aligned, readable, and accessible.
+Accessibility of Character Controls
+FR-9.52: The system shall ensure that all character creation controls are understandable and easy to interact with.
+Fields, cards, sliders, buttons, and labels must use clear naming, sufficient size, and proper contrast for usability and accessibility.
+Multi-Step Story Setup Support
+FR-9.53: The system shall support character creation as the fourth stage of the multi-step story creation workflow.
+The created character configuration must remain part of the overall setup state throughout later steps unless changed by the user.
+2.3.10 Mockup M10 - Scene Loading Page
+Figure 15 Mockup M10 for Scene Loading Page
+2.3.10.1 Functional Requirements
+Table 12 Functional Requirements Derived from Mockup M10 - Scene Loading Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-10.1: The system shall display the Omni-Narrative Engine logo and brand name on the scene loading page.
+The logo must remain visually consistent with platform branding and may allow navigation only if such navigation does not interrupt critical generation processes.
+Story Hub Navigation Tab
+FR-10.2: The system shall provide a “Story Hub” navigation tab on the scene loading page.
+If navigation away during active generation is allowed, the system must warn the user about possible interruption or save the current generation state automatically.
+My Sessions Navigation Tab
+FR-10.3: The system shall provide a “My Sessions” navigation tab on the scene loading page.
+Accessing another page during generation must follow system rules for safe interruption, background processing, or temporary locking of navigation.
+History Navigation Tab
+FR-10.4: The system shall provide a “History” navigation tab on the scene loading page.
+If selected during active generation, the system must preserve the current generation state or restrict access until processing is stable.
+Memory Navigation Tab
+FR-10.5: The system shall provide a “Memory” navigation tab on the scene loading page.
+Navigation to memory data during generation must not corrupt the active narrative generation state.
+Player Navigation Tab
+FR-10.6: The system shall provide a “Player” navigation tab on the scene loading page.
+Access to player information during generation must follow system rules for continuity and safe state handling.
+User Profile Display
+FR-10.7: The system shall display the current user profile indicator on the scene loading page.
+The profile area must show the logged-in user identity and allow account-related access if permitted during active generation.
+Page State Indicator
+FR-10.8: The system shall display a loading state indicating that the story is currently being generated.
+The loading state must remain visible until the required generation tasks are completed or fail.
+Central Loading Animation
+FR-10.9: The system shall display a central visual animation or activity indicator while story generation is in progress.
+The animation must communicate that the system is actively processing and must remain visible during generation.
+Main Loading Heading
+FR-10.10: The system shall display a heading indicating that the system is generating the story.
+The heading must clearly communicate the current system action and reassure the user that processing is underway.
+Narrative Generation Progress Item
+FR-10.11: The system shall display a progress item for narrative text generation.
+This item must represent the progress of story text creation and update according to the actual generation state.
+Scene Image Generation Progress Item
+FR-10.12: The system shall display a progress item for scene image generation.
+This item must represent the progress of visual scene generation and update according to the actual generation state.
+Atmosphere / Audio Generation Progress Item
+FR-10.13: The system shall display a progress item for atmosphere or audio composition.
+This item must represent the progress of audio or ambience generation and update according to the actual generation state.
+Individual Progress Bars
+FR-10.14: The system shall display a separate progress bar for each generation component.
+Each progress bar must correspond to one backend generation process and update independently.
+Individual Progress Percentages
+FR-10.15: The system shall display a numeric percentage for each generation component.
+The displayed percentage must remain consistent with the actual underlying progress state of that component.
+Multi-Stage Generation Support
+FR-10.16: The system shall support story generation as a multi-stage process involving text, image, and audio or atmosphere components.
+Each stage may complete at different times, but the system must manage them as part of one coordinated scene generation workflow.
+Real-Time Progress Updates
+FR-10.17: The system shall update displayed generation progress in real time or near real time while processing is active.
+Progress values must refresh automatically without requiring the user to reload the page manually.
+Partial Progress Visibility
+FR-10.18: The system shall display partially completed generation stages even if other stages are still processing.
+Users must be able to see which parts are completed, in progress, or not yet started.
+Loading Message / Reassurance Text
+FR-10.19: The system shall display a short reassurance message explaining that the AI is adapting the story based on user decisions.
+The message must help the user understand that story generation depends on prior choices and memory context.
+Generation Based on Prior Choices
+FR-10.20: The system shall generate the current story scene using previously stored user decisions, setup selections, and narrative context.
+The generated output must reflect the established story state and continuity rules.
+Background Processing of Scene Components
+FR-10.21: The system shall process generation tasks in the background while presenting the loading interface to the user.
+The user interface must remain responsive enough to show progress, status, or safe navigation behavior.
+Completion Detection
+FR-10.22: The system shall detect when all required scene generation tasks have been completed.
+The system shall transition to the next appropriate screen only after required generation components are finished or fallback rules are applied.
+Automatic Transition After Completion
+FR-10.23: The system shall automatically navigate the user to the generated scene view after successful completion of the required generation tasks.
+The transition must occur only when the scene is ready for presentation according to defined completion criteria.
+Failure Handling for Generation Component
+FR-10.24: The system shall handle the failure of any generation component without crashing the session.
+If one component fails, the system may retry, apply fallback behavior, or continue with partial content according to defined system rules.
+Retry or Recovery Support
+FR-10.25: The system shall support retry or recovery behavior for interrupted or failed scene generation processes.
+Recovery logic must preserve valid already completed outputs where possible and avoid unnecessary regeneration.
+Session State Preservation During Generation
+FR-10.26: The system shall preserve the current session state while scene generation is in progress.
+The active narrative context, selected choice, and generation inputs must not be lost during the loading phase.
+Continuity-Aware Generation
+FR-10.27: The system shall ensure that generated scene outputs remain consistent with stored story memory, character state, and prior events.
+The system must use continuity rules and retained context when creating the new scene.
+Restriction on Premature Scene Access
+FR-10.28: The system shall prevent the user from accessing an incomplete generated scene before the minimum required content is ready.
+The scene display must not open in a broken or invalid state.
+Support for Asynchronous Generation Pipelines
+FR-10.29: The system shall support asynchronous generation of narrative, image, and audio components.
+Different components may progress independently, but the system must coordinate their results correctly.
+Responsive Loading Layout
+FR-10.30: The system shall ensure that the loading screen remains readable and usable across different screen sizes and devices.
+Progress indicators, labels, navigation items, and status text must remain aligned and visible on supported displays.
+Accessibility of Loading Information
+FR-10.31: The system shall ensure that loading status labels, percentages, and progress indicators are easy to read and understand.
+Text and progress visuals must use sufficient clarity, size, and contrast for usability and accessibility.
+Active Story Generation Context
+FR-10.32: The system shall treat the scene loading page as part of an active story generation flow rather than as a static waiting page.
+All shown progress information must reflect actual backend generation activity tied to the current session.
+2.3.11 Mockup M11 - Active Story Page
+Figure 16 Mockup M11 for Active Story Page
+2.3.11.1 Functional Requirements
+Table 13 Functional Requirements Derived from Mockup M11 - Active Story Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-11.1: The system shall display the Omni-Narrative Engine logo and brand name on the active story session page.
+The logo must remain visually consistent with the platform branding and may allow navigation only if doing so does not unintentionally disrupt the active story session.
+Story Hub Navigation Tab
+FR-11.2: The system shall provide a “Story Hub” navigation tab on the active story session page.
+If the user navigates away from an active session, the system must preserve the current story state or warn the user according to session-handling rules.
+My Sessions Navigation Tab
+FR-11.3: The system shall provide a “My Sessions” navigation tab on the active story session page.
+Clicking this tab shall allow access to the user’s saved or ongoing sessions without causing unintended loss of active story progress.
+History Navigation Tab
+FR-11.4: The system shall provide a “History” navigation tab on the active story session page.
+Clicking this tab shall open or navigate to the story history view for the current session or the user’s broader session history, according to system design.
+Memory Navigation Tab
+FR-11.5: The system shall provide a “Memory” navigation tab on the active story session page.
+Clicking this tab shall open or navigate to the story memory view showing retained facts, prior events, and continuity data for the active story.
+Player Navigation Tab
+FR-11.6: The system shall provide a “Player” navigation tab on the active story session page.
+Clicking this tab shall open or navigate to the player state view containing character-related information for the current session.
+User Profile Display
+FR-11.7: The system shall display the current user profile indicator on the active story session page.
+The profile area must show the logged-in user identity and may provide access to account-related options if selected.
+Chapter Identifier
+FR-11.8: The system shall display the current chapter identifier for the active story scene.
+The chapter label must reflect the current narrative progression state stored for the session.
+Story Title Display
+FR-11.9: The system shall display the title of the active story session on the active story page.
+The title shown must match the saved or generated title associated with the current session.
+Scene Number Display
+FR-11.10: The system shall display the current scene number of the active story session.
+The scene number must reflect the actual current position in the active narrative sequence.
+Active Story Text Panel
+FR-11.11: The system shall display the generated narrative content of the current scene in a dedicated reading panel.
+The displayed text must reflect the latest generated story output and remain consistent with the active session state.
+Scrollable Narrative Area
+FR-11.12: The system shall provide a scrollable reading area for longer narrative scenes.
+If the scene text exceeds the visible area, the user must be able to scroll through the full scene content without truncation.
+Current Scene Content Display
+FR-11.13: The system shall present the full current scene description, dialogue, and narrative developments to the user.
+The scene content must be generated from prior setup choices, story memory, player state, and the last selected action.
+Context Action Section Heading
+FR-11.14: The system shall display a section prompting the user to decide the next action in the story.
+The prompt must clearly indicate that the listed options represent available choices for progressing the narrative.
+Choice List Display
+FR-11.15: The system shall display a list of available choices for the current scene.
+Each choice shown must be derived from the current narrative context and must be relevant to the active story state.
+Individual Choice Card
+FR-11.16: The system shall display each available action as a separate selectable choice card or row.
+Each choice must be visually separated to support clear selection and comparison.
+Choice Text
+FR-11.17: The system shall display the descriptive text of each available story choice.
+The text must clearly communicate the intended action so the user can make an informed decision.
+Choice Risk Indicator
+FR-11.18: The system shall display a risk label for each available story choice when such information is part of the design.
+Risk labels such as low, medium, high, or very high must correspond to predefined or generated consequence levels.
+Choice Style / Trait Indicator
+FR-11.19: The system shall display a secondary descriptor for each choice, such as noble, pragmatic, diplomatic, or reckless.
+These descriptors must reflect the narrative tone or behavioral style associated with the choice.
+Choice Selection
+FR-11.20: The system shall allow the user to select one of the available story choices to continue the narrative.
+A choice shall be selected only through a valid user interaction with that choice item.
+Single Choice Activation
+FR-11.21: The system shall process only one user choice at a time for a given scene.
+Once a valid choice is submitted, other choices for that scene shall no longer remain active unless the system explicitly supports undo or replay behavior.
+Choice Submission Trigger
+FR-11.22: The system shall treat the selected choice as the input for generation of the next scene.
+The selected choice must be recorded in the session history before the next scene generation begins.
+Choice-to-Scene Transition
+FR-11.23: The system shall initiate next-scene generation after a valid choice is selected.
+The transition must preserve continuity, player state, prior events, and selected action details.
+Story History Shortcut Button
+FR-11.24: The system shall provide a “Story History” quick-access button on the active story session page.
+Clicking the button shall open the history view relevant to the current session without losing the current story position.
+Story Memory Shortcut Button
+FR-11.25: The system shall provide a “Story Memory” quick-access button on the active story session page.
+Clicking the button shall open memory details showing retained facts, important events, and continuity data related to the active session.
+Player State Shortcut Button
+FR-11.26: The system shall provide a “Player State” quick-access button on the active story session page.
+Clicking the button shall open the current player or character state view for the active session.
+Context Panel Access
+FR-11.27: The system shall allow the user to access session context tools directly from the active story interface.
+These contextual tools must be accessible without permanently leaving or resetting the current story scene.
+Narration Audio Control
+FR-11.28: The system shall provide an audio player for narration playback on the active story session page.
+The narration control must allow playback of generated or assigned spoken narration for the current scene when available.
+Ambient Audio Control
+FR-11.29: The system shall provide an audio player for ambient or atmosphere playback on the active story session page.
+The ambient audio control must allow playback of generated or assigned background atmosphere for the current scene when available.
+Audio Playback Duration Display
+FR-11.30: The system shall display the playback time or duration for narration and ambient audio tracks.
+The displayed timing must correspond to the actual loaded audio track state.
+Audio Play / Pause Control
+FR-11.31: The system shall allow the user to start or pause narration and ambient audio playback.
+Audio playback must respond to user input without disrupting the story text or choice interface.
+Separate Audio Channel Support
+FR-11.32: The system shall support separate playback controls for narration and ambient audio.
+Each audio stream must be manageable independently unless synchronized playback is explicitly required by the design.
+Current Session State Preservation
+FR-11.33: The system shall preserve the active story session state while the user reads content, plays audio, or reviews contextual tools.
+The current scene, available choices, player state, and memory context must remain intact until a new choice is submitted or the session is otherwise updated.
+Continuity-Aware Scene Presentation
+FR-11.34: The system shall present story content that is consistent with prior choices, established character facts, and retained memory.
+The displayed scene must align with the continuity rules and stored story history of the current session.
+Real-Time Access to Story Tools
+FR-11.35: The system shall allow the user to inspect contextual information such as history, memory, and player state during an active session.
+Accessing these tools must not corrupt the active scene or remove the user from the current story position unless explicitly requested.
+Session Progression Logic
+FR-11.36: The system shall use the selected action from the active story page to advance the story to the next scene.
+Each accepted choice must become part of the permanent or session-scoped narrative history unless the system supports replay or branching rollback.
+Responsive Layout
+FR-11.37: The system shall ensure that the active story session page remains readable and usable across supported screen sizes and devices.
+The reading panel, choices, navigation items, and context buttons must remain aligned, visible, and accessible.
+Accessibility of Story Interface
+FR-11.38: The system shall ensure that narrative text, choice controls, audio controls, and contextual buttons are understandable and easy to interact with.
+Text, labels, and controls must use sufficient clarity, size, spacing, and contrast for usability and accessibility.
+Active Session as Primary Interaction Screen
+FR-11.39: The system shall use the active story session page as the main interface for real-time user interaction with the generated narrative.
+This page must serve as the central point for reading the story, making choices, and accessing supporting contextual information during a live session.
+2.3.12 Mockup M12 - Story History Page
+Figure 17 Mockup M12 for Story History Page
+2.3.12.1 Functional Requirements
+Table 14 Functional Requirements Derived from Mockup M12 - Story History Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-12.1: The system shall display the Omni-Narrative Engine logo and brand name on the story history page.
+The logo must remain visually consistent with the platform branding and may provide navigation according to system navigation rules.
+Story Hub Navigation Tab
+FR-12.2: The system shall provide a “Story Hub” navigation tab on the story history page.
+Clicking the tab shall navigate the user to the Story Hub without deleting or corrupting the current session history.
+My Sessions Navigation Tab
+FR-12.3: The system shall provide a “My Sessions” navigation tab on the story history page.
+Clicking the tab shall navigate the user to the sessions page while preserving the current story session state.
+History Navigation Tab
+FR-12.4: The system shall provide a “History” navigation tab on the story history page and visually indicate it as the active section.
+The currently active navigation tab must be visually highlighted so the user can identify the current page.
+Memory Navigation Tab
+FR-12.5: The system shall provide a “Memory” navigation tab on the story history page.
+Clicking the tab shall navigate the user to the memory view associated with the active session.
+Player Navigation Tab
+FR-12.6: The system shall provide a “Player” navigation tab on the story history page.
+Clicking the tab shall navigate the user to the player state view associated with the active session.
+User Profile Display
+FR-12.7: The system shall display the current user profile indicator on the story history page.
+The profile area must show the logged-in user identity and may provide access to account-related options if selected.
+Back to Story Control
+FR-12.8: The system shall provide a “Back to Story” control to allow the user to return to the active story session screen.
+Clicking this control shall return the user to the current active story scene without losing session continuity.
+Page Heading
+FR-12.9: The system shall display a heading identifying the page as the Story History view.
+The heading must be prominent and clearly communicate that the page contains the record of previous scenes and choices.
+Supporting Description
+FR-12.10: The system shall display a short description explaining that the page contains the user’s journey so far, including scenes and choices.
+The description must help the user understand the purpose of the history page in simple language.
+Story History Timeline Layout
+FR-12.11: The system shall display story history entries in a chronological timeline layout.
+The timeline must present past story events in a clear sequence so the user can follow narrative progression.
+Timeline Marker Display
+FR-12.12: The system shall display visual markers or nodes to represent individual historical story points.
+Each marker must correspond to one recorded scene entry in the story history.
+Scene History Card Display
+FR-12.13: The system shall display each past scene as an individual history card or entry.
+Each card must represent one previously completed scene in the active story session.
+Scene Identifier
+FR-12.14: The system shall display the scene number or scene label for each history entry.
+The scene identifier must match the stored order of the scene in the session history.
+Scene Title
+FR-12.15: The system shall display the title of each previously generated scene.
+The title shown must correspond to the stored scene record in the active session history.
+Scene Summary
+FR-12.16: The system shall display a short summary or excerpt of each past scene.
+The summary must help the user remember what happened in that scene without needing to reopen the full scene content.
+Recorded User Choice Display
+FR-12.17: The system shall display the choice selected by the user for each recorded scene.
+The displayed choice must match the actual option selected and stored during story progression.
+Choice Label Container
+FR-12.18: The system shall present the stored user choice in a visually separated area within each history entry.
+The choice display must be clearly associated with its corresponding scene entry.
+Chronological Ordering of Events
+FR-12.19: The system shall arrange story history entries in narrative order from earlier scenes to later scenes.
+The ordering must remain consistent with the actual progression of the active story session.
+Session-Specific History Retrieval
+FR-12.20: The system shall retrieve and display history records for the currently active or selected story session only.
+A user must not see unrelated history from another story session unless the system explicitly supports cross-session history browsing.
+History Persistence
+FR-12.21: The system shall preserve completed scene and choice records as part of the ongoing story session data.
+Once a scene has been completed and a choice has been recorded, the corresponding history entry must remain available unless the session is deleted or reset.
+Automatic History Update
+FR-12.22: The system shall automatically add new entries to the story history when the user completes a scene and selects a choice.
+Each new scene and its associated choice must be appended to the history in the correct order.
+Continuity Support Through History
+FR-12.23: The system shall use the story history as a readable reference for past events and previous choices.
+The history must reflect actual prior session events and support user understanding of ongoing story continuity.
+Access Without Session Disruption
+FR-12.24: The system shall allow the user to review story history without disrupting the active story session.
+Opening the history page must not reset the story, remove choices, or alter player state.
+Scrollable History Page
+FR-12.25: The system shall support scrolling when the number of story history entries exceeds the visible page area.
+The user must be able to access all recorded entries within the session history.
+Empty History Handling
+FR-12.26: The system shall handle the case where little or no story history exists for a session.
+If the session has no completed scenes yet, the system shall display an appropriate message instead of an empty broken layout.
+Read-Only History View
+FR-12.27: The system shall present story history as a review-oriented view rather than an editable writing interface.
+Users may read past scenes and choices, but history records must not be modifiable directly from this page unless edit functionality is explicitly supported elsewhere.
+Responsive History Layout
+FR-12.28: The system shall ensure that the story history page remains readable and usable across supported screen sizes and devices.
+Timeline entries, text blocks, and navigation controls must remain aligned, visible, and accessible.
+Accessibility of History Content
+FR-12.29: The system shall ensure that history labels, scene entries, and recorded choices are easy to read and understand.
+Text, spacing, and controls must use sufficient clarity, size, and contrast for usability and accessibility.
+Story History as Session Record
+FR-12.30: The system shall use the story history page as the structured record of all prior scenes and user decisions within a session.
+The page must serve as a reliable retrospective view of narrative progression for the active story.
+2.3.13 Mockup M13 - Story Memory Page
+Figure 18 Mockup M13 for Story Memory Page
+2.3.13.1 Functional Requirements
+Table 15 Functional Requirements Derived from Mockup M13 - Story Memory Page
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-13.1: The system shall display the Omni-Narrative Engine logo and brand name on the story memory page.
+The logo must remain visually consistent with the platform branding and follow standard navigation behavior defined by the system.
+Story Hub Navigation Tab
+FR-13.2: The system shall provide a “Story Hub” navigation tab on the story memory page.
+Clicking the tab shall navigate the user to the Story Hub without deleting or corrupting active session memory data.
+My Sessions Navigation Tab
+FR-13.3: The system shall provide a “My Sessions” navigation tab on the story memory page.
+Clicking the tab shall navigate the user to the sessions page while preserving the current session state.
+History Navigation Tab
+FR-13.4: The system shall provide a “History” navigation tab on the story memory page.
+Clicking the tab shall navigate the user to the story history view associated with the current session.
+Memory Navigation Tab
+FR-13.5: The system shall provide a “Memory” navigation tab on the story memory page and visually indicate it as the active section.
+The active navigation tab must be clearly highlighted so the user can recognize the current page.
+Player Navigation Tab
+FR-13.6: The system shall provide a “Player” navigation tab on the story memory page.
+Clicking the tab shall navigate the user to the player state view associated with the active session.
+User Profile Display
+FR-13.7: The system shall display the current user profile indicator on the story memory page.
+The profile area must show the logged-in user identity and may provide account-related access if selected.
+Page Heading
+FR-13.8: The system shall display a heading identifying the page as the Story Memory view.
+The heading must be prominent and clearly communicate that the page contains retained story knowledge.
+Supporting Description
+FR-13.9: The system shall display a short description explaining that the AI remembers events, characters, places, and active story threads.
+The description must help the user understand the purpose of the memory page in simple language.
+Memory Section for Key Events
+FR-13.10: The system shall provide a “Key Events” section on the story memory page.
+This section must contain important events retained from the current narrative session.
+Memory Section for Characters Met
+FR-13.11: The system shall provide a “Characters Met” section on the story memory page.
+This section must contain remembered character records related to the active story session.
+Memory Section for Locations
+FR-13.12: The system shall provide a “Locations” section on the story memory page.
+This section must contain remembered locations discovered or referenced in the active story session.
+Memory Section for Active Story Threads
+FR-13.13: The system shall provide an “Active Story Threads” section on the story memory page.
+This section must contain unresolved or ongoing narrative threads relevant to the current session.
+Key Event Card Display
+FR-13.14: The system shall display each remembered key event as an individual memory card.
+Each card must represent one distinct remembered event from the active session.
+Event Priority / Importance Tag
+FR-13.15: The system shall display an importance indicator for remembered events, such as high or critical.
+Importance labels must reflect the significance level assigned by the memory logic or configured rules.
+Event Title
+FR-13.16: The system shall display a title for each remembered key event.
+The event title must briefly identify the remembered narrative occurrence.
+Event Summary
+FR-13.17: The system shall display a short summary for each remembered key event.
+The summary must explain the event in concise terms and help the user recall its story relevance.
+Event Scene Reference
+FR-13.18: The system shall display the related scene number or scene reference for each remembered event.
+The displayed scene reference must match the scene in which the event was recorded or last updated.
+Character Memory Card Display
+FR-13.19: The system shall display each remembered character as an individual character memory card.
+Each card must represent one character known to the current story session.
+Character Identifier / Avatar
+FR-13.20: The system shall display a visual character identifier, such as an initial or avatar, for each remembered character.
+The identifier must help distinguish character records visually and consistently.
+Character Name
+FR-13.21: The system shall display the name of each remembered character.
+The name must match the stored character record in the active session memory.
+Character Relationship / Status Tag
+FR-13.22: The system shall display a relationship or status label for each remembered character, such as ally, rival, patron, or neutral.
+Relationship labels must be derived from current story context or stored memory state.
+Character Summary
+FR-13.23: The system shall display a short descriptive summary for each remembered character.
+The summary must explain the character’s relevance, role, or known traits in the story.
+Character Last Seen Reference
+FR-13.24: The system shall display the last seen scene reference for each remembered character.
+The displayed value must reflect the most recent scene in which the character appeared or was updated.
+Location Memory Card Display
+FR-13.25: The system shall display each remembered location as an individual location card.
+Each card must represent one distinct location associated with the active story session.
+Location Status Tag
+FR-13.26: The system shall display a status label for each location, such as visited or unknown.
+The status shown must reflect the current knowledge state of that location in the session memory.
+Location Name
+FR-13.27: The system shall display the name of each remembered location.
+The location name must match the stored memory record of the current session.
+Location Description
+FR-13.28: The system shall display a short description for each remembered location.
+The description must summarize the importance or nature of that place within the story.
+Story Thread Card Display
+FR-13.29: The system shall display each active story thread as an individual thread card.
+Each card must represent one unresolved or ongoing narrative objective, mystery, or conflict.
+Story Thread Status Tag
+FR-13.30: The system shall display a status indicator for each story thread, such as active.
+The status must reflect whether the thread is ongoing, resolved, suspended, or otherwise classified by the system.
+Story Thread Title
+FR-13.31: The system shall display a title for each active story thread.
+The title must help the user quickly identify the unresolved narrative issue or objective.
+Story Thread Summary
+FR-13.32: The system shall display a short explanation of each active story thread.
+The summary must clarify why the thread matters and what remains unresolved in the story.
+Session-Specific Memory Retrieval
+FR-13.33: The system shall retrieve and display memory records for the currently active or selected story session only.
+Users must not see unrelated memory records from another session unless cross-session viewing is explicitly supported.
+Automatic Memory Update
+FR-13.34: The system shall automatically update story memory as new scenes, characters, locations, and narrative threads are generated.
+New information must be added or updated according to continuity and memory management rules after relevant story events occur.
+Memory Persistence Across Session
+FR-13.35: The system shall preserve remembered story elements as part of the active session state.
+Stored memory must remain available across scene transitions and session resume operations unless intentionally cleared or changed.
+Continuity Support Through Memory
+FR-13.36: The system shall use stored story memory to support continuity in future scene generation.
+Remembered events, character states, locations, and active threads must be accessible to the narrative engine when generating subsequent scenes.
+Importance-Based Memory Organization
+FR-13.37: The system shall allow memory records to reflect varying importance levels or statuses.
+High-priority memory items should remain easier to identify than low-priority items.
+Read-Only Memory Review
+FR-13.38: The system shall present story memory as a review-oriented interface rather than a direct editing interface.
+Users may inspect memory records, but they must not modify retained memory directly from this page unless such editing is explicitly supported elsewhere.
+Access Without Session Disruption
+FR-13.39: The system shall allow the user to review story memory without disrupting the active story session.
+Opening the memory page must not reset the story, alter player state, or remove pending continuity data.
+Scrollable Memory View
+FR-13.40: The system shall support scrolling when the amount of stored memory content exceeds the visible page area.
+The user must be able to access all available memory records in the active session.
+Empty State Handling for Memory Sections
+FR-13.41: The system shall handle cases where a memory section contains little or no data.
+If a section has no available records yet, the system shall display an informative empty-state message or placeholder instead of a broken layout.
+Responsive Memory Layout
+FR-13.42: The system shall ensure that the story memory page remains readable and usable across supported screen sizes and devices.
+Memory cards, section headings, and navigation items must remain aligned, visible, and accessible.
+Accessibility of Memory Content
+FR-13.43: The system shall ensure that memory labels, cards, summaries, and status indicators are easy to read and understand.
+Text, spacing, and visual indicators must use sufficient clarity, size, and contrast for usability and accessibility.
+Story Memory as Narrative Context Repository
+FR-13.44: The system shall use the story memory page as the structured view of retained narrative context for the active session.
+The page must act as a reliable user-facing representation of what the system currently remembers about the story.
+2.3.14 Mockup M14 - Player State Screen
+Figure 19 Mockup M14 for Player State Screen
+2.3.14.1 Functional Requirements
+Table 16 Functional Requirements Derived from Mockup M14 - Player State Screen
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-14.1: The system shall display the Omni-Narrative Engine logo and brand name on the player state page.
+The logo must remain visually consistent with the platform branding and follow standard navigation behavior defined by the system.
+Story Hub Navigation Tab
+FR-14.2: The system shall provide a “Story Hub” navigation tab on the player state page.
+Clicking the tab shall navigate the user to the Story Hub without corrupting the active player state data.
+My Sessions Navigation Tab
+FR-14.3: The system shall provide a “My Sessions” navigation tab on the player state page.
+Clicking the tab shall navigate the user to the sessions page while preserving current session information.
+History Navigation Tab
+FR-14.4: The system shall provide a “History” navigation tab on the player state page.
+Clicking the tab shall navigate the user to the story history view associated with the active session.
+Memory Navigation Tab
+FR-14.5: The system shall provide a “Memory” navigation tab on the player state page.
+Clicking the tab shall navigate the user to the story memory view associated with the active session.
+Player Navigation Tab
+FR-14.6: The system shall provide a “Player” navigation tab on the player state page and visually indicate it as the active section.
+The active navigation tab must be clearly highlighted so the user can identify the current page.
+User Profile Display
+FR-14.7: The system shall display the current user profile indicator on the player state page.
+The profile area must show the logged-in user identity and may provide access to account-related options if selected.
+Back to Story Control
+FR-14.8: The system shall provide a “Back to Story” control to allow the user to return to the active story session.
+Clicking this control shall return the user to the current active story scene without losing story continuity.
+Page Heading
+FR-14.9: The system shall display a heading identifying the page as the Player State view.
+The heading must be prominent and clearly communicate that the page contains the character’s current gameplay status.
+Supporting Description
+FR-14.10: The system shall display a short description explaining that the page contains the character’s stats, inventory, and current status.
+The description must help the user understand the purpose of the page in simple language.
+Character Summary Panel
+FR-14.11: The system shall display a summary panel for the active player character.
+The panel must present the key identity and progress information of the current character in one place.
+Character Avatar / Role Icon
+FR-14.12: The system shall display a visual avatar or role-related icon for the active character.
+The icon must help represent the character visually and remain consistent with the selected role or class when applicable.
+Character Name
+FR-14.13: The system shall display the name of the active player character.
+The displayed name must match the current session’s stored character record.
+Character Role / Class
+FR-14.14: The system shall display the role or class of the active player character.
+The displayed role must match the role selected or assigned during character creation.
+Character Level Display
+FR-14.15: The system shall display the current level of the active player character.
+The displayed level must reflect the current progression data of the active session.
+Health Points Display
+FR-14.16: The system shall display the current and maximum health points of the character.
+The displayed value must be based on the latest active player state and must not exceed defined limits.
+Health Progress Bar
+FR-14.17: The system shall display a visual health bar for the active player character.
+The health bar must remain consistent with the numeric health values shown.
+Health Percentage Display
+FR-14.18: The system shall display the health percentage of the character when percentage-based presentation is used.
+The displayed percentage must match the health value relative to the current maximum.
+Experience Points Display
+FR-14.19: The system shall display the current and maximum experience points required for progression.
+The displayed experience values must match the stored progress state of the active character.
+Experience Progress Bar
+FR-14.20: The system shall display a visual experience bar for the active player character.
+The experience bar must remain consistent with the numeric experience values shown.
+Experience Percentage Display
+FR-14.21: The system shall display the experience progress percentage of the character when percentage-based presentation is used.
+The displayed percentage must match the character’s current progress toward the next level.
+Current Location Indicator
+FR-14.22: The system shall display the current or most relevant player location within the character summary area.
+The displayed location must reflect the current scene context or stored session state.
+Attributes Section
+FR-14.23: The system shall provide an “Attributes” section on the player state page.
+This section must present the current numeric character attributes used by the system.
+Attribute Labels
+FR-14.24: The system shall display labels for each player attribute, such as Strength, Intelligence, Charisma, Agility, Wisdom, and Endurance.
+Attribute labels must correspond to the internal character model used by the system.
+Attribute Values
+FR-14.25: The system shall display the current numeric value of each player attribute.
+The values must reflect the latest stored character state, including any valid modifications.
+Attribute Bars
+FR-14.26: The system shall display visual progress bars for each player attribute.
+Each bar must remain consistent with the corresponding numeric attribute value.
+Status Effects Section
+FR-14.27: The system shall provide a “Status Effects” section on the player state page.
+This section must list active positive or negative effects currently applied to the player character.
+Status Effect Card Display
+FR-14.28: The system shall display each active status effect as an individual status card.
+Each card must represent one distinct active condition affecting the player.
+Status Effect Title
+FR-14.29: The system shall display the name of each active status effect.
+The title must clearly identify the effect, such as a blessing, curse, buff, or debuff.
+Status Effect Description
+FR-14.30: The system shall display a short explanation of each active status effect.
+The description must explain what the effect means or how it influences gameplay or narrative state.
+Positive and Negative Effect Distinction
+FR-14.31: The system shall visually distinguish beneficial and harmful status effects.
+Positive and negative effects must use clearly different visual cues so the user can recognize them quickly.
+Inventory Section
+FR-14.32: The system shall provide an “Inventory” section on the player state page.
+This section must contain the items currently held by the player character in the active session.
+Inventory Item Card Display
+FR-14.33: The system shall display each inventory item as an individual item card.
+Each item card must represent one distinct item or item stack in the player’s inventory.
+Item Icon Display
+FR-14.34: The system shall display a visual icon for each inventory item.
+The icon must help identify the item type and remain consistent with the item’s category.
+Item Name
+FR-14.35: The system shall display the name of each inventory item.
+The displayed name must match the stored item record in the player inventory.
+Item Description
+FR-14.36: The system shall display a short description for each inventory item.
+The description must briefly explain the item’s nature, purpose, or origin.
+Item Rarity / Type Tag
+FR-14.37: The system shall display a classification label for each item, such as common, rare, or legendary.
+The displayed classification must match the stored metadata of that item.
+Item Quantity Display
+FR-14.38: The system shall display item quantity for stackable items.
+Quantity values must reflect the actual count currently stored in the inventory.
+Inventory Persistence
+FR-14.39: The system shall preserve player inventory as part of the active session state.
+Items gained, consumed, or removed during the story must update the inventory accordingly and remain consistent across scenes.
+Achievements Section
+FR-14.40: The system shall provide an “Achievements” section on the player state page or associated player view.
+This section must display milestone-based accomplishments unlocked by the player in the active session or account scope, according to system design.
+Achievement Card Display
+FR-14.41: The system shall display each achievement as an individual achievement entry or card.
+Each card must represent one predefined achievement condition tracked by the system.
+Achievement Title
+FR-14.42: The system shall display the title of each achievement.
+The title must clearly identify the accomplishment earned or available.
+Achievement Description
+FR-14.43: The system shall display a short description explaining the requirement or meaning of each achievement.
+The description must help the user understand what was achieved or what remains to be done.
+Achievement Unlock Status
+FR-14.44: The system shall visually distinguish unlocked achievements from locked or incomplete achievements.
+Unlocked achievements must be clearly marked, while locked achievements must remain identifiable but unavailable or incomplete.
+Achievement Completion Indicator
+FR-14.45: The system shall display a completion marker for achievements that have been earned.
+Completion markers must appear only for achievements whose unlock conditions have been met.
+Player State Retrieval
+FR-14.46: The system shall retrieve and display player state information for the currently active or selected story session only.
+Users must not see unrelated player data from another session unless cross-session display is explicitly supported.
+Automatic Player State Update
+FR-14.47: The system shall automatically update player state data as the story progresses.
+Health, experience, attributes, status effects, inventory, and achievements must update when relevant events occur.
+Session Continuity Support
+FR-14.48: The system shall preserve player state across scene transitions, saved sessions, and resumed sessions.
+Player-related values must remain consistent unless changed by valid in-story actions or system rules.
+Read-Only Review of Core State
+FR-14.49: The system shall present player state as a review-oriented interface rather than a manual editing interface.
+Users may inspect player information, but they must not modify core state values directly from this page unless editing is explicitly supported elsewhere.
+Access Without Session Disruption
+FR-14.50: The system shall allow the user to review player state without disrupting the active story session.
+Opening the player page must not reset the story, remove choices, or alter continuity data.
+Scrollable Player State View
+FR-14.51: The system shall support scrolling when the amount of player state content exceeds the visible page area.
+The user must be able to access all sections such as attributes, status effects, inventory, and achievements.
+Empty State Handling
+FR-14.52: The system shall handle cases where certain player state sections contain little or no data.
+If a section has no available records yet, the system shall display an informative empty-state message or placeholder instead of a broken layout.
+Responsive Player State Layout
+FR-14.53: The system shall ensure that the player state page remains readable and usable across supported screen sizes and devices.
+Panels, cards, progress bars, and navigation items must remain aligned, visible, and accessible.
+Accessibility of Player State Content
+FR-14.54: The system shall ensure that stats, labels, item cards, status effects, and achievements are easy to read and understand.
+Text, icons, bars, and indicators must use sufficient clarity, size, and contrast for usability and accessibility.
+Player State as Character Context View
+FR-14.55: The system shall use the player state page as the structured view of the character’s current gameplay condition within the active session.
+The page must act as a reliable user-facing representation of the player’s ongoing status, possessions, and progression.
+2.3.15 Mockup M15 - Profile and Settings
+Figure 20 Mockup M15 for Profile and Settings
+2.3.15.1 Functional Requirements
+Table 17 Functional Requirements Derived from Mockup M15 - Profile and Settings
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-15.1: The system shall display the Omni-Narrative Engine logo and brand name on the Profile and Settings page.
+The logo must remain visually consistent with the platform branding and follow the standard navigation behavior defined by the system.
+Page Access Link / Navigation Entry
+FR-15.2: The system shall provide access to the Profile and Settings page from the main application navigation.
+Only authenticated users shall be allowed to open and use the profile settings area.
+User Preferences Label
+FR-15.3: The system shall display a label or section indicator showing that the page is related to user preferences and settings.
+The label must help the user immediately understand the purpose of the page.
+Page Heading
+FR-15.4: The system shall display a heading identifying the page as the Profile and Settings view.
+The heading must be clear and prominent so that users can easily recognize the current section.
+Supporting Description
+FR-15.5: The system shall display a short description explaining that the page allows management of identity, preferences, and immersive experience options.
+The description must use simple language and should appear near the heading.
+User Profile Card
+FR-15.6: The system shall display a profile card containing the current user’s basic account information.
+The displayed information must belong only to the authenticated user.
+Profile Avatar
+FR-15.7: The system shall display a profile avatar or placeholder graphic for the user.
+The avatar may be system-generated or user-defined depending on implementation.
+User Name Display
+FR-15.8: The system shall display the current user’s name on the profile card.
+The name shown must match the stored account record of the active user.
+User Role / Status Display
+FR-15.9: The system shall display the current user’s role or account label, such as storyteller or adventurer.
+The displayed label must match the stored account classification used by the system.
+Full Name Field
+FR-15.10: The system shall provide an editable field for the user’s full name.
+The field must accept valid text input and must not allow invalid or empty values if the field is required.
+Display Name Field
+FR-15.11: The system shall provide an editable field for the user’s display name.
+The display name may be used for personalization and account presentation within the system.
+Email Field
+FR-15.12: The system shall display the user’s email address in a profile field.
+The email value must match the authenticated account record and must follow valid email formatting rules.
+Password Field Placeholder
+FR-15.13: The system shall display a protected password field or masked password indicator within the settings form.
+Actual stored passwords must never be shown in plain text.
+Email Notifications Toggle
+FR-15.14: The system shall provide a toggle control for enabling or disabling email notifications.
+The toggle state must be stored as part of the user’s account preferences.
+Background Music Toggle
+FR-15.15: The system shall provide a toggle control for enabling or disabling autoplay background music.
+The selected preference must affect future story sessions or media playback behavior where applicable.
+Narration Toggle
+FR-15.16: The system shall provide a toggle control for enabling or disabling narration by default.
+The selected preference must be applied to future scenes and active session audio settings where supported.
+Dark Mode Toggle
+FR-15.17: The system shall provide a toggle control for enabling or disabling dark cinematic mode.
+The selected theme preference must update the application appearance according to supported theme settings.
+Save Changes Button
+FR-15.18: The system shall provide a “Save Changes” button to store updated profile and preference settings.
+The system shall validate editable fields before saving and shall update stored preferences only after successful validation.
+Forgot Password Button
+FR-15.19: The system shall provide a “Forgot Password” option to allow users to begin password recovery.
+Clicking this option shall redirect the user to a secure password reset or recovery flow.
+Account Summary Panel
+FR-15.20: The system shall display an account summary panel on the Profile and Settings page.
+The summary panel must present user-specific account statistics and preference information.
+Stories Created Statistic
+FR-15.21: The system shall display the total number of stories created by the user in the account summary.
+The value must be calculated from stored user session data and updated when new stories are created.
+Saved Sessions Statistic
+FR-15.22: The system shall display the total number of saved sessions in the account summary.
+The value must reflect the actual number of stored sessions associated with the user account.
+Preferred Style Display
+FR-15.23: The system shall display the user’s currently selected or dominant narrative style in the summary panel.
+The displayed style must be based on stored preference data or user activity history where applicable.
+Account Status Display
+FR-15.24: The system shall display the current account status in the summary panel.
+The displayed status must match the actual state of the user account in the system.
+Theme Palette Options
+FR-15.25: The system shall display selectable theme palette options for user interface personalization.
+Only supported theme choices shall be selectable by the user.
+Theme Selection
+FR-15.26: The system shall allow the user to select a preferred theme color or palette.
+The selected theme must be saved as a user preference and reflected in the application interface where supported.
+Go to Story Hub Button
+FR-15.27: The system shall provide a “Go to Story Hub Page” button for returning to the main dashboard.
+Clicking this button shall navigate the user to the Story Hub without affecting saved settings data.
+Profile Field Validation
+FR-15.28: The system shall validate user-editable profile fields before saving updated account data.
+Invalid entries such as incorrect email format or prohibited empty required fields shall not be accepted.
+Secure Profile Update
+FR-15.29: The system shall update profile information securely after successful validation.
+Profile changes must be stored only for the authenticated account and must not affect other users.
+Preference Persistence
+FR-15.30: The system shall preserve saved user preferences across future sessions and logins.
+Once saved successfully, preference values must remain active until changed again by the user.
+Password Protection
+FR-15.31: The system shall protect password-related data from direct exposure within the profile interface.
+Password values must remain masked and any reset action must follow secure authentication procedures.
+Settings Change Confirmation
+FR-15.32: The system shall notify the user when settings or profile changes are saved successfully.
+Confirmation messages must be clear and non-technical.
+Error Handling for Profile Update
+FR-15.33: The system shall notify the user if profile or settings updates fail.
+Error messages must explain the issue clearly without exposing sensitive system details.
+User-Specific Data Retrieval
+FR-15.34: The system shall retrieve and display profile and settings information for the currently authenticated user only.
+Users must not be able to view or edit another user’s profile data.
+Responsive Layout
+FR-15.35: The system shall ensure that the Profile and Settings page remains readable and usable across supported screen sizes and devices.
+Cards, fields, toggles, buttons, and summary panels must remain aligned, visible, and accessible.
+Accessibility of Controls
+FR-15.36: The system shall ensure that all settings fields, toggles, and buttons are easy to read and interact with.
+Labels, controls, and feedback messages must use sufficient clarity, size, and contrast for usability and accessibility.
+Read and Update User Preferences
+FR-15.37: The system shall use the Profile and Settings page as the main interface for viewing and managing account-level preferences.
+Changes made on this page must affect only supported personalization and account behavior settings.
+2.3.16 Mockup M16 - Forgot Password
+Figure 21 Mockup M16 for Forgot Password
+2.3.16.1 Functional Requirements
+Table 18 Functional Requirements Derived from Mockup M16 - Forgot Password
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-16.1: The system shall display the Omni-Narrative Engine logo and brand name on the Forgot Password page.
+The logo must remain visually consistent with the platform branding and follow the standard navigation behavior defined by the system.
+Top Navigation Links
+FR-16.2: The system shall display top navigation links relevant to account recovery, such as Profile & Settings and Logout where applicable.
+Navigation items shown on this page must follow the access rules of the current session state and must not expose restricted features to unauthorized users.
+Account Recovery Label
+FR-16.3: The system shall display a label or badge indicating that the page belongs to the account recovery process.
+The label must help users immediately understand that the page is for password reset and account access recovery.
+Page Heading
+FR-16.4: The system shall display a heading identifying the page as the Forgot Password view.
+The heading must be prominent and clearly communicate the purpose of the page.
+Supporting Description
+FR-16.5: The system shall display a short description explaining that the user can recover account access through a secure reset link.
+The description must use simple language and should appear near the page heading.
+Recovery Form Container
+FR-16.6: The system shall display the password recovery controls inside a structured form container.
+The container must group related recovery elements clearly and keep the layout readable and organized.
+Security Icon / Visual Identifier
+FR-16.7: The system shall display a visual security-related icon in the recovery form area.
+The icon is supportive only and must not interfere with usability or accessibility.
+Email Address Label
+FR-16.8: The system shall display a label identifying the email input field.
+The label must clearly indicate that the user should enter the email linked to the account.
+Email Address Input Field
+FR-16.9: The system shall provide an input field for the user to enter the account email address for password recovery.
+The field must accept valid email input only and must reject empty submission where email is required.
+Email Field Placeholder / Prefill Support
+FR-16.10: The system shall display placeholder text or an example format in the email input field.
+Placeholder content is supportive only and must not be stored as actual recovery data.
+Recovery Instruction Text
+FR-16.11: The system shall display guidance informing the user that a reset link will be sent to the entered email address.
+The guidance text must explain the process clearly and should mention that the reset link is temporary if such policy applies.
+Security Information Card
+FR-16.12: The system shall display a security information element indicating that the password recovery process follows a protected reset flow.
+The information shown must match the actual account recovery mechanism implemented by the system.
+Expiry Information Card
+FR-16.13: The system shall display an expiry-related information element indicating that the reset link is limited in time.
+The displayed message must reflect the actual validity duration or policy of the reset link.
+Back Button
+FR-16.14: The system shall provide a “Back” button to allow the user to return to the previous account access screen.
+Clicking the button shall return the user to the appropriate prior page, such as login, without submitting the recovery form.
+Send Reset Link Button
+FR-16.15: The system shall provide a “Send Reset Link” button that submits the password recovery request.
+Clicking the button shall trigger validation of the email field before initiating the recovery workflow.
+Email Format Validation
+FR-16.16: The system shall validate the entered email address before processing the password reset request.
+Invalid email formats and empty values shall not be accepted for submission.
+Recovery Request Processing
+FR-16.17: The system shall process a valid password recovery request for the entered email address.
+The recovery process must follow the system’s secure authentication and account recovery rules.
+Reset Link Generation
+FR-16.18: The system shall generate or request generation of a secure password reset link for valid recovery requests.
+The reset link must be unique, protected, and associated only with the intended account recovery request.
+Reset Link Delivery
+FR-16.19: The system shall send the password reset link to the entered email address when the recovery request is accepted.
+The link must be delivered only through the verified recovery channel configured by the system.
+Limited-Time Link Enforcement
+FR-16.20: The system shall enforce a limited validity period for password reset links.
+Expired reset links shall no longer be accepted for password change operations.
+Secure Recovery Workflow
+FR-16.21: The system shall ensure that the password reset flow follows secure account recovery practices.
+The recovery process must not expose passwords, tokens, or sensitive account information in plain text.
+Non-Disclosure of Sensitive Account State
+FR-16.22: The system shall handle recovery requests without revealing unnecessary sensitive account details.
+User-facing messages should avoid exposing whether a specific email exists in the system unless such disclosure is explicitly allowed by the security policy.
+Recovery Success Feedback
+FR-16.23: The system shall notify the user when a password reset request has been successfully submitted.
+The confirmation message must be clear, non-technical, and should instruct the user to check their email.
+Recovery Failure Feedback
+FR-16.24: The system shall notify the user if the password reset request cannot be processed.
+Error messages must be clear and helpful without revealing sensitive internal system details.
+Password Reset Link Traceability
+FR-16.25: The system shall associate each issued reset link with the corresponding recovery request and account.
+The link must be usable only for the intended account recovery flow and only within the defined validity period.
+Read-Only Security Guidance
+FR-16.26: The system shall present security and expiry information as informational content rather than editable controls.
+Users may view these security notes, but they must not alter recovery policy settings from this page.
+User-Specific Recovery Handling
+FR-16.27: The system shall process password recovery only for the account linked to the entered email address according to authentication rules.
+Recovery actions must affect only the intended account and must not interfere with other accounts.
+Responsive Layout
+FR-16.28: The system shall ensure that the Forgot Password page remains readable and usable across supported screen sizes and devices.
+Form controls, labels, buttons, and security information cards must remain aligned, visible, and accessible.
+Accessibility of Recovery Controls
+FR-16.29: The system shall ensure that the recovery form fields, instructions, and action buttons are easy to read and interact with.
+Labels, buttons, and messages must use sufficient clarity, size, and contrast for usability and accessibility.
+Password Recovery Interface Role
+FR-16.30: The system shall use the Forgot Password page as the main interface for initiating secure account password recovery.
+This page must serve only the recovery initiation step and must not directly expose password reset execution without proper verification.
+2.3.17 Mockup M17 – Logout
+Figure 22 Mockup M17 for Logout
+2.3.17.1 Functional Requirements
+Table 19 Functional Requirements Derived from Mockup M17 - Logout
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-17.1: The system shall display the Omni-Narrative Engine logo and brand name on the Logout page.
+The logo must remain visually consistent with the platform branding and follow the standard navigation behavior defined by the system.
+Top Navigation Links
+FR-17.2: The system shall display relevant top navigation links such as Forgot Password, Profile & Settings, and Logout on the logout page where applicable.
+The navigation items displayed must follow the user’s current authenticated state and access rules.
+Session Exit Label
+FR-17.3: The system shall display a label or badge indicating that the page belongs to the session exit process.
+The label must help the user immediately understand that the page is for logout confirmation.
+Page Heading
+FR-17.4: The system shall display a heading identifying the page as the Logout view.
+The heading must be prominent and clearly communicate the purpose of the page.
+Supporting Description
+FR-17.5: The system shall display a short description explaining that the page is used to confirm leaving the current session.
+The description must use simple language and should reassure the user about saved progress where applicable.
+Logout Confirmation Container
+FR-17.6: The system shall display the logout confirmation controls inside a structured confirmation container.
+The container must group related information and actions clearly and maintain readability.
+Exit Icon / Visual Identifier
+FR-17.7: The system shall display a logout-related visual icon in the confirmation area.
+The icon is supportive only and must not interfere with usability or accessibility.
+Confirmation Message
+FR-17.8: The system shall display a confirmation message asking the user whether they want to log out.
+The message must clearly state that logout is a deliberate action requiring user confirmation.
+Progress Preservation Message
+FR-17.9: The system shall inform the user that the latest progress is saved before logout, where such save behavior is supported.
+The message must reflect the actual session-saving behavior of the system and must not make false claims.
+Current Story Summary
+FR-17.10: The system shall display the currently active story or most recent story session in the logout confirmation area.
+The displayed story must belong to the authenticated user and match the latest session context.
+Last Save Information
+FR-17.11: The system shall display the last saved time or recent save indicator for the current session.
+The displayed value must reflect the actual latest save state recorded by the system.
+Cancel Button
+FR-17.12: The system shall provide a “Cancel” button to allow the user to dismiss the logout process.
+Clicking the button shall return the user to the previous page or active session without ending authentication.
+Confirm Logout Button
+FR-17.13: The system shall provide a “Confirm Logout” button to allow the user to complete the logout action.
+Clicking the button shall terminate the authenticated session according to the system’s logout procedure.
+Explicit Logout Confirmation
+FR-17.14: The system shall require explicit user confirmation before completing logout from the current session.
+Logout shall not occur immediately without confirmation when this confirmation page is shown.
+Secure Session Termination
+FR-17.15: The system shall securely terminate the current authenticated session after logout confirmation.
+Session tokens or active authentication state must be invalidated according to the system’s security rules.
+Logout Redirection
+FR-17.16: The system shall redirect the user to the appropriate post-logout page after successful session termination.
+After logout, the user shall be sent to a public entry page, login page, or landing page according to system design.
+Save State Check Before Logout
+FR-17.17: The system shall verify or preserve the latest valid session progress before completing logout when session saving is supported.
+User progress must not be lost due to normal logout if auto-save or last-save preservation is part of the system behavior.
+Logout Feedback
+FR-17.18: The system shall notify the user when logout has been completed successfully.
+The confirmation message must be clear, non-technical, and must not expose internal system details.
+Logout Failure Feedback
+FR-17.19: The system shall notify the user if logout cannot be completed successfully.
+Error messages must be understandable and should guide the user without revealing sensitive internal details.
+User-Specific Session Handling
+FR-17.20: The system shall perform logout only for the currently authenticated user session.
+Logging out one user session must not affect unrelated users or sessions.
+Read-Only Session Summary
+FR-17.21: The system shall present current story and last-save information as review-only content in the logout confirmation screen.
+The user may view this summary, but it must not be editable from the logout page.
+Protection Against Accidental Logout
+FR-17.22: The system shall use the confirmation page to reduce accidental session exit.
+The user must be given a clear opportunity to cancel before the logout is finalized.
+Responsive Layout
+FR-17.23: The system shall ensure that the Logout page remains readable and usable across supported screen sizes and devices.
+Buttons, labels, confirmation text, and summary fields must remain aligned, visible, and accessible.
+Accessibility of Logout Controls
+FR-17.24: The system shall ensure that the logout confirmation text and action buttons are easy to read and interact with.
+Labels, messages, and controls must use sufficient clarity, size, and contrast for usability and accessibility.
+Session Exit Interface Role
+FR-17.25: The system shall use the Logout page as the main interface for confirming safe session exit.
+This page must serve as the controlled confirmation step before authentication is ended.
+2.3.18 Mockup M18 – Admin Dashboard
+Figure 23 Mockup M18 for Admin Dashboard
+2.3.18.1 Functional Requirements
+Table 20 Functional Requirements Derived from Mockup M18- Admin Dashboard
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-18.1: The system shall display the Omni-Narrative Engine logo and brand name on the admin dashboard page.
+The logo must remain visually consistent with the platform branding and follow the standard navigation behavior defined for administrator screens.
+Dashboard Navigation Tab
+FR-18.2: The system shall provide a “Dashboard” navigation tab on the admin dashboard page and visually indicate it as the active section.
+The active navigation tab must be clearly highlighted so the administrator can identify the current page.
+Users Navigation Tab
+FR-18.3: The system shall provide a “Users” navigation tab on the admin dashboard page.
+Clicking this tab shall navigate the administrator to the user management section. Access shall be restricted to authorized administrative accounts only.
+Stories Navigation Tab
+FR-18.4: The system shall provide a “Stories” navigation tab on the admin dashboard page.
+Clicking this tab shall navigate the administrator to the story management or moderation section.
+Sessions Navigation Tab
+FR-18.5: The system shall provide a “Sessions” navigation tab on the admin dashboard page.
+Clicking this tab shall navigate the administrator to the session monitoring section.
+Logs Navigation Tab
+FR-18.6: The system shall provide a “Logs” navigation tab on the admin dashboard page.
+Clicking this tab shall navigate the administrator to the detailed system logs section.
+Admin Identity Display
+FR-18.7: The system shall display the currently authenticated administrator identity on the admin dashboard page.
+The displayed identity must correspond to the logged-in administrative account.
+Logout Control
+FR-18.8: The system shall provide a logout control for the administrator on the admin dashboard page.
+Clicking the logout control shall securely terminate the administrator session according to the system’s authentication rules.
+Page Heading
+FR-18.9: The system shall display a heading identifying the page as the Admin Dashboard.
+The heading must be prominent and clearly communicate that the page is intended for administrative use.
+Supporting Description
+FR-18.10: The system shall display a short description explaining that the dashboard is used to view and manage platform activity, user engagement, and system statistics.
+The description must help administrators understand the purpose of the dashboard in simple terms.
+Overall Statistics Section
+FR-18.11: The system shall provide an “Overall Statistics” section on the admin dashboard page.
+This section must present key high-level platform metrics in summarized form.
+Total Users Statistic
+FR-18.12: The system shall display the total number of registered users on the platform.
+The displayed value must be derived from current system records and should update as user data changes.
+Total Stories Statistic
+FR-18.13: The system shall display the total number of stories created on the platform.
+The displayed value must reflect the actual number of stored story records.
+Active Sessions Statistic
+FR-18.14: The system shall display the number of currently active sessions on the platform.
+The displayed value must be based on current session tracking logic and active session data.
+Daily Logins Statistic
+FR-18.15: The system shall display the number of daily logins on the platform.
+The displayed value must reflect login activity for the relevant day according to system records.
+Trend Change Indicator
+FR-18.16: The system shall display increase or decrease indicators with summary statistics where trend tracking is supported.
+Trend values must be calculated from relevant historical comparison periods and must not be shown inaccurately.
+User Engagement Chart Section
+FR-18.17: The system shall provide a “User Engagement Chart” section on the admin dashboard page.
+The chart section must visualize engagement data in a readable form for administrative review.
+Engagement Time Filter
+FR-18.18: The system shall provide a time-range filter for the user engagement chart, such as “This Week.”
+Selecting a different time range shall update the displayed chart data accordingly.
+Engagement Chart Display
+FR-18.19: The system shall display a chart representing user engagement activity over time.
+The chart must be based on stored analytics or session activity data and must reflect the selected time range.
+Chart Legend Display
+FR-18.20: The system shall display a legend identifying chart data categories, such as sessions and new users.
+The legend labels must correspond exactly to the plotted data series.
+Active Sessions Section
+FR-18.21: The system shall provide an “Active Sessions” section on the admin dashboard page.
+This section must display currently active or recently active user sessions in a structured table format.
+Active Sessions Table
+FR-18.22: The system shall display a table of active sessions including user, story, genre, and last active time.
+Table data must be retrieved from current session records and must reflect actual tracked session activity.
+Active Session User Display
+FR-18.23: The system shall display the associated username or user identifier for each active session record.
+The displayed value must match the stored account associated with the session.
+Active Session Story Display
+FR-18.24: The system shall display the story title associated with each active session.
+The displayed story title must match the stored session context.
+Active Session Genre Display
+FR-18.25: The system shall display the genre associated with each active session.
+The genre shown must correspond to the stored story metadata of that session.
+Active Session Last Active Display
+FR-18.26: The system shall display the latest activity time for each active session.
+The displayed time must reflect the most recent recorded interaction for that session.
+View All Active Sessions Control
+FR-18.27: The system shall provide a “View All” control for the active sessions section.
+Clicking this control shall navigate the administrator to a more detailed session monitoring view.
+Recent Stories Section
+FR-18.28: The system shall provide a “Recent Stories” section on the admin dashboard page.
+This section must present recently created or updated stories in a structured list or table format.
+Recent Stories Table
+FR-18.29: The system shall display a table of recent stories including title, genre, creator, and creation time.
+The displayed records must reflect actual recent story entries stored by the platform.
+Recent Story Title Display
+FR-18.30: The system shall display the title of each recent story in the recent stories section.
+The displayed title must match the stored story record.
+Recent Story Genre Display
+FR-18.31: The system shall display the genre of each recent story in the recent stories section.
+The displayed genre must match the story metadata.
+Recent Story Creator Display
+FR-18.32: The system shall display the creator or owner of each recent story.
+The displayed creator must match the account associated with the story record.
+Recent Story Time Display
+FR-18.33: The system shall display the creation or recent activity time of each recent story.
+The displayed time must reflect the recorded timestamp stored for the story.
+View All Recent Stories Control
+FR-18.34: The system shall provide a “View All” control for the recent stories section.
+Clicking this control shall navigate the administrator to a more complete story management view.
+Platform Logs Section
+FR-18.35: The system shall provide a “Platform Logs” section on the admin dashboard page.
+This section must display recent system or platform events relevant to administrative monitoring.
+Platform Logs Table
+FR-18.36: The system shall display a table of platform logs including time, event, and detail.
+The displayed logs must reflect actual tracked system or administrative events.
+Log Time Display
+FR-18.37: The system shall display the time associated with each logged event.
+The displayed time must match the recorded timestamp of the event.
+Log Event Type Display
+FR-18.38: The system shall display the event category or type for each log entry.
+Event labels must correspond to the stored event classification, such as user registration, story creation, or suspension.
+Log Detail Display
+FR-18.39: The system shall display descriptive details for each logged event.
+The detail text must summarize the event without exposing sensitive internal information beyond administrator permissions.
+View All Logs Control
+FR-18.40: The system shall provide a “View All” control for the platform logs section.
+Clicking this control shall navigate the administrator to the complete logging and audit trail view.
+Admin-Only Access Control
+FR-18.41: The system shall restrict access to the admin dashboard page to authenticated users with administrator privileges.
+Unauthorized users must not be permitted to access administrative data or controls.
+Real-Time or Near Real-Time Data Refresh
+FR-18.42: The system shall update dashboard statistics, activity records, and monitoring data in real time or near real time where supported.
+Updated data must reflect recent platform activity without requiring unnecessary manual refreshes where dynamic updates are enabled.
+Administrative Monitoring Capability
+FR-18.43: The system shall allow administrators to monitor platform health, user activity, and operational trends from a centralized dashboard.
+The dashboard must summarize important platform indicators in a way that supports quick review and decision-making.
+Read-Only Dashboard Summary
+FR-18.44: The system shall present the main dashboard statistics and summaries as review-oriented data displays.
+High-level dashboard panels should not directly modify records unless dedicated management actions are explicitly provided elsewhere.
+Responsive Admin Layout
+FR-18.45: The system shall ensure that the admin dashboard page remains readable and usable across supported screen sizes and devices.
+Tables, charts, cards, and controls must remain aligned, visible, and accessible.
+Accessibility of Admin Controls
+FR-18.46: The system shall ensure that administrative tables, charts, buttons, and labels are easy to read and interact with.
+Text, controls, and visual indicators must use sufficient clarity, size, and contrast for usability and accessibility.
+Centralized Admin Overview Role
+FR-18.47: The system shall use the admin dashboard page as the main overview interface for administrative monitoring and management navigation.
+This page must serve as the primary entry point for reviewing platform-wide activity and accessing deeper admin functions.
+2.3.19 Mockup M19 – Export Video
+Figure 24 Mockup M19 for Export Video
+2.3.19.1 Functional Requirements
+Table 21 Functional Requirements Derived from Mockup M19- Export Video
+Feature (derived from UI)
+Functional Requirement (FR-ID: Statement)
+Business Rule
+Application Logo / Brand Name
+FR-19.1: The system shall display the Omni-Narrative Engine logo and brand name on the video export page.
+The logo must remain visually consistent with the platform branding and follow the standard navigation behavior defined by the system.
+Top Navigation Links
+FR-19.2: The system shall display top navigation links relevant to the current authenticated user context, such as My Sessions, History, Memory, and Logout.
+The displayed links must follow the user’s access permissions and current navigation structure.
+Logout Button
+FR-19.3: The system shall provide a logout button on the video export page.
+Clicking the button shall securely terminate the current authenticated session according to the system logout policy.
+Back to Session Link
+FR-19.4: The system shall provide a “Back to Session” control to allow the user to return to the previous story session screen.
+Clicking this control shall return the user to the relevant session view without starting or modifying the export process.
+Page Heading
+FR-19.5: The system shall display a heading identifying the page as the Video Export view.
+The heading must be prominent and clearly communicate the purpose of the page.
+Supporting Description
+FR-19.6: The system shall display a short description explaining that the user can configure export settings for a recorded session video.
+The description must use clear language and briefly explain the available export customization options.
+Export Settings Section
+FR-19.7: The system shall provide an “Export Settings” section on the video export page.
+This section must group the preview area and all video export configuration controls in a structured way.
+Session Video Preview
+FR-19.8: The system shall display a preview area for the selected session video before export.
+The preview must correspond to the currently selected or generated story session media.
+Preview Playback Control
+FR-19.9: The system shall provide playback controls for the video preview.
+The user must be able to play or pause the preview without initiating the export itself.
+Preview Timeline Bar
+FR-19.10: The system shall display a timeline or progress bar for the video preview.
+The timeline must reflect the current playback position and total preview duration.
+Current Playback Time Display
+FR-19.11: The system shall display the current playback time of the preview video.
+The displayed time must update according to preview playback progress.
+Total Video Duration Display
+FR-19.12: The system shall display the total duration of the selected export video.
+The displayed duration must match the actual underlying video content prepared for export.
+Format Selection Field
+FR-19.13: The system shall provide a selectable field for the user to choose the export video format.
+Only supported export formats, such as MP4, shall be available for selection.
+Resolution Selection Field
+FR-19.14: The system shall provide a selectable field for the user to choose the export resolution.
+Only supported resolutions shall be displayed, such as Full HD or other configured export sizes.
+File Size Estimate Display
+FR-19.15: The system shall display an estimated output file size for the selected export configuration.
+The file size estimate must update when export format, resolution, or other options change.
+Export Options Section
+FR-19.16: The system shall provide an “Options” section containing additional export configuration settings.
+The options section must allow users to customize export behavior before starting the export.
+Include Subtitles Option
+FR-19.17: The system shall provide an option to include subtitles in the exported video.
+When enabled, subtitles must be embedded or attached according to the export design supported by the system.
+Add Watermark Option
+FR-19.18: The system shall provide an option to add a watermark to the exported video.
+When enabled, the watermark must be applied consistently according to system branding or export policy.
+Enhance Video Quality Option
+FR-19.19: The system shall provide an option to enable enhanced video quality during export.
+If enabled, the system may increase processing time and file size according to defined export rules.
+Toggle Controls for Options
+FR-19.20: The system shall allow users to enable or disable export options through toggle controls.
+Each toggle must update the export configuration state immediately after valid user interaction.
+Export Progress Section
+FR-19.21: The system shall provide an “Export Progress” section on the video export page.
+This section must show the current export state once export begins.
+Export Progress Bar
+FR-19.22: The system shall display a progress bar for the video export process.
+The progress bar must reflect the actual export status in real time or near real time.
+Export Percentage Display
+FR-19.23: The system shall display the percentage completion of the export process.
+The displayed percentage must remain consistent with the export progress state.
+Estimated Time Remaining Display
+FR-19.24: The system shall display an estimated remaining time for the export operation.
+The estimate may update dynamically as the export progresses.
+Cancel Export Button
+FR-19.25: The system shall provide a “Cancel” button to allow the user to stop the export process.
+Clicking this button shall cancel an active export or close the export process according to current state and system policy.
+Start Export Button
+FR-19.26: The system shall provide a “Start Export” button to initiate the video export process.
+Clicking the button shall validate the selected export settings before beginning export.
+Export Configuration Validation
+FR-19.27: The system shall validate export settings before starting video export.
+Unsupported or incomplete configurations shall not be allowed to proceed to export.
+Start Video Export Process
+FR-19.28: The system shall initiate the export process using the selected format, resolution, and option settings.
+Export processing must use the latest valid settings selected by the user.
+Export Processing State Management
+FR-19.29: The system shall maintain and display the current state of the export process while the video is being prepared.
+The user must receive visible feedback during export and must not be left without status information.
+Export Completion Handling
+FR-19.30: The system shall notify the user when the video export process has been completed successfully.
+The completion message must be clear and must indicate that the exported file is ready.
+Export Failure Handling
+FR-19.31: The system shall notify the user if the export process fails or cannot be completed.
+Error messages must be understandable and must not expose sensitive internal processing details.
+Export Based on Session Content
+FR-19.32: The system shall generate the exported video using the selected story session content, including supported visuals, narration, and scene sequence.
+The exported file must correspond to the intended session and reflect the included export options.
+User-Specific Export Access
+FR-19.33: The system shall allow video export only for sessions accessible to the authenticated user.
+Users must not be able to export sessions that do not belong to them unless authorized by system rules.
+Read-Only Preview and Settings Review
+FR-19.34: The system shall present export settings and preview controls as preparation tools for video generation.
+These controls must affect export configuration only and must not alter the original saved session content.
+Responsive Layout
+FR-19.35: The system shall ensure that the video export page remains readable and usable across supported screen sizes and devices.
+Preview areas, dropdowns, toggles, progress indicators, and buttons must remain aligned, visible, and accessible.
+Accessibility of Export Controls
+FR-19.36: The system shall ensure that preview controls, selection fields, toggle options, and action buttons are easy to read and interact with.
+Labels, controls, and feedback text must use sufficient clarity, size, and contrast for usability and accessibility.
+Video Export Interface Role
+FR-19.37: The system shall use the video export page as the main interface for configuring and generating exportable session videos.
+This page must serve as the controlled user interface for previewing, customizing, and exporting story session videos.
+2.3 Non-Functional Requirements
+The Non-Functional Requirements are:
+2.3.1 Performance
+PER-1: The system shall generate and display the initial narrative response for a new story session within an acceptable response time under normal operating conditions.
+PER-2: The system shall update scene-generation progress indicators in real time or near real time while narrative, image, and audio components are being processed.
+PER-3: The Story Hub , saved sessions view, history page, memory page, and player state page shall load within a short and usable time after a valid user request.
+PER-4: The system shall process user choice submission and initiate next-scene generation without unnecessary delay.
+PER-5: The system shall support smooth retrieval of saved sessions, story history, memory records, and player state without noticeable interruption to the user experience.
+2.3.2 Accuracy and Consistency
+ACC-1: The system shall generate story content that remains consistent with the user’s selected genre, scenario, tone, difficulty, and character configuration.
+ACC-2: The system shall maintain continuity of key events, characters, locations, player state, and active story threads across scene transitions.
+ACC-3: The system shall ensure that displayed progress values, scene numbers, attribute values, and session details match the actual stored session state.
+ACC-4: The system shall record user choices accurately and use them as valid input for future scene generation.
+ACC-5: The system shall preserve consistency between visible story memory and the internal context used by the narrative engine wherever applicable.
+2.3.3 Usability
+USA-1: A new user shall be able to understand the basic purpose of the system and begin a story session with minimal guidance.
+USA-2: The system shall provide a clear and step-based story setup flow so that users can configure genre, scenario, tone, difficulty, and character without confusion.
+USA-3: Important user actions, such as starting a new story, resuming a session, selecting a choice, and reviewing context pages, shall require only a small number of clear interactions.
+USA-4: The interface shall use readable text, clear labels, meaningful buttons, and organized layout structures to support ease of use.
+USA-5: The system shall present story-related context, such as memory, history, and player state, in a way that is easy for users to understand even during long sessions.
+2.3.4 Reliability
+REL-1: The system shall remain operational and available for normal use except during planned maintenance or major service interruption.
+REL-2: If one multimedia generation component fails, such as image or audio generation, the system shall continue to preserve the narrative session and provide fallback behavior where possible.
+REL-3: The system shall preserve saved sessions, story memory, history, and player state so that users can continue their narratives later without major loss of progress.
+REL-4: The system shall handle failed API calls, temporary service delays, or incomplete generation states without crashing the user session.
+REL-5: The system shall maintain valid session continuity when a user resumes a previously saved story.
+2.3.5 Security & Privacy
+SEC-1: The system shall require secure authentication for registered users and shall protect account access through validated login procedures.
+SEC-2: User credentials shall be stored securely using accepted encryption or hashing practices and shall never be stored in plain text.
+SEC-3: The system shall restrict access to saved sessions, story history, memory, and player state so that only the authorized user can access their own data.
+SEC-4: Communication between frontend, backend, and integrated services shall occur through secure channels.
+SEC-5: Sensitive system credentials, configuration values, and API keys shall be stored securely and shall not be exposed directly in the user-facing interface.
+2.3.6 Portability
+POR-1: The system shall be deployable in a web-based environment accessible through standard modern browsers.
+POR-2: The user interface shall adapt to different screen sizes and resolutions without losing major functionality.
+POR-3: The architecture of the system should support future deployment extension to other platforms if required.
+2.3.7 Maintainability
+MAI-1: The system should be designed in modular form so that major components such as narrative generation, session management, memory handling, multimedia generation, and interface logic can be updated independently.
+MAI-2: The codebase should be organized in a way that simplifies testing, debugging, and future enhancement.
+MAI-3: The system should support replacement, improvement, or retraining of AI-related modules without requiring complete redesign of the whole application.
+MAI-4: Backend services, APIs, and data storage logic should be structured clearly to support maintenance and future scalability.
+2.3.8 Accessibility
+ACS-1: The interface shall use readable typography, clear contrast, and properly sized controls so that users can interact with the system comfortably.
+ACS-2: Buttons, tabs, cards, and navigation controls shall remain easy to identify and select across supported devices.
+ACS-3: The system shall organize information in a clear and consistent way so that users can move between story interaction and support pages without confusion.
+ACS-4: Progress indicators, labels, and state information shall be presented in a way that is understandable to a broad range of users.
+2.4 External Interface Requirements
+This section defines the external interface requirements of the Omni-Narrative Engine, including user, software, hardware, and communication interfaces. These interfaces ensure that the system remains usable, modular, connected, and operational across the components involved in interactive story generation and session management.
+2.4.1 User Interfaces Requirements
+UI-1: The application shall follow an immersive visual theme suitable for AI-driven storytelling, using a dark cinematic interface with contrasting accent colors to support focus and atmosphere.
+UI-2: The system shall provide a consistent top navigation structure for important sections such as Story Hub, My Sessions, History, Memory, and Player State.
+UI-3: The interface shall present the story setup process as a clear step-by-step flow with visible progress indicators.
+UI-4: The system shall use modern, readable typography with clear heading hierarchy and suitable font sizing across major screens.
+UI-5: All major screens shall maintain a consistent layout structure with branding, navigation, primary content area, and action controls.
+UI-6: The system shall use clear visual indicators for selected options, active tabs, progress states, risk levels, and status conditions.
+UI-7: The active story screen shall present narrative content, decision choices, and audio controls in a structured and readable way.
+UI-8: The system shall provide context support pages, such as Story History, Story Memory, and Player State, using organized card-based or section-based layouts.
+UI-9: The interface shall remain responsive across supported screen sizes so that core features remain accessible on different displays.
+UI-10: The system should follow accessibility-aware design principles such as readable contrast, meaningful labels, large enough controls, and simple navigation flow.
+2.4.2 Software interfaces
+SW-1: The frontend application shall communicate with the backend through defined API endpoints for session control, story generation, and user-related operations.
+SW-2: The system shall integrate a narrative generation engine to produce story text based on user setup, previous scenes, and selected choices.
+SW-3: The system shall integrate image generation services or modules for producing scene-related visuals where supported.
+SW-4: The system shall integrate audio or ambience generation and playback support for narration and atmospheric sound where enabled.
+SW-5: The backend shall communicate with the session management module to save, load, and update story session data.
+SW-6: The system shall connect with a data storage mechanism for user accounts, saved stories, story history, memory records, and player state information.
+SW-7: The system shall support structured request and response formats for data exchange between frontend and backend components.
+SW-8: The system should support modular integration of AI-related services so that narrative, visual, and audio generation can operate as separate but coordinated components.
+SW-9: Administrative or maintenance-related system monitoring may be supported through protected backend access in future extensions.
+SW-10: All software interfaces shall follow secure authentication and authorization practices for protected resources.
+2.4.3 Hardware interfaces
+The Omni-Narrative Engine does not depend on specialized external hardware devices. Its main hardware interaction is through standard computing devices used to access the application.
+HW-1: The system shall operate on standard computing devices capable of running a modern web browser.
+HW-2: The system shall rely on the device display for showing story content, generation progress, memory panels, and player state information.
+HW-3: The system shall use the device’s audio output hardware for narration and ambient sound playback where such features are enabled.
+HW-4: The system shall rely on the device’s input hardware, such as keyboard, mouse, touchpad, or touchscreen, for setup selection and story interaction.
+HW-5: The system shall require internet-connected hardware capable of communicating with remote generation and storage services.
+HW-6: Future versions may support extended multimedia or device-specific features, but such hardware dependencies are not required in the current scope.
+2.4.4 Communications interfaces
+The Omni-Narrative Engine communicates with backend services, storage systems, and AI generation components through secure network-based interfaces.
+CI-1: The frontend application shall communicate with the backend using secure internet-based communication protocols.
+CI-2: Data exchanged between user interface and backend services shall use structured request-response communication.
+CI-3: The system shall support communication between the main application backend and narrative generation services for producing story content.
+CI-4: The system shall support communication between the main backend and image or audio generation modules when multimedia output is enabled.
+CI-5: The system shall transmit authentication and session-related data using secure token-based or session-based mechanisms.
+CI-6: Communication between session management, memory management, and storage components shall preserve data consistency for active and saved stories.
+CI-7: The system shall support asynchronous processing behavior for long-running generation tasks such as scene creation, visual production, or audio synthesis.
+CI-8: The system shall handle temporary communication failure gracefully and should avoid permanent loss of valid story progress.
+CI-9: Sensitive communication credentials and API configuration values shall be stored securely and managed outside direct user access.
+CI-10: The communication framework shall ensure that protected user data is not transmitted or stored in plain text.

@@ -2,7 +2,6 @@ import type { HealthStatus, StorySetupData } from "@/types/story";
 
 export type {
   ChoiceType,
-  DummySceneTemplate,
   GeneratedMedia,
   HealthStatus,
   MemoryItem,

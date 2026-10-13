@@ -1,3 +1,6 @@
+-- CreateExtension
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- CreateEnum
 CREATE TYPE "StoryMode" AS ENUM ('GUIDED', 'CUSTOM');
 
@@ -21,41 +24,6 @@ CREATE TYPE "MediaStatus" AS ENUM ('PENDING', 'GENERATING', 'READY', 'FAILED');
 
 -- CreateEnum
 CREATE TYPE "JobStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED');
-
--- CreateTable
-CREATE TABLE "User" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "PasswordResetToken" (
-    "id" TEXT NOT NULL,
-    "tokenHash" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "used" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "UserActivity" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "activityType" TEXT NOT NULL,
-    "metadata" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "UserActivity_pkey" PRIMARY KEY ("id")
-);
 
 -- CreateTable
 CREATE TABLE "StoryProject" (
@@ -82,6 +50,7 @@ CREATE TABLE "StoryDraft" (
     "includeNarration" BOOLEAN NOT NULL DEFAULT true,
     "status" "DraftStatus" NOT NULL DEFAULT 'EDITING',
     "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "progressState" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -101,6 +70,8 @@ CREATE TABLE "Character" (
     "referenceImageUrl" TEXT,
     "voiceSampleUrl" TEXT,
     "sourceType" "CharacterSource" NOT NULL DEFAULT 'TEXT',
+    "lastSeenScene" INTEGER,
+    "currentEmotionalState" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -165,6 +136,23 @@ CREATE TABLE "StoryMemory" (
 );
 
 -- CreateTable
+CREATE TABLE "StoryMemoryEmbedding" (
+    "id" TEXT NOT NULL,
+    "draftId" TEXT NOT NULL,
+    "sceneId" TEXT,
+    "memoryId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "memoryType" TEXT NOT NULL,
+    "memoryHash" TEXT NOT NULL,
+    "metadata" JSONB,
+    "embedding" vector(768),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT now(),
+
+    CONSTRAINT "StoryMemoryEmbedding_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "MediaAsset" (
     "id" TEXT NOT NULL,
     "draftId" TEXT NOT NULL,
@@ -195,15 +183,6 @@ CREATE TABLE "VideoGenerationJob" (
 
     CONSTRAINT "VideoGenerationJob_pkey" PRIMARY KEY ("id")
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-
--- CreateIndex
-CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
-
--- CreateIndex
-CREATE INDEX "UserActivity_userId_idx" ON "UserActivity"("userId");
 
 -- CreateIndex
 CREATE INDEX "StoryProject_userId_idx" ON "StoryProject"("userId");
@@ -239,6 +218,12 @@ CREATE INDEX "StoryMemory_draftId_idx" ON "StoryMemory"("draftId");
 CREATE INDEX "StoryMemory_sceneId_idx" ON "StoryMemory"("sceneId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "StoryMemoryEmbedding_draftId_memoryHash_key" ON "StoryMemoryEmbedding"("draftId", "memoryHash");
+
+-- CreateIndex
+CREATE INDEX "story_memory_embedding_hnsw_idx" ON "StoryMemoryEmbedding" USING hnsw ("embedding" vector_cosine_ops);
+
+-- CreateIndex
 CREATE INDEX "MediaAsset_draftId_idx" ON "MediaAsset"("draftId");
 
 -- CreateIndex
@@ -249,15 +234,6 @@ CREATE INDEX "MediaAsset_characterId_idx" ON "MediaAsset"("characterId");
 
 -- CreateIndex
 CREATE INDEX "VideoGenerationJob_draftId_idx" ON "VideoGenerationJob"("draftId");
-
--- AddForeignKey
-ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "UserActivity" ADD CONSTRAINT "UserActivity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "StoryProject" ADD CONSTRAINT "StoryProject_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StoryDraft" ADD CONSTRAINT "StoryDraft_storyProjectId_fkey" FOREIGN KEY ("storyProjectId") REFERENCES "StoryProject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -282,6 +258,12 @@ ALTER TABLE "StoryMemory" ADD CONSTRAINT "StoryMemory_draftId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "StoryMemory" ADD CONSTRAINT "StoryMemory_sceneId_fkey" FOREIGN KEY ("sceneId") REFERENCES "Scene"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StoryMemoryEmbedding" ADD CONSTRAINT "StoryMemoryEmbedding_draftId_fkey" FOREIGN KEY ("draftId") REFERENCES "StoryDraft"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StoryMemoryEmbedding" ADD CONSTRAINT "StoryMemoryEmbedding_memoryId_fkey" FOREIGN KEY ("memoryId") REFERENCES "StoryMemory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MediaAsset" ADD CONSTRAINT "MediaAsset_draftId_fkey" FOREIGN KEY ("draftId") REFERENCES "StoryDraft"("id") ON DELETE CASCADE ON UPDATE CASCADE;

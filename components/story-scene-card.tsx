@@ -1,5 +1,5 @@
 import { MapPin, Sparkles } from "lucide-react";
-import { AudioPlayerMock } from "@/components/audio-player-mock";
+import { SceneMedia } from "@/components/scene-media";
 
 type StorySceneCardProps = {
   title: string;
@@ -7,6 +7,20 @@ type StorySceneCardProps = {
   mood: string;
   location: string;
   imageLabel: string;
+  imagePrompt: string;
+  narrationLabel: string;
+  narrationDuration: string;
+  audioMoodPrompt: string;
+  backgroundMusicMood: string;
+  sceneNumber: number;
+  draftId?: string;
+  projectId?: string;
+  characterNames?: string[];
+  characterAppearances?: string[];
+  existingImageUrl?: string;
+  existingNarrationUrl?: string;
+  existingMusicUrl?: string;
+  onMediaUpdate?: (patch: { imageUrl?: string; narrationAudioUrl?: string; musicUrl?: string }) => void;
 };
 
 export function StorySceneCard({
@@ -14,20 +28,45 @@ export function StorySceneCard({
   text,
   mood,
   location,
-  imageLabel
+  imageLabel,
+  imagePrompt,
+  narrationLabel,
+  narrationDuration,
+  audioMoodPrompt,
+  backgroundMusicMood,
+  sceneNumber,
+  draftId,
+  projectId,
+  characterNames,
+  characterAppearances,
+  existingImageUrl,
+  existingNarrationUrl,
+  existingMusicUrl,
+  onMediaUpdate
 }: StorySceneCardProps) {
   return (
     <section className="space-y-5">
-      <div className="glass-panel overflow-hidden rounded-[2rem]">
-        <div className="relative h-72 bg-[radial-gradient(circle_at_top,rgba(141,183,255,0.28),transparent_28%),linear-gradient(160deg,#141a3b,#070b1b_78%)] sm:h-80">
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_10%,rgba(3,6,18,0.82))]" />
-          <div className="absolute right-5 top-5 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs text-gold">
-            Generated Scene Art
-          </div>
-          <div className="absolute bottom-5 left-5 right-5">
-            <p className="max-w-xl text-sm text-white/90">{imageLabel}</p>
-          </div>
-        </div>
+      <div className="glass-panel overflow-hidden rounded-[2rem] p-4">
+        <SceneMedia
+          imagePrompt={imagePrompt}
+          imageLabel={imageLabel}
+          location={location}
+          sceneMood={mood}
+          narrationText={text}
+          narrationLabel={narrationLabel}
+          narrationDuration={narrationDuration}
+          audioMoodPrompt={audioMoodPrompt}
+          backgroundMusicMood={backgroundMusicMood}
+          sceneNumber={sceneNumber}
+          draftId={draftId}
+          projectId={projectId}
+          characterNames={characterNames}
+          characterAppearances={characterAppearances}
+          existingImageUrl={existingImageUrl}
+          existingNarrationUrl={existingNarrationUrl}
+          existingMusicUrl={existingMusicUrl}
+          onUpdate={onMediaUpdate}
+        />
       </div>
 
       <div className="glass-panel rounded-[2rem] p-6">
@@ -45,9 +84,6 @@ export function StorySceneCard({
         <h2 className="font-[var(--font-heading)] text-3xl text-white">{title}</h2>
         <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
           <p className="text-base leading-8 text-white/78">{text}</p>
-        </div>
-        <div className="mt-5">
-          <AudioPlayerMock />
         </div>
       </div>
     </section>

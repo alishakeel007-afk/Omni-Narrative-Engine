@@ -51,3 +51,51 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ character }, { status: 201 });
 }
+
+const updateCharacterSchema = z.object({
+  draftId: z.string().min(1),
+  name: z.string().min(1),
+  emotionalState: z.string().optional(),
+  visualAppearance: z.string().optional(),
+  sceneNumber: z.number().optional(),
+});
+
+export async function PATCH(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const session = user ? { userId: user.id } : null;
+
+  if (!session?.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const result = updateCharacterSchema.safeParse(body);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error.issues[0]?.message ?? "Invalid update data" }, { status: 400 });
+  }
+
+  const draft = await prisma.storyDraft.findFirst({
+    where: {
+      id: result.data.draftId,
+      project: { userId: session.userId },
+    },
+  });
+
+  if (!draft) {
+    return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+  }
+
+  const { draftId, name, ...update } = result.data;
+  
+  // Note: we need to import upsertCharacterState in this file
+  const { upsertCharacterState } = await import("@/lib/story-database");
+  const character = await upsertCharacterState(draftId, name, update);
+
+  if (!character) {
+    return NextResponse.json({ error: "Character not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ character });
+}
