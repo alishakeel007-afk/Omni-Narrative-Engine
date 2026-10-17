@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  previewFeatures = ["postgresqlExtensions", "driverAdapters"]
 }
 
 datasource db {
@@ -90,6 +90,9 @@ model Scene {
   sceneTone          String?
   soundDesign        String?
   visualPrompt       String?
+  // Canonical authored image instruction, distinct from the generated-media
+  // prompt saved on MediaAsset. This survives save/resume before first image.
+  imagePrompt        String?
   estimatedDuration  String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -110,6 +113,9 @@ model Dialogue {
   text        String
   delivery    String?
   audioUrl    String?
+  /// Stable authored order inside a scene. This keeps each persisted audio URL
+  /// attached to its original dialogue line after reloads and reorders.
+  position    Int        @default(0)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   character   Character? @relation(fields: [characterId], references: [id])

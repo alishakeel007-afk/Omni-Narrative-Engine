@@ -11,11 +11,8 @@ import {
 } from "lucide-react";
 
 export const navLinks: { href: Route; label: string }[] = [
-  { href: "/story/mode", label: "Start" },
-  { href: "/setup", label: "Setup" },
-  { href: "/story/play", label: "Play Story" },
-  { href: "/story/memory", label: "Story Memory Board" },
-  { href: "/video", label: "AI Story Studio" },
+  { href: "/", label: "Home" },
+  { href: "/story/mode", label: "Video Studio" },
   { href: "/dashboard", label: "Dashboard" }
 ];
 
@@ -26,18 +23,18 @@ export const featureCards = [
     icon: Sparkles
   },
   {
-    title: "AI Guided Story Mode",
-    description: "Follow AI-suggested choices step by step.",
+    title: "Scene & Dialogue Control",
+    description: "Review, edit, reorder, and refine every scene before media generation.",
     icon: BookOpenText
   },
   {
-    title: "AI Story Studio",
-    description: "Build full stories with scenes, dialogues, voice, music, and video preview.",
+    title: "Character Voices",
+    description: "Assign consistent voices and generate narration and character dialogue.",
     icon: Wand2
   },
   {
-    title: "Custom Story Path",
-    description: "Write your own actions and control story direction.",
+    title: "Cinematic Visuals",
+    description: "Generate scene artwork that reflects your characters, location, and mood.",
     icon: Compass
   },
   {

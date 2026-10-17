@@ -9,25 +9,25 @@ export function HeroSection() {
             Cinematic AI Studio
           </div>
           <h1 className="max-w-4xl font-[var(--font-heading)] text-4xl leading-tight text-white sm:text-5xl lg:text-7xl">
-            <span className="text-gradient">Create cinematic AI stories with dialogue,</span>
+            <span className="text-gradient">Create Stories with AI.</span>
             <br />
-            <span className="text-white">voice, music, and video-ready scenes.</span>
+            <span className="text-white">From idea to a cinematic browser preview.</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-8 text-white/72 sm:text-lg">
-            Omni-Narrative Engine is an AI-powered storytelling platform where users can build guided adventures, create custom stories, generate character dialogues, add narration, compose background music, and preview video-ready scenes.
+            Turn a rough idea into a complete multimedia story: generate scenes, customize dialogue, assign character voices, create visuals, score each moment, and preview the saved sequence in Video Studio.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <Link
-              href="/auth?next=/story/mode"
+              href="/story/mode"
               className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950 shadow-glow transition hover:scale-[1.02]"
             >
-              Start Your Story
+              Open Video Studio
             </Link>
             <Link
-              href="/auth?next=/video"
+              href="/dashboard"
               className="rounded-full border border-white/15 bg-white/10 px-7 py-4 text-center text-sm font-semibold text-white/90 backdrop-blur-sm transition hover:bg-white/20"
             >
-              Open AI Story Studio
+              My Projects
             </Link>
           </div>
         </div>
@@ -37,10 +37,10 @@ export function HeroSection() {
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
-                  Story Preview
+                  Video Studio Preview
                 </p>
                 <h2 className="mt-2 font-[var(--font-heading)] text-2xl text-slate-950">
-                  The Whispering Gate
+                  Your story, scene by scene
                 </h2>
               </div>
               <span className="rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
@@ -51,22 +51,22 @@ export function HeroSection() {
             <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
-                  Guided Story
+                  Story & Scenes
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
-                  Suspenseful
+                  Voice & Narration
                 </span>
                 <span className="rounded-full border border-gold/20 bg-white px-3 py-1 text-xs font-semibold text-gold">
-                  Memory Active
+                  Visuals & Music
                 </span>
               </div>
               <div className="mt-8 space-y-4">
                 <div className="h-2 w-28 rounded-full bg-blue-600" />
                 <p className="max-w-md text-sm leading-7 text-slate-700">
-                  The ancient gate trembles as blue light leaks through broken symbols. Your next decision will shape the story path.
+                  Build a saved story sequence with dialogue, visuals, voices, and scene-aware music before reviewing it in the browser preview.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {["AI Choices", "Custom Input", "Memory Sync"].map((item) => (
+                  {["Create", "Customize", "Preview"].map((item) => (
                     <div
                       key={item}
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"

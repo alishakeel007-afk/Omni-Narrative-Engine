@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -28,6 +28,7 @@ import {
   VIDEO_STAGE_LABELS,
   createStoryTextFromScript,
   loadVideoStudioFlow,
+  previousVideoStudioStage,
   saveVideoStudioFlow,
   type VideoStudioFlowState,
   type VideoStudioStage
@@ -35,9 +36,18 @@ import {
 import {
   createVideoStudioProject,
   loadVideoStudioFromDatabase,
-  saveVideoStudioToDatabase
+  saveVideoStudioToDatabase,
+  type VideoStudioSaveResult
 } from "@/lib/video-studio-db";
+import { createSampleScoreRecipe, renderSampleBasedScore, type SampleScoreRecipe } from "@/lib/audio/sample-score";
+import { SAMPLE_CREDITS } from "@/lib/audio/sample-catalog";
+import { decideSceneMusic } from "@/lib/audio/music-policy";
+import { resolveDialogueEmotion } from "@/lib/audio/emotion-informed-delivery";
+import { hasUsableMediaReference, validateSceneMedia, type MediaValidationStatus } from "@/lib/video-studio-readiness";
+import { summarizeVideoAudio, summarizeVideoMusic, videoAudioStatus, videoMusicStatus } from "@/lib/video-studio-media-summary";
 import type { MovieDialogueLine, MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
+import { isCurrentVideoScriptLanguage, textDirectionForVideoLanguage } from "@/lib/video-language";
+import { buildSceneVisualContext } from "@/lib/image/scene-visual-context";
 
 type EditableSceneField =
   | "directorNotes"
@@ -51,12 +61,27 @@ type EditableSceneField =
   | "soundDesign"
   | "visualPrompt";
 
+type SampleScorePreview = {
+  blob: Blob;
+  url: string;
+  durationSeconds: number;
+  recipe: SampleScoreRecipe;
+  description: string;
+};
+
+type MusicBatchProgress = {
+  current: number;
+  total: number;
+  currentSceneNumber?: number;
+  results: Record<number, "saved" | "skipped" | "silent" | "failed">;
+};
+
 const VIDEO_VOICE_OPTIONS = [
-  { deepgramModel: "aura-orion-en", gender: "male", voiceName: "Orion - warm male" },
-  { deepgramModel: "aura-asteria-en", gender: "female", voiceName: "Asteria - clear female" },
-  { deepgramModel: "aura-athena-en", gender: "female", voiceName: "Athena - confident female" },
-  { deepgramModel: "aura-arcas-en", gender: "male", voiceName: "Arcas - expressive male" },
-  { deepgramModel: "aura-orpheus-en", gender: "male", voiceName: "Orpheus - narrator male" }
+  { deepgramModel: "aura-2-orion-en", gender: "male", voiceName: "Orion - warm male" },
+  { deepgramModel: "aura-2-asteria-en", gender: "female", voiceName: "Asteria - clear female" },
+  { deepgramModel: "aura-2-athena-en", gender: "female", voiceName: "Athena - confident female" },
+  { deepgramModel: "aura-2-arcas-en", gender: "male", voiceName: "Arcas - expressive male" },
+  { deepgramModel: "aura-2-orpheus-en", gender: "male", voiceName: "Orpheus - narrator male" }
 ];
 
 function createDialogueId() {
@@ -69,41 +94,152 @@ export default function VideoStudioScreen() {
   const [error, setError] = useState("");
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [regeneratingDialogueAudioId, setRegeneratingDialogueAudioId] = useState<string | null>(null);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [musicBatchProgress, setMusicBatchProgress] = useState<MusicBatchProgress | null>(null);
+  const [sampleScores, setSampleScores] = useState<Record<number, SampleScorePreview>>({});
+  const [sampleErrors, setSampleErrors] = useState<Record<number, string>>({});
+  const [generatingSampleScene, setGeneratingSampleScene] = useState<number | null>(null);
+  const [savingSampleScene, setSavingSampleScene] = useState<number | null>(null);
+  const samplePreviewRefs = useRef<Record<number, HTMLAudioElement | null>>({});
+  const sampleUrlsRef = useRef(new Set<string>());
+  const sampleGenerationRevisionRef = useRef(0);
+  const musicBatchRunningRef = useRef(false);
+  const isMountedRef = useRef(true);
   const [generatingDialogueScene, setGeneratingDialogueScene] = useState<number | null>(null);
   const [generatingDialogueLineId, setGeneratingDialogueLineId] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [customGenreInput, setCustomGenreInput] = useState("");
   const [customToneInput, setCustomToneInput] = useState("");
+  const [saveState, setSaveState] = useState<"local" | "saving" | "saved" | "failed">("local");
+  const [finalSaveFeedback, setFinalSaveFeedback] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [hydrationState, setHydrationState] = useState<"loading" | "ready" | "failed">("loading");
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
+  const saveRevisionRef = useRef(0);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const lastQueuedSignatureRef = useRef<string | null>(null);
+  const failedSaveRef = useRef<VideoStudioFlowState | null>(null);
+  const finalSaveRunningRef = useRef(false);
+  const hydrationStateRef = useRef<"loading" | "ready" | "failed">("loading");
 
   useEffect(() => {
     const localFlow = loadVideoStudioFlow();
-    setFlow(localFlow);
+    const requestedProjectId = new URLSearchParams(window.location.search).get("project")?.trim();
+    const hasProjectParameter = requestedProjectId !== undefined;
+    const hasRequestedProject = Boolean(requestedProjectId && /^[0-9a-f-]{36}$/i.test(requestedProjectId));
+    // An explicit project URL is database-authoritative. Do not display a
+    // matching cache or queue a save until its authenticated hydration ends.
+    hydrationStateRef.current = "loading";
+    setHydrationState("loading");
+    setFlow(null);
+    const initialRevision = saveRevisionRef.current;
+    let cancelled = false;
 
-    if (localFlow.projectId) {
-      loadVideoStudioFromDatabase(localFlow.projectId).then((dbFlow) => {
-        if (dbFlow) {
+    if (hasRequestedProject && requestedProjectId) {
+      void loadVideoStudioFromDatabase(requestedProjectId).then((dbFlow) => {
+        // Never replace edits made while database hydration was in flight.
+        if (dbFlow && !cancelled && saveRevisionRef.current === initialRevision) {
+          hydrationStateRef.current = "ready";
           setFlow(dbFlow);
           saveVideoStudioFlow(dbFlow);
+          setSaveState("saved");
+          setHydrationState("ready");
+        } else if (!cancelled) {
+          // Never replace an owned project with the default Stage 1 document.
+          // A failed restore remains recoverable and cannot trigger autosave.
+          hydrationStateRef.current = "failed";
+          setFlow(null);
+          setSaveState("local");
+          setHydrationState("failed");
         }
       });
+    } else if (hasProjectParameter) {
+      hydrationStateRef.current = "failed";
+      setHydrationState("failed");
+    } else {
+      // A new/local Guided flow has no remote project to hydrate.
+      hydrationStateRef.current = "ready";
+      setFlow(localFlow);
+      setHydrationState("ready");
     }
+    return () => { cancelled = true; };
+  }, [hydrationAttempt]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      sampleGenerationRevisionRef.current += 1;
+      for (const url of sampleUrlsRef.current) URL.revokeObjectURL(url);
+      sampleUrlsRef.current.clear();
+    };
   }, []);
 
-  const visibleScript = flow?.voiceResult ?? flow?.script ?? null;
+  const visibleScript = flow?.script ?? flow?.voiceResult ?? null;
   const totalDialogueLines = useMemo(
     () => visibleScript?.scenes.reduce((total, scene) => total + scene.dialogues.length, 0) ?? 0,
     [visibleScript]
   );
 
+  const queueDatabaseSave = (snapshot: VideoStudioFlowState, force = false): Promise<VideoStudioSaveResult> => {
+    const failed: VideoStudioSaveResult = { success: false, sceneIds: {} };
+    // No snapshot from a cached/default flow may write over an explicit
+    // project's database document while hydration is pending or failed.
+    if (hydrationStateRef.current !== "ready") return Promise.resolve(failed);
+    if (!snapshot.projectId || !snapshot.draftId || (!snapshot.script && !snapshot.voiceResult)) return Promise.resolve(failed);
+    const signature = JSON.stringify({
+      // `script` is edited in the Studio. A prior voice snapshot must not make
+      // an edited script look unchanged and suppress its save.
+      projectId: snapshot.projectId, draftId: snapshot.draftId, script: snapshot.script ?? snapshot.voiceResult,
+      stage: snapshot.stage, musicDecisions: snapshot.musicDecisions, flags: [snapshot.scenesNeedRegeneration, snapshot.voiceNeedsRegeneration, snapshot.videoOutdated],
+    });
+    if (!force && signature === lastQueuedSignatureRef.current) return Promise.resolve(failed);
+    lastQueuedSignatureRef.current = signature;
+    const revision = ++saveRevisionRef.current;
+    setSaveState("saving");
+    const queued = saveChainRef.current.catch(() => undefined).then(async () => {
+      const saved = await saveVideoStudioToDatabase(snapshot);
+      if (revision !== saveRevisionRef.current) return saved;
+      if (saved.success) {
+        // The database assigns the stable identity used to reconcile future
+        // deletes and reorders. Persist it locally only after the transaction
+        // succeeds, so an unsaved client edit can never masquerade as saved.
+        const attachSceneIds = (result: typeof snapshot.script | null) => result ? {
+          ...result,
+          scenes: result.scenes.map((scene) => saved.sceneIds[scene.sceneNumber]
+            ? { ...scene, persistenceSceneId: saved.sceneIds[scene.sceneNumber] }
+            : scene)
+        } : null;
+        const reconciledSnapshot = {
+          ...snapshot,
+          script: attachSceneIds(snapshot.script),
+          voiceResult: attachSceneIds(snapshot.voiceResult)
+        };
+        failedSaveRef.current = null;
+        setFlow(reconciledSnapshot);
+        saveVideoStudioFlow(reconciledSnapshot);
+        setSaveState("saved");
+      } else {
+        failedSaveRef.current = snapshot;
+        setSaveState("failed");
+      }
+      return saved;
+    }).catch(() => {
+      if (revision === saveRevisionRef.current) {
+        failedSaveRef.current = snapshot;
+        setSaveState("failed");
+      }
+      return failed;
+    });
+    saveChainRef.current = queued.then(() => undefined);
+    return queued;
+  };
+
   const persistFlow = (nextFlow: VideoStudioFlowState) => {
     setFlow(nextFlow);
     saveVideoStudioFlow(nextFlow);
-
-    if (nextFlow.projectId && nextFlow.draftId && (nextFlow.script || nextFlow.voiceResult)) {
-      saveVideoStudioToDatabase(nextFlow);
-    }
+    queueDatabaseSave(nextFlow);
   };
 
   const updateFlow = (partial: Partial<VideoStudioFlowState>) => {
@@ -122,6 +258,38 @@ export default function VideoStudioScreen() {
     });
     setError("");
     setEditingKey(null);
+  };
+
+  const goToPreviousStage = () => {
+    if (!flow) return;
+    const previous = previousVideoStudioStage(flow.stage);
+    if (previous) setStage(previous);
+  };
+
+  const savePreviewProject = async () => {
+    if (!flow?.script || finalSaveRunningRef.current) return;
+    finalSaveRunningRef.current = true;
+    setFinalSaveFeedback("saving");
+    try {
+      let snapshot = flow;
+      if (!snapshot.projectId || !snapshot.draftId) {
+        const created = await createVideoStudioProject(snapshot);
+        if (!created) throw new Error("Could not create the project.");
+        snapshot = { ...snapshot, ...created };
+        // Keep the server-assigned identity locally before queuing the first
+        // scene save, so a retry updates this project instead of creating one.
+        setFlow(snapshot);
+        saveVideoStudioFlow(snapshot);
+      }
+
+      const saved = await queueDatabaseSave(snapshot, true);
+      if (!saved.success) throw new Error("Could not save the project.");
+      setFinalSaveFeedback("saved");
+    } catch {
+      setFinalSaveFeedback("failed");
+    } finally {
+      finalSaveRunningRef.current = false;
+    }
   };
 
   const toggleGenre = (genre: string) => {
@@ -260,6 +428,7 @@ export default function VideoStudioScreen() {
         roughIdea: scenario,
         scenesNeedRegeneration: false,
         script,
+        scriptLanguage: flow.language,
         stage: "storyReview",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
@@ -344,6 +513,7 @@ export default function VideoStudioScreen() {
         generatedStory: flow.generatedStory || createStoryTextFromScript(script),
         scenesNeedRegeneration: false,
         script,
+        scriptLanguage: flow.language,
         stage: "scenes",
         videoOutdated: true,
         voiceNeedsRegeneration: false,
@@ -396,7 +566,15 @@ export default function VideoStudioScreen() {
     const nextScript = {
       ...flow.script,
       scenes: flow.script.scenes.map((scene) =>
-        scene.sceneNumber === sceneNumber ? { ...scene, [field]: value } : scene
+        scene.sceneNumber === sceneNumber ? {
+          ...scene,
+          [field]: value,
+          ...(field === "narration" ? { narrationAudioOutdated: true } : {}),
+          ...(field === "visualPrompt" || field === "imagePrompt" || field === "location" || field === "mood" || field === "directorNotes"
+            ? { generatedImageOutdated: true } : {}),
+          ...(field === "mood" || field === "sceneTone" || field === "soundDesign"
+            ? { backgroundMusicOutdated: scene.backgroundMusicStatus === "silent" ? false : true } : {}),
+        } : scene
       )
     };
 
@@ -417,7 +595,7 @@ export default function VideoStudioScreen() {
           ? {
               ...scene,
               dialogues: scene.dialogues.map((dialogue) =>
-                dialogue.id === dialogueId ? { ...dialogue, line: value } : dialogue
+                dialogue.id === dialogueId ? { ...dialogue, line: value, audioOutdated: true } : dialogue
               )
             }
           : scene
@@ -447,12 +625,13 @@ export default function VideoStudioScreen() {
         scene.sceneNumber === sceneNumber
           ? {
               ...scene,
+              ...(partial.voiceProfile?.appearance !== undefined ? { generatedImageOutdated: true } : {}),
               dialogues: scene.dialogues.map((dialogue) =>
                 dialogue.id === dialogueId
                   ? {
                       ...dialogue,
                       ...partial,
-                      audioUrl: undefined,
+                      audioOutdated: true,
                       voiceProfile: {
                         ...dialogue.voiceProfile,
                         ...partial.voiceProfile,
@@ -519,13 +698,22 @@ export default function VideoStudioScreen() {
 
   const deleteScene = (sceneNumber: number) => {
     if (!flow?.script || flow.script.scenes.length <= 1) return;
+    const nextMusicDecisions: typeof flow.musicDecisions = {};
     const nextScenes = flow.script.scenes
       .filter((scene) => scene.sceneNumber !== sceneNumber)
-      .map((scene, index) => ({ ...scene, sceneNumber: index + 1 }));
+      .map((scene, index) => {
+        const nextSceneNumber = index + 1;
+        const decision = flow.musicDecisions[String(scene.sceneNumber)];
+        if (decision) nextMusicDecisions[String(nextSceneNumber)] = decision;
+        // persistenceSceneId is intentionally retained: it is the database
+        // identity, whereas sceneNumber is only the mutable display order.
+        return { ...scene, sceneNumber: nextSceneNumber };
+      });
 
     persistFlow({
       ...flow,
       sceneCount: nextScenes.length,
+      musicDecisions: nextMusicDecisions,
       script: {
         ...flow.script,
         scenes: nextScenes
@@ -610,7 +798,7 @@ export default function VideoStudioScreen() {
         : [...flow.script.characterVoices, nextDialogue.voiceProfile],
       scenes: flow.script.scenes.map((scene) =>
         scene.sceneNumber === sceneNumber
-          ? { ...scene, dialogues: [...scene.dialogues, nextDialogue] }
+          ? { ...scene, generatedImageOutdated: true, dialogues: [...scene.dialogues, nextDialogue] }
           : scene
       )
     };
@@ -691,6 +879,7 @@ export default function VideoStudioScreen() {
             })),
           sceneDescription: [scene.narration, scene.directorNotes, scene.visualPrompt].filter(Boolean).join("\n"),
           sceneNumber: scene.sceneNumber,
+          draftId: flow.draftId,
           storyTitle: flow.script.title,
           tones: [scene.sceneTone]
         }),
@@ -788,6 +977,7 @@ export default function VideoStudioScreen() {
             dialogue.delivery ? `Requested delivery: ${dialogue.delivery}` : ""
           ].filter(Boolean).join("\n"),
           sceneNumber: scene.sceneNumber,
+          draftId: flow.draftId,
           storyTitle: flow.script.title,
           tones: [scene.sceneTone]
         }),
@@ -812,13 +1002,31 @@ export default function VideoStudioScreen() {
 
   const generateVoice = async () => {
     if (!flow?.script || isGeneratingVoice) return;
+    if (!isCurrentVideoScriptLanguage(flow.scriptLanguage, flow.language)) {
+      setError("This script was generated for a different language. Regenerate scenes before generating voice audio.");
+      return;
+    }
 
     setIsGeneratingVoice(true);
     setError("");
 
     try {
+      const narratorProfile = {
+        archetype: "narrator", character: "Narrator", deepgramModel: "aura-2-athena-en",
+        description: "Dedicated scene narrator voice", gender: "feminine", tone: "calm, cinematic", voiceName: "Athena"
+      };
+      const scriptForTts = {
+        ...flow.script,
+        scenes: flow.script.scenes.map((scene) => ({
+          ...scene,
+          dialogues: scene.narration.trim() ? [{
+            id: `scene-${scene.sceneNumber}-narration`, character: "Narrator", delivery: "narration",
+            line: scene.narration, voiceProfile: narratorProfile
+          }, ...scene.dialogues] : scene.dialogues,
+        })),
+      };
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script: flow.script, projectId: flow.projectId, language: flow.language }),
+        body: JSON.stringify({ script: scriptForTts, projectId: flow.projectId, draftId: flow.draftId, language: flow.language, scriptLanguage: flow.scriptLanguage }),
         headers: {
           "Content-Type": "application/json"
         },
@@ -830,7 +1038,21 @@ export default function VideoStudioScreen() {
         throw new Error(payload.error ?? "Voice generation failed.");
       }
 
-      const voiceResult = payload as VideoGenerationResponse;
+      const voicePayload = payload as VideoGenerationResponse;
+      const voiceResult: VideoGenerationResponse = {
+        ...voicePayload,
+        scenes: voicePayload.scenes.map((scene) => {
+          const narrator = scene.dialogues.find((line) => line.id === `scene-${scene.sceneNumber}-narration`);
+          return {
+            ...scene,
+            narrationAudioUrl: narrator?.audioUrl,
+            narrationAudioOutdated: false,
+            dialogues: scene.dialogues
+              .filter((line) => line.id !== `scene-${scene.sceneNumber}-narration`)
+              .map((line) => ({ ...line, audioOutdated: false })),
+          };
+        }),
+      };
       persistFlow({
         ...flow,
         script: voiceResult,
@@ -845,21 +1067,100 @@ export default function VideoStudioScreen() {
     }
   };
 
-  const generateSceneImages = async (forceRegenerateAll = false) => {
+  const regenerateDialogueAudio = async (sceneNumber: number, dialogueId: string) => {
+    if (!flow?.script || regeneratingDialogueAudioId || isGeneratingVoice) return;
+    const sourceScene = flow.script.scenes.find((scene) => scene.sceneNumber === sceneNumber);
+    const sourceLine = sourceScene?.dialogues.find((line) => line.id === dialogueId);
+    if (!sourceScene || !sourceLine) return;
+    if (!isCurrentVideoScriptLanguage(flow.scriptLanguage, flow.language)) {
+      setError("This script was generated for a different language. Regenerate scenes before regenerating dialogue audio.");
+      return;
+    }
+
+    setRegeneratingDialogueAudioId(dialogueId);
+    setError("");
+    try {
+      // This is deliberately scoped to one dialogue line; narration and other
+      // saved character clips are not regenerated by this user action.
+      const response = await fetch("/api/video/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          script: { ...flow.script, scenes: [{ ...sourceScene, dialogues: [sourceLine] }] },
+          projectId: flow.projectId,
+          draftId: flow.draftId,
+          language: flow.language,
+          scriptLanguage: flow.scriptLanguage,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Dialogue voice regeneration failed.");
+
+      const replacement = (payload as VideoGenerationResponse).scenes[0]?.dialogues[0];
+      if (!replacement) throw new Error("Dialogue voice regeneration returned no result.");
+      const nextScript = {
+        ...flow.script,
+        scenes: flow.script.scenes.map((scene) => scene.sceneNumber !== sceneNumber ? scene : {
+          ...scene,
+          dialogues: scene.dialogues.map((line) => line.id === dialogueId ? { ...line, ...replacement, audioOutdated: false } : line),
+        }),
+      };
+      persistFlow({
+        ...flow,
+        script: nextScript,
+        voiceResult: nextScript,
+        voiceNeedsRegeneration: false,
+        videoOutdated: true,
+      });
+    } catch (voiceError) {
+      setError(voiceError instanceof Error ? voiceError.message : "Dialogue voice regeneration failed.");
+    } finally {
+      setRegeneratingDialogueAudioId(null);
+    }
+  };
+
+  const generateSceneImages = async (forceRegenerateAll = false, replacementSceneId?: string) => {
     if (!flow?.script || isGeneratingImages) return;
 
     setIsGeneratingImages(true);
     setError("");
-    persistFlow({
-      ...flow,
-      images: {
-        ...flow.images,
-        message: "Generating AI visual artwork...",
-        status: "generating"
-      }
-    });
+    let mediaFlow = flow;
 
     try {
+      // Image generation is ownership-scoped to a persisted Scene. Wait for
+      // earlier serialized saves before establishing those targets so a Stage 6
+      // request cannot race the API's ownership check.
+      await saveChainRef.current;
+      const savedTargets = await saveVideoStudioToDatabase(flow);
+      if (!savedTargets.success) {
+        throw new Error("Save the current scenes before generating visuals. No image request was sent.");
+      }
+      const attachSceneIds = (script: VideoGenerationResponse | null): VideoGenerationResponse | null => script ? ({
+        ...script,
+        scenes: script.scenes.map((scene) => ({
+          ...scene,
+          persistenceSceneId: savedTargets.sceneIds[scene.sceneNumber] ?? scene.persistenceSceneId,
+        })),
+      }) : null;
+      mediaFlow = {
+        ...flow,
+        script: attachSceneIds(flow.script),
+        voiceResult: attachSceneIds(flow.voiceResult),
+      };
+      const persistedScript = mediaFlow.script;
+      if (!persistedScript || !persistedScript.scenes.every((scene) => Boolean(scene.persistenceSceneId))) {
+        throw new Error("The saved scene identities could not be restored. No image request was sent.");
+      }
+      mediaFlow = {
+        ...mediaFlow,
+        images: {
+          ...mediaFlow.images,
+          message: "Generating AI visual artwork...",
+          status: "generating"
+        }
+      };
+      persistFlow(mediaFlow);
+
       const mapWithConcurrency = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) => {
         const results: R[] = [];
         const executing: Promise<void>[] = [];
@@ -879,13 +1180,10 @@ export default function VideoStudioScreen() {
         return results;
       };
 
-      const updatedScenes = flow.script.scenes.map(scene => {
+      const updatedScenes = persistedScript.scenes.map(scene => {
         if (forceRegenerateAll) {
           return {
             ...scene,
-            generatedImageUrl: undefined,
-            generatedImagePrompt: undefined,
-            generatedImageHash: undefined,
             generatedImageStatus: "idle" as const,
             generatedImageError: undefined
           };
@@ -895,34 +1193,64 @@ export default function VideoStudioScreen() {
 
       let errorsOccurred = false;
 
-      // Concurrency of 1: Cloudflare has no configured credentials in this environment,
-      // so every image request currently falls through to the Pollinations fallback.
-      // Firing scenes one at a time avoids tripping its rate limit.
+      // Keep one in-flight image request so a story's visual continuity is
+      // generated in scene order and the provider is not needlessly saturated.
       await mapWithConcurrency(updatedScenes, 1, async (scene) => {
-        if (scene.generatedImageStatus === "completed" || scene.generatedImageUrl) {
+        if (replacementSceneId && scene.persistenceSceneId !== replacementSceneId) return;
+        const isReplacement = forceRegenerateAll || Boolean(replacementSceneId) || Boolean(scene.generatedImageOutdated);
+        if (!isReplacement && hasUsableMediaReference(scene.generatedImageUrl) && !scene.generatedImageOutdated) {
           return;
         }
 
         scene.generatedImageStatus = "generating";
 
         try {
-          const sceneCharacterNames = Array.from(new Set(scene.dialogues.map((d) => d.character).filter(Boolean)));
-          const sceneCharacterAppearances = sceneCharacterNames
-            .map((name) => flow.script?.characterVoices.find((v) => v.character.toLowerCase() === name.toLowerCase())?.appearance)
-            .filter((appearance): appearance is string => Boolean(appearance));
+          const previousScene = mediaFlow.script?.scenes.find((candidate) => candidate.sceneNumber === scene.sceneNumber - 1);
+          const visualContext = buildSceneVisualContext({
+            scene: {
+              title: scene.title,
+              narration: scene.narration,
+              imagePrompt: scene.imagePrompt,
+              visualPrompt: scene.visualPrompt,
+              directorNotes: scene.directorNotes,
+              location: scene.location,
+              mood: scene.mood,
+              dialogueCharacterNames: scene.dialogues.map((dialogue) => dialogue.character),
+              visualDirection: scene.visualDirection,
+            },
+            characters: (mediaFlow.script?.characterVoices ?? []).map((voice) => ({
+              id: voice.characterId,
+              name: voice.character,
+              appearance: voice.appearance,
+              role: voice.archetype,
+              personalityTone: voice.tone,
+            })),
+            priorScene: previousScene ? {
+              title: previousScene.title,
+              location: previousScene.location,
+              imagePrompt: previousScene.imagePrompt,
+              visualPrompt: previousScene.visualPrompt,
+            } : undefined,
+          });
 
           const response = await fetch("/api/video/image", {
             body: JSON.stringify({
               sceneId: `scene-${scene.sceneNumber}`,
-              imagePrompt: scene.imagePrompt || scene.visualPrompt || scene.title,
-              visualPrompt: scene.visualPrompt,
+              imagePrompt: visualContext.imagePrompt,
+              visualPrompt: visualContext.visualPrompt,
               sceneTitle: scene.title,
-              location: scene.location,
-              mood: scene.mood,
-              genres: flow.genres,
-              existingHash: scene.generatedImageHash,
-              characterNames: sceneCharacterNames,
-              characterAppearances: sceneCharacterAppearances,
+              location: visualContext.location,
+              mood: visualContext.mood,
+              genres: mediaFlow.genres,
+              // A requested regeneration is a replacement attempt; preserve
+              // the old URL locally until the new provider/upload succeeds.
+              existingHash: isReplacement ? undefined : scene.generatedImageHash,
+              characterNames: visualContext.characterNames,
+              characterAppearances: visualContext.characterAppearances,
+              continuityNotes: visualContext.continuityNotes,
+              draftId: flow.draftId,
+              sceneNumber: scene.sceneNumber,
+              persistenceSceneId: scene.persistenceSceneId,
             }),
             headers: {
               "Content-Type": "application/json"
@@ -944,20 +1272,24 @@ export default function VideoStudioScreen() {
           scene.generatedImageHash = payload.hash;
           scene.generatedImageStatus = "completed";
           scene.generatedImageError = undefined;
+          scene.generatedImageOutdated = false;
         } catch (err) {
           console.error(err);
           errorsOccurred = true;
-          scene.generatedImageStatus = "failed";
+          // A failed replacement never discards a valid saved image. Keep it
+          // visible as outdated so the user can retry deliberately.
+          scene.generatedImageStatus = hasUsableMediaReference(scene.generatedImageUrl) ? "completed" : "failed";
+          scene.generatedImageOutdated = hasUsableMediaReference(scene.generatedImageUrl);
           scene.generatedImageError = err instanceof Error ? err.message : "Image generation failed";
         }
       });
 
-      const anyImages = updatedScenes.some(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
+      const anyImages = updatedScenes.some((scene) => hasUsableMediaReference(scene.generatedImageUrl));
 
       persistFlow({
-        ...flow,
+        ...mediaFlow,
         script: {
-          ...flow.script,
+          ...persistedScript,
           scenes: updatedScenes
         },
         images: {
@@ -971,7 +1303,7 @@ export default function VideoStudioScreen() {
       });
     } catch (imgError) {
       persistFlow({
-        ...flow,
+        ...mediaFlow,
         images: {
           ...flow.images,
           message:
@@ -990,162 +1322,245 @@ export default function VideoStudioScreen() {
     generateSceneImages(true);
   };
 
-  const generateBackgroundMusic = async (forceRegenerateAll = false) => {
-    if (!flow?.script || isGeneratingMusic) return;
+  const regenerateSceneImage = (persistenceSceneId: string | undefined) => {
+    if (!persistenceSceneId) {
+      setError("Save this scene before requesting a replacement image.");
+      return;
+    }
+    void generateSceneImages(false, persistenceSceneId);
+  };
 
+  const updateSceneVisualDirection = (sceneNumber: number, patch: NonNullable<MovieScene["visualDirection"]>) => {
+    if (!flow?.script) return;
+    persistFlow({ ...flow, script: { ...flow.script, scenes: flow.script.scenes.map((scene) => scene.sceneNumber === sceneNumber ? { ...scene, visualDirection: patch, generatedImageOutdated: Boolean(scene.generatedImageUrl) } : scene) } });
+  };
+
+  const generateAllMusic = async () => {
+    if (!flow?.script || isGeneratingMusic || musicBatchRunningRef.current) return;
+    if (!flow.draftId) {
+      setError("Save the Video Studio project before generating cinematic scores.");
+      return;
+    }
+    if (typeof OfflineAudioContext === "undefined" && !(globalThis as typeof globalThis & { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext) {
+      setError("This browser cannot render a cinematic score offline.");
+      return;
+    }
+
+    musicBatchRunningRef.current = true;
     setIsGeneratingMusic(true);
     setError("");
-    persistFlow({
-      ...flow,
-      music: {
-        ...flow.music,
-        message: "Generating scene-specific background music...",
-        status: "generating"
+    const updatedScenes = flow.script.scenes.map((scene) => ({ ...scene }));
+    const updatedMusicDecisions = { ...flow.musicDecisions };
+    const results: MusicBatchProgress["results"] = {};
+    const candidates: Array<{ scene: MovieScene; category: "ambient" | "suspense" | "emotional" | "action" | "hopeful" }> = [];
+
+    updatedScenes.forEach((scene, index) => {
+      // A ready saved URL (including older imported WAVs) wins. A stale URL is
+      // preserved for playback but is an explicit regeneration candidate.
+      if (hasUsableMediaReference(scene.backgroundMusicUrl) && !scene.backgroundMusicOutdated) {
+        results[scene.sceneNumber] = "skipped";
+        return;
       }
+
+      const persisted = updatedMusicDecisions[String(scene.sceneNumber)];
+      const decision = persisted?.outcome === "silence"
+        ? persisted
+        : persisted?.category
+          ? persisted
+          : scene.backgroundMusicStatus === "silent"
+            ? { outcome: "silence" as const, reason: scene.backgroundMusicReason || "Intentional silence was previously selected for this scene." }
+            : decideSceneMusic({
+                sceneTitle: scene.title,
+                mood: scene.mood || scene.sceneTone || flow.tones.join(", "),
+                sceneTone: scene.sceneTone,
+                soundDesign: scene.soundDesign,
+                narration: scene.narration,
+                dialogueCount: scene.dialogues.length,
+                estimatedDuration: scene.estimatedDuration,
+                previous: index > 0 ? {
+                  category: updatedScenes[index - 1].backgroundMusicCategory,
+                  trackId: updatedScenes[index - 1].backgroundMusicTrackId,
+                  wasSilent: updatedScenes[index - 1].backgroundMusicStatus === "silent",
+                } : undefined,
+              });
+
+      if (decision.outcome === "silence") {
+        updatedMusicDecisions[String(scene.sceneNumber)] = { outcome: "silence", reason: decision.reason };
+        scene.backgroundMusicTitle = "Intentional silence";
+        scene.backgroundMusicMood = "silence";
+        scene.backgroundMusicPrompt = decision.reason;
+        scene.backgroundMusicReason = decision.reason;
+        scene.backgroundMusicStatus = "silent";
+        scene.backgroundMusicError = undefined;
+        results[scene.sceneNumber] = "silent";
+        return;
+      }
+
+      // Persisted legacy decisions can be malformed; recompute rather than
+      // attempting to render an unspecified category.
+      const category = decision.category;
+      if (!category) {
+        scene.backgroundMusicStatus = "failed";
+        scene.backgroundMusicError = "This scene has no valid music category. Generate its scene-aware decision again.";
+        results[scene.sceneNumber] = "failed";
+        return;
+      }
+      updatedMusicDecisions[String(scene.sceneNumber)] = { outcome: "music", category, reason: decision.reason };
+      scene.backgroundMusicTitle = "Cinematic score not saved yet";
+      scene.backgroundMusicMood = category;
+      scene.backgroundMusicCategory = category;
+      scene.backgroundMusicPrompt = decision.reason;
+      scene.backgroundMusicReason = decision.reason;
+      scene.backgroundMusicStatus = "generating";
+      scene.backgroundMusicError = undefined;
+      candidates.push({ scene, category });
     });
 
+    setMusicBatchProgress({ current: 0, total: candidates.length, results });
+    // Show the selected states while the sequential renderer works, without
+    // queueing incomplete "generating" state as a successful project save.
+    setFlow({ ...flow, script: { ...flow.script, scenes: updatedScenes }, musicDecisions: updatedMusicDecisions });
+
     try {
-      const mapWithConcurrency = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) => {
-        const results: R[] = [];
-        const executing: Promise<void>[] = [];
-        for (const item of items) {
-          const p = Promise.resolve().then(() => fn(item)).then(res => {
-            results.push(res);
-          });
-          
-          const e = p.then(() => {
-            executing.splice(executing.indexOf(e), 1);
-          });
-          executing.push(e);
-          
-          if (executing.length >= limit) {
-            await Promise.race(executing);
-          }
-        }
-        await Promise.all(executing);
-        return results;
-      };
-
-      const updatedScenes = flow.script.scenes.map(scene => {
-        if (forceRegenerateAll) {
-          return {
-            ...scene,
-            backgroundMusicUrl: undefined,
-            backgroundMusicTitle: undefined,
-            backgroundMusicMood: undefined,
-            backgroundMusicPrompt: undefined,
-            backgroundMusicHash: undefined,
-            backgroundMusicStatus: "idle" as const,
-            backgroundMusicError: undefined
-          };
-        }
-        return { ...scene };
-      });
-
-      let errorsOccurred = false;
-
-      await mapWithConcurrency(updatedScenes, 2, async (scene) => {
-        if (scene.backgroundMusicStatus === "completed" || scene.backgroundMusicUrl) {
-          return;
-        }
-
-        scene.backgroundMusicStatus = "generating";
-
+      for (let index = 0; index < candidates.length; index += 1) {
+        const { scene, category } = candidates[index];
+        setMusicBatchProgress({ current: index + 1, total: candidates.length, currentSceneNumber: scene.sceneNumber, results: { ...results } });
         try {
-          const response = await fetch("/api/background-music", {
-            body: JSON.stringify({
-              mood: scene.mood || scene.sceneTone || flow.tones.join(", "),
-              soundDesign: scene.soundDesign || "",
-              sceneTitle: scene.title,
-              sceneLocation: scene.location,
-              narration: scene.narration,
-              estimatedDuration: scene.estimatedDuration,
-              genres: flow.genres,
-              existingHash: scene.backgroundMusicHash,
-              sceneId: `scene-${scene.sceneNumber}`,
-            }),
-            headers: {
-              "Content-Type": "application/json"
-            },
-            method: "POST"
+          const recipe = createSampleScoreRecipe({
+            category,
+            sceneTitle: scene.title,
+            mood: [scene.mood, scene.sceneTone, scene.directorNotes, scene.location].filter(Boolean).join(" "),
+            genres: flow.genres,
+            // Omit a seed so the established scene-aware deterministic recipe
+            // remains stable. The explicit per-scene Regenerate control picks
+            // a fresh seed only when the user asks for a replacement.
           });
+          const rendered = await renderSampleBasedScore(recipe);
+          const description = `Sample-based ${category} cinematic instrumental score; seed ${recipe.seed}; ${recipe.tempo} BPM; ${rendered.durationSeconds.toFixed(1)} seconds; ${rendered.eventCount} recorded-instrument events. No vocals or dialogue.`;
+          const form = new FormData();
+          form.append("draftId", flow.draftId);
+          form.append("sceneNumber", String(scene.sceneNumber));
+          form.append("file", new Blob([rendered.wav], { type: "audio/wav" }), `scene-${scene.sceneNumber}-cinematic-score.wav`);
+          form.append("description", description);
+          const response = await fetch("/api/background-music/sample-based", { method: "POST", body: form });
           const payload = await response.json();
-
-          if (payload.duplicate === true) {
-            return;
-          }
-
-          if (!response.ok) {
-            throw new Error(payload.error ?? `Failed to generate music for Scene ${scene.sceneNumber}.`);
-          }
-
-          scene.backgroundMusicUrl = payload.audioUrl;
-          scene.backgroundMusicTitle = payload.title ?? `Scene ${scene.sceneNumber} Score`;
-          scene.backgroundMusicMood = payload.mood ?? scene.mood;
-          scene.backgroundMusicPrompt = payload.prompt;
-          scene.backgroundMusicHash = payload.hash;
-          scene.backgroundMusicStatus = "completed";
-          scene.backgroundMusicError = undefined;
-        } catch (err) {
-          console.error(err);
-          errorsOccurred = true;
-          scene.backgroundMusicStatus = "failed";
-          scene.backgroundMusicError = err instanceof Error ? err.message : "Generation failed";
+          if (!response.ok || !payload.audioUrl) throw new Error(payload.error ?? "Could not save the cinematic score.");
+          Object.assign(scene, {
+            backgroundMusicUrl: payload.audioUrl,
+            backgroundMusicTitle: `Scene ${scene.sceneNumber} cinematic score`,
+            backgroundMusicMood: category,
+            backgroundMusicCategory: category,
+            backgroundMusicTrackId: `sample-based-${recipe.seed}`,
+            backgroundMusicProvider: "Sample-Based Cinematic Score v1",
+            backgroundMusicPrompt: description,
+            backgroundMusicHash: `sample-based-${recipe.seed}`,
+            backgroundMusicReason: "Saved browser-rendered sample-based cinematic score.",
+            backgroundMusicStatus: "completed" as const,
+            backgroundMusicError: undefined,
+            backgroundMusicOutdated: false,
+          });
+          results[scene.sceneNumber] = "saved";
+        } catch (sceneError) {
+          scene.backgroundMusicStatus = hasUsableMediaReference(scene.backgroundMusicUrl) ? "completed" : "failed";
+          scene.backgroundMusicOutdated = hasUsableMediaReference(scene.backgroundMusicUrl);
+          scene.backgroundMusicError = sceneError instanceof Error ? sceneError.message : "Could not generate the cinematic score.";
+          results[scene.sceneNumber] = "failed";
         }
-      });
+        setMusicBatchProgress({ current: index + 1, total: candidates.length, currentSceneNumber: scene.sceneNumber, results: { ...results } });
+      }
 
-      const anyTracks = updatedScenes.some(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
-
+      const failed = Object.values(results).filter((result) => result === "failed").length;
+      const saved = Object.values(results).filter((result) => result === "saved").length;
       persistFlow({
         ...flow,
-        script: {
-          ...flow.script,
-          scenes: updatedScenes
-        },
-        music: {
-          message: errorsOccurred 
-            ? "Background music generation finished, but some scenes failed." 
-            : "Background music is ready.",
-          mood: updatedScenes[0]?.backgroundMusicMood ?? "ambient",
-          status: anyTracks ? "ready" : "error",
-          title: "Scene-Specific Background Score",
-          trackUrl: updatedScenes[0]?.backgroundMusicUrl ?? "",
-          provider: ""
-        },
-        videoOutdated: true
-      });
-    } catch (musicError) {
-      persistFlow({
-        ...flow,
+        script: { ...flow.script, scenes: updatedScenes },
+        musicDecisions: updatedMusicDecisions,
         music: {
           ...flow.music,
-          message:
-            musicError instanceof Error
-              ? musicError.message
-              : "Background music generation failed.",
-          status: "error"
-        }
+          message: failed ? `Generated ${saved} cinematic score${saved === 1 ? "" : "s"}; ${failed} scene${failed === 1 ? " needs" : "s need"} attention.` : candidates.length ? `Generated and saved ${saved} cinematic score${saved === 1 ? "" : "s"}.` : "All eligible scenes already have a saved score or intentional silence.",
+          status: failed ? "error" : "ready",
+          provider: "Sample-Based Cinematic Score v1",
+        },
+        videoOutdated: true,
       });
     } finally {
+      musicBatchRunningRef.current = false;
       setIsGeneratingMusic(false);
     }
   };
 
-  const regenerateAllMusic = () => {
-    generateBackgroundMusic(true);
+  const generateSampleScore = async (scene: MovieScene, category: "ambient" | "suspense" | "emotional" | "action" | "hopeful", regenerate = false) => {
+    if (!flow?.script || generatingSampleScene !== null || savingSampleScene !== null) return;
+    if (typeof OfflineAudioContext === "undefined" && !(globalThis as typeof globalThis & { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext) {
+      setSampleErrors((current) => ({ ...current, [scene.sceneNumber]: "This browser cannot render a cinematic score offline." }));
+      return;
+    }
+    setGeneratingSampleScene(scene.sceneNumber); setSampleErrors((current) => ({ ...current, [scene.sceneNumber]: "" }));
+    const revision = ++sampleGenerationRevisionRef.current;
+    try {
+      const previous = sampleScores[scene.sceneNumber];
+      const recipe = createSampleScoreRecipe({ category, sceneTitle: scene.title, mood: [scene.mood, scene.sceneTone, scene.directorNotes, scene.location].filter(Boolean).join(" "), genres: flow.genres, seed: regenerate ? (previous?.recipe.seed ?? Date.now()) + 1 : undefined });
+      const rendered = await renderSampleBasedScore(recipe);
+      if (!isMountedRef.current || revision !== sampleGenerationRevisionRef.current) return;
+      const blob = new Blob([rendered.wav], { type: "audio/wav" }); const url = URL.createObjectURL(blob); sampleUrlsRef.current.add(url);
+      if (previous) { URL.revokeObjectURL(previous.url); sampleUrlsRef.current.delete(previous.url); }
+      const description = `Sample-based ${category} cinematic instrumental score; seed ${recipe.seed}; ${recipe.tempo} BPM; ${rendered.durationSeconds.toFixed(1)} seconds; ${rendered.eventCount} recorded-instrument events. No vocals or dialogue.`;
+      setSampleScores((current) => ({ ...current, [scene.sceneNumber]: { blob, url, durationSeconds: rendered.durationSeconds, recipe, description } }));
+    } catch (generationError) {
+      if (isMountedRef.current && revision === sampleGenerationRevisionRef.current) setSampleErrors((current) => ({ ...current, [scene.sceneNumber]: generationError instanceof Error ? generationError.message : "Could not render the cinematic score." }));
+    } finally { if (isMountedRef.current && revision === sampleGenerationRevisionRef.current) setGeneratingSampleScene(null); }
   };
 
-  const openPreview = () => {
+  const previewSampleScore = async (sceneNumber: number) => {
+    const player = samplePreviewRefs.current[sceneNumber]; if (!player) return;
+    Object.entries(samplePreviewRefs.current).forEach(([key, audio]) => { if (Number(key) !== sceneNumber && audio) audio.pause(); });
+    try { player.currentTime = 0; await player.play(); }
+    catch { setSampleErrors((current) => ({ ...current, [sceneNumber]: "Browser playback was blocked. Use the audio controls to start the preview." })); }
+  };
+
+  const saveSampleScore = async (sceneNumber: number) => {
+    if (!flow?.script || !flow.draftId || savingSampleScene !== null) return;
+    const preview = sampleScores[sceneNumber]; if (!preview) return;
+    setSavingSampleScene(sceneNumber); setSampleErrors((current) => ({ ...current, [sceneNumber]: "" }));
+    try {
+      const form = new FormData(); form.append("draftId", flow.draftId); form.append("sceneNumber", String(sceneNumber)); form.append("file", preview.blob, `scene-${sceneNumber}-cinematic-score.wav`); form.append("description", preview.description);
+      const response = await fetch("/api/background-music/sample-based", { method: "POST", body: form }); const payload = await response.json();
+      if (!response.ok || !payload.audioUrl) throw new Error(payload.error ?? "Could not save the cinematic score.");
+      const completedScenes = flow.script.scenes.map((scene) => scene.sceneNumber === sceneNumber ? { ...scene, backgroundMusicUrl: payload.audioUrl, backgroundMusicTitle: `Scene ${sceneNumber} cinematic score`, backgroundMusicMood: preview.recipe.category, backgroundMusicCategory: preview.recipe.category, backgroundMusicTrackId: `sample-based-${preview.recipe.seed}`, backgroundMusicProvider: "Sample-Based Cinematic Score v1", backgroundMusicPrompt: preview.description, backgroundMusicHash: `sample-based-${preview.recipe.seed}`, backgroundMusicReason: "Saved browser-rendered sample-based cinematic score.", backgroundMusicStatus: "completed" as const, backgroundMusicError: undefined, backgroundMusicOutdated: false } : scene);
+      persistFlow({ ...flow, script: { ...flow.script, scenes: completedScenes }, music: { ...flow.music, message: `Saved cinematic score for Scene ${sceneNumber}.`, status: "ready", provider: "Sample-Based Cinematic Score v1" }, videoOutdated: true });
+      URL.revokeObjectURL(preview.url); sampleUrlsRef.current.delete(preview.url); setSampleScores((current) => { const next = { ...current }; delete next[sceneNumber]; return next; });
+    } catch (saveError) { setSampleErrors((current) => ({ ...current, [sceneNumber]: saveError instanceof Error ? saveError.message : "Could not save the cinematic score." })); }
+    finally { setSavingSampleScene(null); }
+  };
+
+  const openPreview = async () => {
     if (!flow) return;
-    persistFlow({
+    // The standalone Guided preview restores only the authorized persisted
+    // project. Waiting for this queued save prevents it from loading an older
+    // snapshot while a Stage 4–7 edit is still in flight.
+    if (!flow.projectId || !flow.draftId || !flow.script) {
+      setError("Save this Guided project before opening the preview.");
+      return;
+    }
+    const returnStage = flow.stage === "preview" ? (flow.returnStage ?? "preview") : flow.stage;
+    const snapshot: VideoStudioFlowState = {
       ...flow,
       stage: "preview",
+      returnStage,
       videoOutdated: false
-    });
-    router.push("/video-preview?mode=guided");
+    };
+    setFlow(snapshot);
+    saveVideoStudioFlow(snapshot);
+    const saved = await queueDatabaseSave(snapshot, true);
+    if (!saved.success) {
+      setError("Could not save the current project for preview. Your local work is still available; retry Save Changes before opening preview.");
+      return;
+    }
+    router.push(`/video-preview?mode=guided&project=${encodeURIComponent(snapshot.projectId!)}`);
   };
 
   if (!flow) {
+    const hydrationFailed = hydrationState === "failed";
     return (
       <ProtectedRoute>
         <div className="px-4 py-16 sm:px-6 lg:px-8">
@@ -1153,8 +1568,12 @@ export default function VideoStudioScreen() {
             <div className="glass-panel rounded-[2rem] p-8 text-center">
               <Sparkles className="mx-auto h-8 w-8 text-gold" />
               <h1 className="mt-4 font-[var(--font-heading)] text-3xl text-white">
-                Loading Video Studio
+                {hydrationFailed ? "Could not restore this project" : "Loading Video Studio"}
               </h1>
+              {hydrationFailed ? <>
+                <p role="alert" className="mt-3 text-sm leading-6 text-red-100">Your saved Guided project could not be restored. Nothing was changed or saved. Check that the database migration is applied, then retry.</p>
+                <button type="button" onClick={() => setHydrationAttempt((attempt) => attempt + 1)} className="mt-5 rounded-full border border-starlight/30 bg-starlight/10 px-5 py-3 text-sm font-semibold text-starlight transition hover:bg-starlight/20">Retry restore</button>
+              </> : <p className="mt-3 text-sm text-white/70">Restoring your authorized project without changing its saved stage.</p>}
             </div>
           </div>
         </div>
@@ -1192,14 +1611,20 @@ export default function VideoStudioScreen() {
                   <div className="text-sm font-semibold text-white">
                     {VIDEO_STAGE_LABELS.find((stage) => stage.id === flow.stage)?.label}
                   </div>
+                  <div className={`mt-1 text-xs ${saveState === "failed" ? "text-rose-300" : "text-white/60"}`}>
+                    {saveState === "saving" ? "Saving changes…" : saveState === "saved" ? "Saved to project" : saveState === "failed" ? "Project save failed" : "Saved locally"}
+                    {saveState === "failed" && failedSaveRef.current ? (
+                      <button type="button" className="ml-2 underline" onClick={() => queueDatabaseSave(failedSaveRef.current!, true)}>Retry</button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
               <StageIndicator currentStage={flow.stage} />
 
               {error ? (
-                <div className="mb-6 flex gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-200 backdrop-blur-sm">
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+                <div role="alert" className="mb-6 flex gap-3 rounded-2xl border border-red-300 bg-red-50 p-5 text-sm leading-6 text-red-950 shadow-sm">
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
                   <span>{error}</span>
                 </div>
               ) : null}
@@ -1218,7 +1643,15 @@ export default function VideoStudioScreen() {
                   onCustomToneInputChange={setCustomToneInput}
                   onToggleGenre={toggleGenre}
                   onToggleTone={toggleTone}
-                  onLanguageChange={(language) => updateFlow({ language })}
+                  onLanguageChange={(language) => {
+                    const scriptIsStale = language !== flow.language && Boolean(flow.script);
+                    updateFlow({
+                      language,
+                      scenesNeedRegeneration: flow.scenesNeedRegeneration || scriptIsStale,
+                      voiceNeedsRegeneration: flow.voiceNeedsRegeneration || scriptIsStale || Boolean(flow.voiceResult),
+                      videoOutdated: flow.videoOutdated || scriptIsStale,
+                    });
+                  }}
                 />
               ) : null}
 
@@ -1226,7 +1659,7 @@ export default function VideoStudioScreen() {
                 <StoryIdeaStage
                   flow={flow}
                   isGenerating={isGeneratingStory}
-                  onBack={() => setStage("setup")}
+                  onBack={goToPreviousStage}
                   onGenerate={() => generateStory()}
                   onRoughIdeaChange={updateRoughIdea}
                 />
@@ -1237,7 +1670,7 @@ export default function VideoStudioScreen() {
                   flow={flow}
                   isGenerating={isGeneratingStory}
                   onAcceptedStoryChange={updateAcceptedStory}
-                  onBack={() => setStage("storyIdea")}
+                  onBack={goToPreviousStage}
                   onContinue={acceptStory}
                   onRegenerate={() => generateStory()}
                 />
@@ -1254,7 +1687,7 @@ export default function VideoStudioScreen() {
                   onAddDialogueLine={addDialogueLine}
                   onAddSceneCharacter={addSceneCharacter}
                   onAddScene={addScene}
-                  onBack={() => setStage("storyReview")}
+                  onBack={goToPreviousStage}
                   onContinue={() => setStage("voice")}
                   onDeleteDialogueLine={deleteDialogueLine}
                   onDeleteScene={deleteScene}
@@ -1275,9 +1708,11 @@ export default function VideoStudioScreen() {
                   isGenerating={isGeneratingVoice}
                   script={visibleScript}
                   totalDialogueLines={totalDialogueLines}
-                  onBack={() => setStage("scenes")}
+                  onBack={goToPreviousStage}
                   onContinue={() => setStage("images")}
                   onGenerate={generateVoice}
+                  regeneratingDialogueId={regeneratingDialogueAudioId}
+                  onRegenerateDialogue={regenerateDialogueAudio}
                 />
               ) : null}
 
@@ -1285,10 +1720,12 @@ export default function VideoStudioScreen() {
                 <ImageStage
                   flow={flow}
                   isGenerating={isGeneratingImages}
-                  onBack={() => setStage("voice")}
+                  onBack={goToPreviousStage}
                   onContinue={() => setStage("music")}
                   onGenerate={() => generateSceneImages(false)}
                   onRegenerateAll={regenerateAllImages}
+                  onRegenerateScene={regenerateSceneImage}
+                  onVisualDirectionChange={updateSceneVisualDirection}
                 />
               ) : null}
 
@@ -1296,9 +1733,17 @@ export default function VideoStudioScreen() {
                 <MusicStage
                   flow={flow}
                   isGenerating={isGeneratingMusic}
-                  onBack={() => setStage("images")}
-                  onGenerate={() => generateBackgroundMusic(false)}
-                  onRegenerateAll={regenerateAllMusic}
+                  batchProgress={musicBatchProgress}
+                  onBack={goToPreviousStage}
+                  onGenerateAll={() => void generateAllMusic()}
+                  sampleScores={sampleScores}
+                  sampleErrors={sampleErrors}
+                  generatingSampleScene={generatingSampleScene}
+                  savingSampleScene={savingSampleScene}
+                  samplePreviewRefs={samplePreviewRefs}
+                  onGenerateSample={generateSampleScore}
+                  onPreviewSample={previewSampleScore}
+                  onSaveSample={saveSampleScore}
                   onPreview={openPreview}
                 />
               ) : null}
@@ -1306,9 +1751,11 @@ export default function VideoStudioScreen() {
               {flow.stage === "preview" ? (
                 <PreviewShortcutStage
                   flow={flow}
-                  onBackAudio={() => setStage("music")}
-                  onBackDialogues={() => setStage("scenes")}
+                  finalSaveFeedback={finalSaveFeedback}
+                  hasSavedProject={Boolean(flow.projectId && flow.draftId)}
+                  onPreviousStep={goToPreviousStage}
                   onPreview={openPreview}
+                  onSave={savePreviewProject}
                 />
               ) : null}
             </div>
@@ -1326,13 +1773,13 @@ export default function VideoStudioScreen() {
         if (flow.stage === "voice" && flow.voiceResult && !flow.voiceNeedsRegeneration) {
           isReady = true;
           label = "Voices Ready";
-          sublabel = "All character dialogues generated.";
+          sublabel = "Narration and dialogue audio are ready. Next: prepare visuals.";
           action = () => setStage("music");
           actionLabel = "Continue to Music";
         } else if (flow.stage === "music" && flow.music.status === "ready") {
           isReady = true;
           label = "Music Ready";
-          sublabel = "Cinematic score generated.";
+          sublabel = "Scene-aware music decisions are saved. Next: review the preview.";
           action = openPreview;
           actionLabel = "Continue to Video";
         }
@@ -1367,9 +1814,15 @@ export default function VideoStudioScreen() {
 
 function StageIndicator({ currentStage }: { currentStage: VideoStudioStage }) {
   const currentIndex = VIDEO_STAGE_LABELS.findIndex((stage) => stage.id === currentStage);
+  const nextStage = VIDEO_STAGE_LABELS[currentIndex + 1];
 
   return (
-    <div className="mb-8 grid gap-2 md:grid-cols-4 xl:grid-cols-7">
+    <div className="mb-8">
+      <p className="mb-3 text-sm text-white/70" aria-live="polite">
+        You are in <span className="font-semibold text-white">Step {currentIndex + 1}: {VIDEO_STAGE_LABELS[currentIndex]?.label}</span>
+        {nextStage ? <>. Next: {nextStage.label}.</> : <>. Review your saved preview or return to any earlier stage.</>}
+      </p>
+      <div className="grid gap-2 md:grid-cols-4 xl:grid-cols-7">
       {VIDEO_STAGE_LABELS.map((stage, index) => {
         const isCurrent = stage.id === currentStage;
         const isPast = index < currentIndex;
@@ -1377,6 +1830,7 @@ function StageIndicator({ currentStage }: { currentStage: VideoStudioStage }) {
         return (
           <div
             key={stage.id}
+            aria-current={isCurrent ? "step" : undefined}
             className={`rounded-[1rem] border px-3 py-3 text-sm transition ${
               isCurrent
                 ? "border-cyan-400/45 bg-cyan-400/15 text-cyan-100"
@@ -1390,6 +1844,7 @@ function StageIndicator({ currentStage }: { currentStage: VideoStudioStage }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -1414,7 +1869,8 @@ function Warnings({ flow }: { flow: VideoStudioFlowState }) {
       {warnings.map((warning) => (
         <div
           key={warning}
-          className="rounded-[1rem] border border-gold/20 bg-gold/10 px-4 py-3 text-sm leading-6 text-gold"
+          role="status"
+          className="rounded-[1rem] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-950 shadow-sm"
         >
           {warning}
         </div>
@@ -1542,6 +1998,7 @@ function StoryIdeaStage({
       <textarea
         value={flow.roughIdea}
         onChange={(event) => onRoughIdeaChange(event.target.value)}
+        dir={textDirectionForVideoLanguage(flow.language)}
         placeholder="Describe your rough story concept, characters, world, conflict, and ending..."
         className="min-h-56 w-full resize-y rounded-2xl border border-slate-600/50 bg-slate-800/50 px-6 py-5 text-sm leading-7 text-white outline-none backdrop-blur-sm transition placeholder:text-slate-400 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
       />
@@ -1587,7 +2044,8 @@ function StoryReviewStage({
       <textarea
         value={flow.acceptedStory}
         onChange={(event) => onAcceptedStoryChange(event.target.value)}
-        className="min-h-[28rem] w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-sm leading-7 text-white outline-none focus:border-gold/35"
+        dir={textDirectionForVideoLanguage(flow.language)}
+        className={`min-h-[28rem] w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-sm leading-7 text-white outline-none focus:border-gold/35 ${flow.language === "ur" ? "text-right" : ""}`}
       />
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <SecondaryButton onClick={onBack}>
@@ -1659,6 +2117,7 @@ function ScenesStage({
   onTitleChange: (field: "logline" | "title", value: string) => void;
 }) {
   const script = flow.script;
+  const rtl = flow.language === "ur";
 
   if (!script) {
     return (
@@ -1683,6 +2142,7 @@ function ScenesStage({
               label="Movie Title"
               singleLine
               text={script.title}
+              rtl={rtl}
               onChange={(value) => onTitleChange("title", value)}
               onEditingChange={onEditingChange}
             />
@@ -1691,6 +2151,7 @@ function ScenesStage({
               editingKey={editingKey}
               label="Logline"
               text={script.logline}
+              rtl={rtl}
               onChange={(value) => onTitleChange("logline", value)}
               onEditingChange={onEditingChange}
             />
@@ -1725,6 +2186,7 @@ function ScenesStage({
           generatingDialogueLineId={generatingDialogueLineId}
           generatingDialogueScene={generatingDialogueScene}
           scene={scene}
+          rtl={rtl}
           onAddDialogueLine={onAddDialogueLine}
           onAddSceneCharacter={onAddSceneCharacter}
           onDeleteDialogueLine={onDeleteDialogueLine}
@@ -1756,7 +2218,9 @@ function VoiceStage({
   totalDialogueLines,
   onBack,
   onContinue,
-  onGenerate
+  onGenerate,
+  regeneratingDialogueId,
+  onRegenerateDialogue
 }: {
   flow: VideoStudioFlowState;
   isGenerating: boolean;
@@ -1765,8 +2229,12 @@ function VoiceStage({
   onBack: () => void;
   onContinue: () => void;
   onGenerate: () => void;
+  regeneratingDialogueId: string | null;
+  onRegenerateDialogue: (sceneNumber: number, dialogueId: string) => void;
 }) {
-  const generatedCount = flow.voiceResult?.audio.generatedCount ?? 0;
+  const audioSummary = summarizeVideoAudio(script?.scenes ?? []);
+  const audioStatus = videoAudioStatus(audioSummary, flow.voiceNeedsRegeneration);
+  const languageMismatch = Boolean(script && !isCurrentVideoScriptLanguage(flow.scriptLanguage, flow.language));
 
   return (
     <section className="space-y-6">
@@ -1777,21 +2245,21 @@ function VoiceStage({
           title="Voice Audio"
         />
         <div className="grid gap-3 md:grid-cols-4">
-          <Stat label="Dialogue" value={String(totalDialogueLines)} />
-          <Stat label="Voiced" value={String(generatedCount)} />
-          <Stat label="Provider" value="Deepgram" />
-          <Stat label="Status" value={flow.voiceNeedsRegeneration ? "Needs regen" : flow.voiceResult ? "Ready" : "Idle"} />
+          <Stat label="Dialogue lines" value={String(audioSummary.dialogueLines)} />
+          <Stat label="Dialogue clips" value={String(audioSummary.dialogueClips)} />
+          <Stat label="Narration clips" value={`${audioSummary.narrationClips}/${audioSummary.narrationRequired}`} />
+          <Stat label="Audio status" value={audioStatus} />
         </div>
         <div className="mt-6 grid gap-3 md:grid-cols-4">
           <SecondaryButton onClick={onBack}>
             <ArrowLeft className="h-4 w-4" />
             Back to Edit Dialogues
           </SecondaryButton>
-          <PrimaryButton disabled={!script || isGenerating} onClick={onGenerate}>
+          <PrimaryButton disabled={!script || isGenerating || languageMismatch} onClick={onGenerate}>
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />}
             Generate Voice
           </PrimaryButton>
-          <SecondaryButton disabled={!script || isGenerating} onClick={onGenerate}>
+          <SecondaryButton disabled={!script || isGenerating || languageMismatch} onClick={onGenerate}>
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             Regenerate Voice
           </SecondaryButton>
@@ -1802,7 +2270,11 @@ function VoiceStage({
             <ImageIcon className="h-4 w-4" />
             Continue to Visuals
           </PrimaryButton>
-          {!flow.voiceResult && !isGenerating && (
+          {languageMismatch ? (
+            <p className="col-span-full mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs font-medium text-amber-950 italic">
+              Language changed after this script was generated. Regenerate scenes and dialogues before voice synthesis; existing saved media remains intact.
+            </p>
+          ) : !flow.voiceResult && !isGenerating && (
             <p className="col-span-full mt-2 text-center text-xs text-white/75 italic">
               Please generate voice audio to unlock visual generation.
             </p>
@@ -1811,7 +2283,13 @@ function VoiceStage({
       </div>
 
       {script?.scenes.map((scene) => (
-        <VoiceSceneCard key={`${script.id}-${scene.sceneNumber}`} scene={scene} />
+          <VoiceSceneCard
+          key={`${script.id}-${scene.sceneNumber}`}
+          scene={scene}
+            rtl={flow.language === "ur"}
+          regeneratingDialogueId={regeneratingDialogueId}
+          onRegenerateDialogue={onRegenerateDialogue}
+        />
       ))}
     </section>
   );
@@ -1823,6 +2301,8 @@ function ImageStage({
   onBack,
   onGenerate,
   onRegenerateAll,
+  onRegenerateScene,
+  onVisualDirectionChange,
   onContinue
 }: {
   flow: VideoStudioFlowState;
@@ -1830,10 +2310,12 @@ function ImageStage({
   onBack: () => void;
   onGenerate: () => void;
   onRegenerateAll: () => void;
+  onRegenerateScene: (persistenceSceneId: string | undefined) => void;
+  onVisualDirectionChange: (sceneNumber: number, direction: NonNullable<MovieScene["visualDirection"]>) => void;
   onContinue: () => void;
 }) {
-  const allGenerated = flow.script?.scenes.every(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
-  const anyImages = flow.script?.scenes.some(s => s.generatedImageStatus === "completed" || !!s.generatedImageUrl);
+  const allGenerated = flow.script?.scenes.every((scene) => hasUsableMediaReference(scene.generatedImageUrl) && !scene.generatedImageOutdated);
+  const anyImages = flow.script?.scenes.some((scene) => hasUsableMediaReference(scene.generatedImageUrl));
 
   return (
     <section className="glass-panel rounded-[2rem] p-6">
@@ -1853,19 +2335,25 @@ function ImageStage({
               <div>
                 <p className="text-sm font-semibold text-white">Scene {scene.sceneNumber}: {scene.title}</p>
                 <p className="text-xs text-white/70 italic mt-1">"{scene.imagePrompt || scene.visualPrompt || "Cinematic visual"}"</p>
+                <VisualBriefSummary scene={scene} characters={flow.script?.characterVoices ?? []} onChange={(direction) => onVisualDirectionChange(scene.sceneNumber, direction)} />
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {(!scene.generatedImageStatus || scene.generatedImageStatus === "idle") && (
                   <><span className="h-2 w-2 rounded-full bg-gray-500"></span><span className="text-gray-400">Not generated</span></>
                 )}
                 {scene.generatedImageStatus === "generating" && (
-                  <><Loader2 className="h-3 w-3 animate-spin text-amber-400" /><span className="text-amber-400">Generating...</span></>
+                  <><Loader2 className="h-3 w-3 animate-spin text-amber-700" /><span className="text-amber-900">Generating...</span></>
                 )}
-                {scene.generatedImageStatus === "completed" && (
-                  <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Completed</span></>
+                {scene.generatedImageStatus === "completed" && hasUsableMediaReference(scene.generatedImageUrl) && (
+                  scene.generatedImageOutdated
+                    ? <><RefreshCcw className="h-3 w-3 text-amber-700" /><span className="text-amber-900">Outdated — Regenerate recommended</span></>
+                    : <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Ready</span></>
+                )}
+                {scene.generatedImageStatus === "completed" && !hasUsableMediaReference(scene.generatedImageUrl) && (
+                  <><X className="h-3 w-3 text-amber-700" /><span className="text-amber-900">Media reference missing</span></>
                 )}
                 {scene.generatedImageStatus === "failed" && (
-                  <><X className="h-3 w-3 text-red-400" /><span className="text-red-400">Failed</span></>
+                  <><X className="h-3 w-3 text-red-700" /><span className="text-red-800">Failed</span></>
                 )}
               </div>
             </div>
@@ -1876,13 +2364,24 @@ function ImageStage({
               </div>
             )}
 
+            {hasUsableMediaReference(scene.generatedImageUrl) && (
+              <button
+                type="button"
+                onClick={() => onRegenerateScene(scene.persistenceSceneId)}
+                disabled={isGenerating}
+                className="self-start text-xs font-medium text-starlight underline hover:text-white disabled:opacity-50"
+              >
+                Replace This Scene Image
+              </button>
+            )}
+
             {scene.generatedImageStatus === "failed" && (
               <div className="flex flex-col gap-2 mt-1">
-                <p className="text-xs text-red-300 bg-red-900/30 p-2 rounded">{scene.generatedImageError}</p>
+                <p role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-xs font-medium text-red-900">{scene.generatedImageError}</p>
                 <button
                   onClick={onGenerate}
                   disabled={isGenerating}
-                  className="self-start text-xs text-red-400 underline hover:text-red-300"
+                  className="self-start text-xs font-medium text-red-800 underline hover:text-red-950"
                 >
                   Retry Generation
                 </button>
@@ -1899,7 +2398,7 @@ function ImageStage({
         </SecondaryButton>
         <PrimaryButton disabled={isGenerating || allGenerated} onClick={onGenerate}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-          Generate Missing Images
+          {isGenerating ? "Generating Visuals…" : "Generate Visuals"}
         </PrimaryButton>
         <SecondaryButton disabled={isGenerating} onClick={onRegenerateAll}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
@@ -1917,37 +2416,117 @@ function ImageStage({
   );
 }
 
+function VisualBriefSummary({ scene, characters, onChange }: { scene: MovieScene; characters: VideoGenerationResponse["characterVoices"]; onChange?: (direction: NonNullable<MovieScene["visualDirection"]>) => void }) {
+  const context = buildSceneVisualContext({
+    scene: {
+      id: scene.persistenceSceneId,
+      title: scene.title,
+      narration: scene.narration,
+      imagePrompt: scene.imagePrompt,
+      visualPrompt: scene.visualPrompt,
+      directorNotes: scene.directorNotes,
+      location: scene.location,
+      mood: scene.mood,
+      dialogueCharacterNames: scene.dialogues.map((dialogue) => dialogue.character),
+      visualDirection: scene.visualDirection,
+    },
+    characters: characters.map((voice) => ({ id: voice.characterId, name: voice.character, appearance: voice.appearance, role: voice.archetype, personalityTone: voice.tone })),
+  });
+  const { brief } = context;
+  return (
+    <details className="mt-3 max-w-xl rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/80">
+      <summary className="cursor-pointer font-medium text-starlight">Review visual brief before generating</summary>
+      <p className="mt-2"><span className="font-semibold text-white">Required:</span> {brief.requiredVisualEvents.join(" ") || "No visual event authored."}</p>
+      <p className="mt-1"><span className="font-semibold text-white">Setting:</span> {brief.primaryLocation} ({brief.interiorOrExterior})</p>
+      <p className="mt-1"><span className="font-semibold text-white">Characters:</span> {brief.presentCharacterNames.join(", ") || "None identified"}</p>
+      {brief.visibleCharacterActions.length > 0 && <p className="mt-1"><span className="font-semibold text-white">Actions:</span> {brief.visibleCharacterActions.join(" ")}</p>}
+      {brief.warnings.map((warning) => <p key={warning} role="alert" className="mt-2 rounded border border-amber-300/50 bg-amber-100/10 p-2 font-medium text-amber-100">{warning}</p>)}
+      {onChange && <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <input aria-label="Primary visual location" defaultValue={scene.visualDirection?.primaryLocation ?? brief.primaryLocation} onBlur={(event) => onChange({ ...scene.visualDirection, primaryLocation: event.target.value })} className="rounded border border-white/15 bg-black/30 px-2 py-1 text-white" placeholder="Primary visual location" />
+        <input aria-label="Required visual event" defaultValue={scene.visualDirection?.requiredEvent ?? brief.requiredVisualEvents.join(" ")} onBlur={(event) => onChange({ ...scene.visualDirection, requiredEvent: event.target.value })} className="rounded border border-white/15 bg-black/30 px-2 py-1 text-white" placeholder="Required visual event" />
+        <input aria-label="Camera and composition" defaultValue={scene.visualDirection?.composition ?? brief.compositionAndCamera} onBlur={(event) => onChange({ ...scene.visualDirection, composition: event.target.value })} className="rounded border border-white/15 bg-black/30 px-2 py-1 text-white sm:col-span-2" placeholder="Camera and composition" />
+        <div className="sm:col-span-2">Visible characters: {characters.map((character) => <label key={character.character} className="mr-3 inline-flex items-center gap-1"><input type="checkbox" defaultChecked={scene.visualDirection?.visibleCharacterIds ? scene.visualDirection.visibleCharacterIds.includes(character.characterId ?? "") : brief.presentCharacterNames.includes(character.character)} onChange={(event) => { const selected = new Set(scene.visualDirection?.visibleCharacterIds ?? brief.presentCharacterIds); event.target.checked ? selected.add(character.characterId ?? "") : selected.delete(character.characterId ?? ""); onChange({ ...scene.visualDirection, visibleCharacterIds: [...selected].filter(Boolean) }); }} />{character.character}</label>)}</div>
+      </div>}
+    </details>
+  );
+}
+
 function MusicStage({
   flow,
   isGenerating,
+  batchProgress,
   onBack,
-  onGenerate,
-  onRegenerateAll,
+  onGenerateAll,
+  sampleScores,
+  sampleErrors,
+  generatingSampleScene,
+  savingSampleScene,
+  samplePreviewRefs,
+  onGenerateSample,
+  onPreviewSample,
+  onSaveSample,
   onPreview
 }: {
   flow: VideoStudioFlowState;
   isGenerating: boolean;
+  batchProgress: MusicBatchProgress | null;
   onBack: () => void;
-  onGenerate: () => void;
-  onRegenerateAll: () => void;
+  onGenerateAll: () => void;
+  sampleScores: Record<number, SampleScorePreview>;
+  sampleErrors: Record<number, string>;
+  generatingSampleScene: number | null;
+  savingSampleScene: number | null;
+  samplePreviewRefs: MutableRefObject<Record<number, HTMLAudioElement | null>>;
+  onGenerateSample: (scene: MovieScene, category: "ambient" | "suspense" | "emotional" | "action" | "hopeful", regenerate?: boolean) => Promise<void>;
+  onPreviewSample: (sceneNumber: number) => Promise<void>;
+  onSaveSample: (sceneNumber: number) => Promise<void>;
   onPreview: () => void;
 }) {
-  const allGenerated = flow.script?.scenes.every(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
-  const anyTracks = flow.script?.scenes.some(s => s.backgroundMusicStatus === "completed" || !!s.backgroundMusicUrl);
-
+  const anyTracks = flow.script?.scenes.some((scene) => hasUsableMediaReference(scene.backgroundMusicUrl));
+  const musicSummary = summarizeVideoMusic(flow.script?.scenes ?? []);
+  const musicAvailability = videoMusicStatus(musicSummary);
   return (
     <section className="glass-panel rounded-[2rem] p-6">
       <SectionHeader
         icon={<Music2 className="h-7 w-7 text-white" />}
-        label="Stage 6"
+        label="Stage 7"
         title="Background Music"
       />
       <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-5">
-        <p className="text-xs uppercase tracking-[0.26em] text-white/75">Music Status</p>
-        <h3 className="mt-2 text-xl font-semibold capitalize text-white">{flow.music.status}</h3>
-        <p className="mt-3 text-sm leading-7 text-white/90">{flow.music.message}</p>
+        <p className="text-xs uppercase tracking-[0.26em] text-white/75">Music availability</p>
+        <h3 className="mt-2 text-xl font-semibold text-white">{musicAvailability}</h3>
+        <p className="mt-3 text-sm leading-7 text-white/90">
+          {musicSummary.availableTracks > 0
+            ? `${musicSummary.availableTracks} playable track${musicSummary.availableTracks === 1 ? " is" : "s are"} saved for this project.`
+            : "Music is optional. Scenes with intentional silence can continue without a saved track."}
+        </p>
         
-        {flow.script?.scenes.map((scene) => (
+        {flow.script?.scenes.map((scene, index) => {
+          const previous = flow.script?.scenes[index - 1];
+          const persistedDecision = flow.musicDecisions[String(scene.sceneNumber)];
+          const effectiveDecision = persistedDecision?.outcome === "silence"
+            ? { outcome: "silence" as const, reason: persistedDecision.reason }
+            : persistedDecision?.category
+              ? { outcome: "music" as const, category: persistedDecision.category, reason: persistedDecision.reason, reusePreviousTrack: false }
+              : undefined;
+          const sceneDecision = effectiveDecision ?? decideSceneMusic({
+            sceneTitle: scene.title,
+            mood: scene.mood,
+            sceneTone: scene.sceneTone,
+            soundDesign: scene.soundDesign,
+            dialogueCount: scene.dialogues.length,
+            estimatedDuration: scene.estimatedDuration,
+            previous: previous
+              ? {
+                  category: previous.backgroundMusicCategory,
+                  trackId: previous.backgroundMusicTrackId,
+                  wasSilent: previous.backgroundMusicStatus === "silent",
+                }
+              : undefined,
+          });
+          const samplePreview = sampleScores[scene.sceneNumber];
+          const sampleBusy = generatingSampleScene === scene.sceneNumber || savingSampleScene === scene.sceneNumber;
+          return (
           <div key={scene.sceneNumber} className="mt-4 border-t border-white/10 pt-4 flex flex-col gap-2">
             <div className="flex justify-between items-start">
               <div>
@@ -1956,60 +2535,109 @@ function MusicStage({
               </div>
               <div className="flex items-center gap-2 text-xs">
                 {(!scene.backgroundMusicStatus || scene.backgroundMusicStatus === "idle") && (
-                  <><span className="h-2 w-2 rounded-full bg-gray-500"></span><span className="text-gray-400">Not generated</span></>
+                  <><span className="h-2 w-2 rounded-full bg-gray-500"></span><span className="text-gray-400">Not decided</span></>
                 )}
                 {scene.backgroundMusicStatus === "generating" && (
-                  <><Loader2 className="h-3 w-3 animate-spin text-cyan-400" /><span className="text-cyan-400">Generating...</span></>
+                  <><Loader2 className="h-3 w-3 animate-spin text-cyan-400" /><span className="text-cyan-400">Selecting...</span></>
                 )}
-                {scene.backgroundMusicStatus === "completed" && (
-                  <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Completed</span></>
+                {scene.backgroundMusicStatus === "completed" && hasUsableMediaReference(scene.backgroundMusicUrl) && (
+                  scene.backgroundMusicOutdated
+                    ? <><RefreshCcw className="h-3 w-3 text-amber-700" /><span className="text-amber-900">Outdated — Regenerate recommended</span></>
+                    : <><Check className="h-3 w-3 text-green-400" /><span className="text-green-400">Track available</span></>
+                )}
+                {scene.backgroundMusicStatus === "completed" && !hasUsableMediaReference(scene.backgroundMusicUrl) && (
+                  <><X className="h-3 w-3 text-amber-700" /><span className="text-amber-900">Track reference missing</span></>
+                )}
+                {scene.backgroundMusicStatus === "silent" && (
+                  <><span className="h-2 w-2 rounded-full bg-slate-400"></span><span className="text-slate-300">Intentional silence</span></>
+                )}
+                {scene.backgroundMusicStatus === "unavailable" && (
+                  <><span className="h-2 w-2 rounded-full bg-amber-500"></span><span className="text-amber-900">Cinematic score not saved</span></>
                 )}
                 {scene.backgroundMusicStatus === "failed" && (
-                  <><X className="h-3 w-3 text-red-400" /><span className="text-red-400">Failed</span></>
+                  <><X className="h-3 w-3 text-red-700" /><span className="text-red-800">Failed</span></>
                 )}
               </div>
             </div>
             
             {scene.backgroundMusicStatus === "failed" && (
               <div className="flex flex-col gap-2 mt-1">
-                <p className="text-xs text-red-300 bg-red-900/30 p-2 rounded">{scene.backgroundMusicError}</p>
+                <p role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-xs font-medium text-red-900">{scene.backgroundMusicError}</p>
                 <button
-                  onClick={onGenerate}
+                  onClick={onGenerateAll}
                   disabled={isGenerating}
                   className="self-start text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded"
                 >
-                  Retry
+                  Retry missing or failed scores
                 </button>
               </div>
             )}
+
+              <span className="text-xs text-white/55">Optional — scenes without a track remain silent.</span>
+            {sceneDecision.outcome === "music" ? (
+              <div className="rounded-lg border border-emerald-400/25 bg-emerald-950/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-100">Cinematic Score</p>
+                    <p className="mt-1 text-xs text-white/70">Recorded CC0 piano, strings, glockenspiel, and timpani arranged in your browser. It is not neural AI music.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void onGenerateSample(scene, sceneDecision.category)} disabled={sampleBusy || isGenerating} className="rounded bg-emerald-400/15 px-2.5 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/25 disabled:cursor-not-allowed disabled:opacity-50">
+                      {generatingSampleScene === scene.sceneNumber ? "Generating…" : samplePreview ? "Generate New Score" : "Generate Cinematic Score"}
+                    </button>
+                    {hasUsableMediaReference(scene.backgroundMusicUrl) && !samplePreview ? <button type="button" onClick={() => void onGenerateSample(scene, sceneDecision.category, true)} disabled={sampleBusy || isGenerating} className="rounded bg-white/10 px-2.5 py-1 text-xs text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50">Regenerate Saved Score</button> : null}
+                    {samplePreview ? <button type="button" onClick={() => void onGenerateSample(scene, sceneDecision.category, true)} disabled={sampleBusy} className="rounded bg-white/10 px-2.5 py-1 text-xs text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50">Regenerate</button> : null}
+                  </div>
+                </div>
+                {samplePreview ? <div className="mt-3 flex flex-wrap items-center gap-2"><audio ref={(node) => { samplePreviewRefs.current[scene.sceneNumber] = node; }} controls src={samplePreview.url} className="h-8 min-w-56 flex-1" /><button type="button" onClick={() => void onPreviewSample(scene.sceneNumber)} disabled={sampleBusy} className="rounded bg-white/10 px-2.5 py-1 text-xs text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50">Preview Generated Score</button><button type="button" onClick={() => void onSaveSample(scene.sceneNumber)} disabled={sampleBusy} className="rounded bg-emerald-400/15 px-2.5 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/25 disabled:cursor-not-allowed disabled:opacity-50">{savingSampleScene === scene.sceneNumber ? "Saving…" : "Save to Scene"}</button></div> : null}
+                {sampleErrors[scene.sceneNumber] ? <p role="alert" className="mt-2 text-xs font-medium text-red-800">{sampleErrors[scene.sceneNumber]}</p> : null}
+                {samplePreview && hasUsableMediaReference(scene.backgroundMusicUrl) ? <p className="mt-2 text-xs font-medium text-amber-900">Saving this preview will explicitly replace the existing score.</p> : null}
+                <details className="mt-3 text-xs text-white/65"><summary className="cursor-pointer text-white/80">Sample credits and provenance</summary><p className="mt-2 leading-5">{SAMPLE_CREDITS.source} — {SAMPLE_CREDITS.license}. {SAMPLE_CREDITS.attribution}</p><a className="underline" href={SAMPLE_CREDITS.sourceUrl} target="_blank" rel="noreferrer">View source and license</a></details>
+              </div>
+            ) : null}
+
+            {sceneDecision.outcome === "silence" ? (
+              <p className="rounded bg-slate-900/30 px-3 py-2 text-xs text-slate-300">
+                Intentional silence — no music required.
+              </p>
+            ) : null}
+
+            {(scene.backgroundMusicStatus === "silent" || scene.backgroundMusicStatus === "unavailable") && scene.backgroundMusicReason ? (
+              <p className="text-xs text-white/70">{scene.backgroundMusicReason}</p>
+            ) : null}
             
-            {(scene.backgroundMusicStatus === "completed" || scene.backgroundMusicUrl) && (
+            {hasUsableMediaReference(scene.backgroundMusicUrl) && (
               <audio controls src={scene.backgroundMusicUrl} className="w-full h-8 mt-1" />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      {batchProgress ? (
+        <div role="status" className="mt-4 rounded-xl border border-cyan-400/20 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-50">
+          {isGenerating
+            ? `Generating music ${batchProgress.current}/${batchProgress.total}${batchProgress.currentSceneNumber ? ` for Scene ${batchProgress.currentSceneNumber}` : ""}...`
+            : `Music batch complete: ${Object.values(batchProgress.results).filter((result) => result === "saved").length} saved, ${Object.values(batchProgress.results).filter((result) => result === "skipped").length} existing kept, ${Object.values(batchProgress.results).filter((result) => result === "silent").length} intentional silence, ${Object.values(batchProgress.results).filter((result) => result === "failed").length} failed.`}
+        </div>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-stretch gap-3 [&>*]:flex-1 [&>*]:min-w-[200px] xl:[&>*]:min-w-[180px]">
         <SecondaryButton onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
           Back
         </SecondaryButton>
-        <PrimaryButton disabled={isGenerating || allGenerated} onClick={onGenerate}>
+        <PrimaryButton disabled={isGenerating} onClick={onGenerateAll}>
           {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music2 className="h-4 w-4" />}
-          Generate Missing Music
+          Generate All Music
         </PrimaryButton>
-        <SecondaryButton disabled={isGenerating} onClick={onRegenerateAll}>
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-          Regenerate All Music
-        </SecondaryButton>
         <div className="flex">
           <PreviewFinalAudioButton
             scenes={flow.script?.scenes || []}
           />
         </div>
         <PrimaryButton
-          disabled={!anyTracks || isGenerating}
+          disabled={isGenerating}
           onClick={onPreview}
         >
           <Clapperboard className="h-4 w-4" />
@@ -2017,7 +2645,7 @@ function MusicStage({
         </PrimaryButton>
         {!anyTracks && !isGenerating && (
           <p className="col-span-full mt-2 text-center text-xs text-white/75 italic">
-            Complete background music to unlock final video preview.
+            Preview remains available: intentional silence is a valid scene decision.
           </p>
         )}
       </div>
@@ -2027,33 +2655,42 @@ function MusicStage({
 
 function PreviewShortcutStage({
   flow,
-  onBackAudio,
-  onBackDialogues,
-  onPreview
+  finalSaveFeedback,
+  hasSavedProject,
+  onPreviousStep,
+  onPreview,
+  onSave,
 }: {
   flow: VideoStudioFlowState;
-  onBackAudio: () => void;
-  onBackDialogues: () => void;
+  finalSaveFeedback: "idle" | "saving" | "saved" | "failed";
+  hasSavedProject: boolean;
+  onPreviousStep: () => void;
   onPreview: () => void;
+  onSave: () => void;
 }) {
   return (
     <section className="glass-panel rounded-[2rem] p-6">
       <SectionHeader
         icon={<Clapperboard className="h-7 w-7 text-white" />}
-        label="Stage 7"
+        label="Stage 8"
         title="Video Preview"
       />
       <p className="text-sm leading-7 text-white/90">
-        Preview data is saved for {flow.script?.title ?? "the current film"}. Open the dedicated preview page or jump back to editing.
+        Preview data is saved for <span dir={textDirectionForVideoLanguage(flow.language)} className={flow.language === "ur" ? "inline-block text-right" : ""}>{flow.script?.title ?? "the current film"}</span>. Open the dedicated preview page or jump back to editing.
       </p>
+      {finalSaveFeedback !== "idle" ? (
+        <p role={finalSaveFeedback === "failed" ? "alert" : "status"} className={`mt-4 text-sm font-medium ${finalSaveFeedback === "failed" ? "text-rose-300" : finalSaveFeedback === "saved" ? "text-emerald-300" : "text-cyan-200"}`}>
+          {finalSaveFeedback === "saving" ? "Saving project…" : finalSaveFeedback === "saved" ? "Project saved to My Projects." : "Project save failed. Your current work remains safely in this browser; try again."}
+        </p>
+      ) : null}
       <div className="mt-6 grid gap-3 md:grid-cols-3">
-        <SecondaryButton onClick={onBackDialogues}>
+        <SecondaryButton onClick={onPreviousStep}>
           <ArrowLeft className="h-4 w-4" />
-          Back to Edit Dialogues
+          Previous Step
         </SecondaryButton>
-        <SecondaryButton onClick={onBackAudio}>
-          <Music2 className="h-4 w-4" />
-          Back to Audio & Music
+        <SecondaryButton disabled={finalSaveFeedback === "saving"} onClick={onSave}>
+          {finalSaveFeedback === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          {hasSavedProject ? "Save Changes" : "Save to My Projects"}
         </SecondaryButton>
         <PrimaryButton onClick={onPreview}>
           <Clapperboard className="h-4 w-4" />
@@ -2226,6 +2863,7 @@ function SceneCard({
   generatingDialogueLineId,
   generatingDialogueScene,
   scene,
+  rtl,
   onAddDialogueLine,
   onAddSceneCharacter,
   onDeleteDialogueLine,
@@ -2241,6 +2879,7 @@ function SceneCard({
   generatingDialogueLineId: string | null;
   generatingDialogueScene: number | null;
   scene: MovieScene;
+  rtl: boolean;
   onAddDialogueLine: (sceneNumber: number, characterName?: string, line?: string) => void;
   onAddSceneCharacter: (sceneNumber: number, characterName: string) => void;
   onDeleteDialogueLine: (sceneNumber: number, dialogueId: string) => void;
@@ -2258,6 +2897,7 @@ function SceneCard({
   onGenerateDialogueForLine: (sceneNumber: number, dialogueId: string) => void;
   onSceneFieldChange: (sceneNumber: number, field: EditableSceneField, value: string) => void;
 }) {
+  const priorMediaValidation = validateSceneMedia(scene, "authoring");
   return (
     <article className="glass-panel overflow-hidden rounded-[2rem]">
       <div className="border-b border-white/10 bg-white/[0.03] p-6">
@@ -2275,8 +2915,14 @@ function SceneCard({
             {scene.sceneTone}
           </span>
         </div>
-        <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
+        <h3 dir={rtl ? "rtl" : undefined} className={`font-[var(--font-heading)] text-2xl text-white ${rtl ? "text-right" : ""}`}>{scene.title}</h3>
         <p className="mt-2 text-sm text-white/85">{scene.location}</p>
+        {priorMediaValidation.issues.length > 0 ? (
+          <div className="mt-4" aria-label={`Previously generated media for Scene ${scene.sceneNumber}`}>
+            <p className="text-xs uppercase tracking-[0.2em] text-white/60">Previously generated media</p>
+            <MediaValidationSummary status={priorMediaValidation.status} issues={priorMediaValidation.issues} />
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={() => onDeleteScene(scene.sceneNumber)}
@@ -2332,6 +2978,7 @@ function SceneCard({
             editingKey={editingKey}
             label="Narration"
             text={scene.narration}
+            rtl={rtl}
             onChange={(value) => onSceneFieldChange(scene.sceneNumber, "narration", value)}
             onEditingChange={onEditingChange}
           />
@@ -2371,6 +3018,7 @@ function SceneCard({
 
         <DialogueReview
           dialogues={scene.dialogues}
+          rtl={rtl}
           editingKey={editingKey}
           generatingDialogueLineId={generatingDialogueLineId}
           isGenerating={generatingDialogueScene === scene.sceneNumber}
@@ -2389,8 +3037,27 @@ function SceneCard({
   );
 }
 
+function MediaValidationSummary({ status, issues }: { status: MediaValidationStatus; issues: string[] }) {
+  const styles: Record<MediaValidationStatus, string> = {
+    ready: "border-emerald-400/25 bg-emerald-400/10 text-emerald-100",
+    needs_attention: "border-amber-300 bg-amber-50 text-amber-950",
+    unavailable: "border-slate-400/25 bg-slate-400/10 text-slate-200",
+  };
+  const label: Record<MediaValidationStatus, string> = {
+    ready: "Ready",
+    needs_attention: "Needs attention",
+    unavailable: "Validation unavailable",
+  };
+  return <div className={`mt-3 rounded-xl border p-3 text-xs ${styles[status]}`}>
+    <p className="font-semibold">Validation: {label[status]}</p>
+    {issues.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-4 leading-5">{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p className="mt-1 text-white/70">Saved references are structurally valid. Remote availability is unverified until playback or storage access is attempted.</p>}
+    {status === "needs_attention" ? <p className="mt-2 text-amber-900">Use the existing Visuals, Voice, or Music controls to retry, generate, or import only the affected asset.</p> : null}
+  </div>;
+}
+
 function DialogueReview({
   dialogues,
+  rtl,
   editingKey,
   generatingDialogueLineId,
   isGenerating,
@@ -2405,6 +3072,7 @@ function DialogueReview({
   onGenerateDialogueForLine
 }: {
   dialogues: MovieDialogueLine[];
+  rtl: boolean;
   editingKey: string | null;
   generatingDialogueLineId: string | null;
   isGenerating: boolean;
@@ -2461,6 +3129,7 @@ function DialogueReview({
         </div>
         <div className="flex flex-col gap-2 rounded-[1rem] border border-white/10 bg-white/5 p-3 sm:flex-row">
           <input
+            dir={rtl ? "rtl" : undefined}
             value={newCharacterName}
             onChange={(event) => setNewCharacterName(event.target.value)}
             onKeyDown={(event) => {
@@ -2488,6 +3157,7 @@ function DialogueReview({
           <div key={dialogue.id} className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <select
+                dir={rtl ? "rtl" : undefined}
                 value={dialogue.character}
                 onChange={(event) =>
                   onDialogueMetaChange(sceneNumber, dialogue.id, {
@@ -2564,6 +3234,7 @@ function DialogueReview({
               editingKey={editingKey}
               label="Dialogue Line"
               text={dialogue.line}
+                rtl={rtl}
               onChange={(value) => onDialogueChange(sceneNumber, dialogue.id, value)}
               onEditingChange={onEditingChange}
             />
@@ -2574,7 +3245,17 @@ function DialogueReview({
   );
 }
 
-function VoiceSceneCard({ scene }: { scene: MovieScene }) {
+function VoiceSceneCard({
+  scene,
+  rtl,
+  regeneratingDialogueId,
+  onRegenerateDialogue,
+}: {
+  scene: MovieScene;
+  rtl: boolean;
+  regeneratingDialogueId: string | null;
+  onRegenerateDialogue: (sceneNumber: number, dialogueId: string) => void;
+}) {
   return (
     <article className="glass-panel overflow-hidden rounded-[2rem]">
       <div className="border-b border-white/10 bg-white/[0.03] p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -2587,7 +3268,7 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
               {scene.mood}
             </span>
           </div>
-          <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
+          <h3 dir={rtl ? "rtl" : undefined} className={`font-[var(--font-heading)] text-2xl text-white ${rtl ? "text-right" : ""}`}>{scene.title}</h3>
         </div>
         <PlaySceneAudioButton audioUrls={scene.dialogues.map(d => d.audioUrl || "")} />
       </div>
@@ -2595,7 +3276,10 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
         {scene.dialogues.map((dialogue) => (
           <div key={dialogue.id} className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
             <p className="text-sm font-semibold text-white">{dialogue.character}</p>
-            <p className="mt-3 text-sm leading-7 text-white/72">"{dialogue.line}"</p>
+            <p className="mt-1 text-xs text-starlight/90">
+              Emotion-informed delivery: {resolveDialogueEmotion({ line: dialogue, scene }).emotion}
+            </p>
+            <p dir={rtl ? "rtl" : undefined} className={`mt-3 text-sm leading-7 text-white/72 ${rtl ? "text-right" : ""}`}>"{dialogue.line}"</p>
             {dialogue.audioUrl ? (
               <audio controls src={dialogue.audioUrl} className="mt-3 w-full" />
             ) : (
@@ -2603,6 +3287,16 @@ function VoiceSceneCard({ scene }: { scene: MovieScene }) {
                 {dialogue.audioError ?? "Waiting for voice generation."}
               </p>
             )}
+            {dialogue.audioOutdated ? <p className="mt-2 text-xs font-medium text-amber-900">Outdated — Regenerate recommended. The previous clip is retained until replacement succeeds.</p> : null}
+            <button
+              type="button"
+              onClick={() => onRegenerateDialogue(scene.sceneNumber, dialogue.id)}
+              disabled={Boolean(regeneratingDialogueId)}
+              className="mt-3 inline-flex items-center gap-2 rounded-full border border-starlight/30 px-3 py-2 text-xs font-semibold text-starlight transition hover:bg-starlight/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {regeneratingDialogueId === dialogue.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+              Regenerate emotional delivery
+            </button>
           </div>
         ))}
       </div>
@@ -2616,6 +3310,7 @@ function EditableBlock({
   label,
   singleLine = false,
   text,
+  rtl = false,
   onChange,
   onEditingChange
 }: {
@@ -2624,6 +3319,7 @@ function EditableBlock({
   label: string;
   singleLine?: boolean;
   text: string;
+  rtl?: boolean;
   onChange: (value: string) => void;
   onEditingChange: (key: string | null) => void;
 }) {
@@ -2647,15 +3343,17 @@ function EditableBlock({
         <div>
           {singleLine ? (
             <input
+              dir={rtl ? "rtl" : undefined}
               value={text}
               onChange={(event) => onChange(event.target.value)}
-              className="w-full rounded-[1rem] border border-cyan-400/25 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-gold/35"
+              className={`w-full rounded-[1rem] border border-cyan-400/25 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-gold/35 ${rtl ? "text-right" : ""}`}
             />
           ) : (
             <textarea
+              dir={rtl ? "rtl" : undefined}
               value={text}
               onChange={(event) => onChange(event.target.value)}
-              className="min-h-32 w-full resize-y rounded-[1rem] border border-cyan-400/25 bg-black/30 px-4 py-3 text-sm leading-7 text-white outline-none focus:border-gold/35"
+              className={`min-h-32 w-full resize-y rounded-[1rem] border border-cyan-400/25 bg-black/30 px-4 py-3 text-sm leading-7 text-white outline-none focus:border-gold/35 ${rtl ? "text-right" : ""}`}
             />
           )}
           <button

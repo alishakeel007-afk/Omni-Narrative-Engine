@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const auth = readFileSync(resolve(process.cwd(), "context/AuthContext.tsx"), "utf8");
+const client = readFileSync(resolve(process.cwd(), "lib/supabase/client.ts"), "utf8");
+const middleware = readFileSync(resolve(process.cwd(), "lib/supabase/middleware.ts"), "utf8");
+assert.match(client, /let browserClient/, "browser must reuse one Supabase auth client");
+assert.match(auth, /event === "SIGNED_OUT"/, "only an explicit provider sign-out clears the established session");
+assert.match(auth, /error && currentUserRef\.current/, "transient getUser errors must retain an established session");
+assert.match(auth, /TOKEN_REFRESHED with no session is deliberately not treated as logout/, "refresh races must not redirect the user");
+assert.match(auth, /subscription\.unsubscribe\(\)/, "auth listener must clean up on unmount");
+assert.match(middleware, /'\/projects'/, "My Projects must receive the same server-side protection");
+console.log("Step 133 auth session lifecycle regression contracts passed.");

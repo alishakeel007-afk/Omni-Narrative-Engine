@@ -8,6 +8,7 @@ import {
   type SavePayload,
   type QueuedSave,
 } from "@/lib/save-queue";
+import type { PersistedMemoryFact } from "@/types/story";
 
 const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 2000;
@@ -20,18 +21,28 @@ function backoffMs(attempts: number) {
 export function useSaveQueue() {
   const busyRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successCallbacksRef = useRef(new Map<string, (memories: PersistedMemoryFact[]) => void>());
 
-  const attemptSave = useCallback(async (item: QueuedSave): Promise<boolean> => {
-    const { projectId, draftId, sceneNumber, scene, choice, currentState } = item.payload;
+  const attemptSave = useCallback(async (item: QueuedSave): Promise<{ success: boolean; memories: PersistedMemoryFact[] }> => {
+    const { projectId, draftId, sceneNumber, scene, choice, choiceSceneNumber, currentState, setup } = item.payload;
     try {
       const response = await fetch(`/api/story/${projectId}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId, sceneNumber, scene, choice, currentState }),
+        body: JSON.stringify({ draftId, sceneNumber, scene, choice, choiceSceneNumber, currentState, setup }),
       });
-      return response.ok;
+      if (!response.ok) return { success: false, memories: [] };
+      const data = await response.json().catch(() => null) as { memories?: unknown } | null;
+      const memories = Array.isArray(data?.memories)
+        ? data.memories.filter((memory): memory is PersistedMemoryFact => Boolean(
+          memory && typeof memory === "object" && typeof (memory as PersistedMemoryFact).id === "string" &&
+          typeof (memory as PersistedMemoryFact).memoryType === "string" && typeof (memory as PersistedMemoryFact).content === "string" &&
+          typeof (memory as PersistedMemoryFact).importanceScore === "number"
+        ))
+        : [];
+      return { success: true, memories };
     } catch {
-      return false;
+      return { success: false, memories: [] };
     }
   }, []);
 
@@ -58,12 +69,15 @@ export function useSaveQueue() {
       // Save attempt increment to local storage
       saveLocalQueue(queue);
 
-      const success = await attemptSave(item);
+      const result = await attemptSave(item);
 
-      if (success) {
+      if (result.success) {
         // Success: remove from local storage
         const currentQueue = getLocalQueue();
         saveLocalQueue(currentQueue.filter((q) => q.id !== item.id));
+        const onSaved = successCallbacksRef.current.get(item.id);
+        successCallbacksRef.current.delete(item.id);
+        onSaved?.(result.memories);
       } else {
         const currentQueue = getLocalQueue();
         const updatedItem = currentQueue.find((q) => q.id === item.id);
@@ -94,8 +108,9 @@ export function useSaveQueue() {
   }, [attemptSave]);
 
   const enqueue = useCallback(
-    (payload: SavePayload) => {
-      enqueueLocalSave(payload);
+    (payload: SavePayload, onSaved?: (memories: PersistedMemoryFact[]) => void) => {
+      const item = enqueueLocalSave(payload);
+      if (onSaved) successCallbacksRef.current.set(item.id, onSaved);
       drainQueue();
     },
     [drainQueue]

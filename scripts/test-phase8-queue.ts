@@ -10,7 +10,10 @@
  * - Recovery logic falls back correctly.
  */
 
-import { getLocalQueue, saveLocalQueue, enqueueLocalSave, syncPendingSavesForDraft, type SavePayload, type QueuedSave } from "../lib/save-queue";
+import type { SavePayload, QueuedSave } from "../lib/save-queue";
+
+const saveQueueModule: typeof import("../lib/save-queue") = await import(new URL("../lib/save-queue.ts", import.meta.url).href);
+const { getLocalQueue, saveLocalQueue, enqueueLocalSave, syncPendingSavesForDraft } = saveQueueModule;
 
 // Mock localStorage for the NodeJS test environment
 const mockStorage: Record<string, string> = {};

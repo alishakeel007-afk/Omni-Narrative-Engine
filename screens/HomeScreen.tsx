@@ -21,7 +21,7 @@ export default function HomeScreen() {
               </h2>
             </div>
             <p className="max-w-2xl text-sm leading-7 text-white/90">
-              Everything needed to create interactive, consistent, and multimedia AI stories.
+              Everything needed to shape a story into scenes, voices, visuals, music, and a synchronized browser preview.
             </p>
           </div>
 
@@ -38,21 +38,21 @@ export default function HomeScreen() {
           <div className="glass-panel rounded-[2rem] p-6 sm:p-8 lg:p-10">
             <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-gold">Why Omni-Narrative Engine Stands Out</p>
+                <p className="text-xs uppercase tracking-[0.32em] text-gold">Video Studio Workflow</p>
                 <h2 className="mt-3 font-[var(--font-heading)] text-3xl text-white sm:text-4xl">
-                  The user is never locked into one path.
+                  One workspace from story idea to preview.
                 </h2>
                 <p className="mt-5 max-w-2xl text-base leading-8 text-white/90">
-                  Users can follow AI-guided choices, write their own story direction, or build a complete cinematic story through AI Story Studio. This makes the system flexible for both beginners and creative users.
+                  Video Studio keeps your script, scene edits, character voices, artwork, music, and media readiness together in one saved project. Return to any stage without starting over.
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 {[
-                  ["AI Guided Story Mode", "Best for users who want the system to guide the story."],
-                  ["AI Story Studio", "Best for users who want to build a complete story and video-ready script."],
-                  ["Hybrid Flow", "Users can combine AI suggestions with their own custom input."],
-                  ["Story Memory", "The system tracks decisions, characters, and locations for continuity."]
+                  ["1. Create", "Start with a rough idea, genre, tone, and language."],
+                  ["2. Customize", "Edit scenes, dialogue, and character voice assignments."],
+                  ["3. Prepare Media", "Generate visuals, narration, dialogue audio, and cinematic scores."],
+                  ["4. Preview", "Review the saved scene sequence with synchronized browser playback."]
                 ].map(([title, description]) => (
                   <div
                     key={title}
@@ -70,19 +70,13 @@ export default function HomeScreen() {
                 href="/story/mode"
                 className="rounded-full bg-gradient-to-r from-aurora to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950"
               >
-                Start Guided Story
+                Open Video Studio
               </Link>
               <Link
-                href="/setup"
+                href="/dashboard"
                 className="rounded-full border border-white/10 bg-white/5 px-7 py-4 text-center text-sm font-semibold text-white/82"
               >
-                Open AI Story Studio
-              </Link>
-              <Link
-                href="/story/memory"
-                className="rounded-full border border-gold/20 bg-gold/10 px-7 py-4 text-center text-sm font-semibold text-gold"
-              >
-                View Memory Board
+                My Projects
               </Link>
             </div>
           </div>

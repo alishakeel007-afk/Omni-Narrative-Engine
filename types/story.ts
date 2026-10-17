@@ -31,6 +31,7 @@ export type StorySetupData = {
   mood: string;
   moods: string[];
   numberOfScenes: number;
+  ownerId?: string;
   scenarioDescription: string;
   scenarioTitle: string;
   selectedTemplate: string;
@@ -54,6 +55,8 @@ export type InventoryUpdate = {
 } | null;
 
 export type StoryCharacter = {
+  /** Stable database identity when this character was restored from a saved draft. */
+  id?: string;
   emotionalState: string;
   imageLabel: string;
   name: string;
@@ -61,7 +64,19 @@ export type StoryCharacter = {
   role: string;
   traits: string[];
   visualAppearance: string;
+  /** Provider-neutral persisted voice selection; not interpreted by Interactive Story. */
+  voiceStyle?: string;
 };
+
+/** A safe, displayable subset of an ownership-checked StoryMemory record. */
+export type PersistedMemoryFact = {
+  id: string;
+  memoryType: string;
+  content: string;
+  importanceScore: number;
+};
+
+export type StoryRecoverySource = "database" | "offline-cache" | "local" | "none";
 
 export type GeneratedMedia = {
   audioMoodPrompt: string;
@@ -116,6 +131,12 @@ export type PersistedStoryState = {
   selectedChoiceType: ChoiceType | null;
   setup: StorySetupData;
   dynamicCast: StoryCharacter[];
+  /** Facts saved for this draft. These are distinct from the recent choice timeline. */
+  persistedMemories: PersistedMemoryFact[];
+  recoverySource: StoryRecoverySource;
+  recoveryError?: string;
+  draftVersion?: number;
+  projectTitle?: string;
 };
 
 

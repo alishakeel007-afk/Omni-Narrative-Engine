@@ -73,11 +73,17 @@ export function extractAtomicMemories(scene: StoryScene, userChoice: string): At
 
   // 5. Extract a brief Plot summary from the actual scene text
   if (scene.text) {
-    // Take the first 300 characters as a plot summary, stripping newlines
-    const summaryText = scene.text.substring(0, 300).replace(/\n/g, " ").trim();
+    // Keep a complete early sentence whenever possible. Partial fragments are
+    // less useful for retrieval and can turn into misleading "facts" later.
+    const normalizedText = scene.text.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+    const sentenceEnd = normalizedText.slice(0, 420).search(/[.!?](?:\s|$)/);
+    const summaryText = (sentenceEnd >= 0
+      ? normalizedText.slice(0, sentenceEnd + 1)
+      : normalizedText.slice(0, 420)
+    ).trim();
     memories.push({
       type: "PLOT",
-      content: `Plot event: ${summaryText}${scene.text.length > 300 ? "..." : ""}`
+      content: `Plot event: ${summaryText}${normalizedText.length > summaryText.length ? " …" : ""}`
     });
   }
 

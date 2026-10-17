@@ -1,19 +1,22 @@
-import type { StoryScene, HealthStatus, ChoiceType } from "@/types/story";
+import type { StoryScene, HealthStatus, ChoiceType, StorySetupData } from "@/types/story";
 
 export interface SavePayload {
   projectId: string;
   draftId: string;
   sceneNumber: number;
   scene: StoryScene;
-  choice: {
+  choice?: {
     text: string;
     choiceType: ChoiceType;
   };
+  /** Scene which offered `choice`; differs from the newly generated scene. */
+  choiceSceneNumber?: number;
   currentState: {
     sceneNumber: number;
     healthStatus: HealthStatus;
     inventory: string[];
   };
+  setup?: StorySetupData;
 }
 
 export interface QueuedSave {
@@ -67,12 +70,12 @@ export function enqueueLocalSave(payload: SavePayload): QueuedSave {
 }
 
 async function attemptSave(item: QueuedSave): Promise<boolean> {
-  const { projectId, draftId, sceneNumber, scene, choice, currentState } = item.payload;
+  const { projectId, draftId, sceneNumber, scene, choice, choiceSceneNumber, currentState, setup } = item.payload;
   try {
     const response = await fetch(`/api/story/${projectId}/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draftId, sceneNumber, scene, choice, currentState }),
+    body: JSON.stringify({ draftId, sceneNumber, scene, choice, choiceSceneNumber, currentState, setup }),
     });
     return response.ok;
   } catch {

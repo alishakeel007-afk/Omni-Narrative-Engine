@@ -1,0 +1,11 @@
+flowchart LR
+  A[Mode selector] --> B[Custom Story Builder]
+  B --> C[Manual title, scenes, dialogue]
+  C --> D{Ask for AI suggestion?}
+  D -- Yes --> E[Three selectable suggestions]
+  E --> C
+  D -- No --> F[Continue manual authoring]
+  F --> G[Explicit Save to My Projects]
+  G --> H[(Custom progressState snapshot)]
+  H --> I[Voice, visuals, music]
+  I --> J[Synchronized browser preview]

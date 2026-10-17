@@ -10,6 +10,15 @@ import type {
 import { getEnvValue } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { uploadTtsAudioToStorage } from "@/lib/audio/tts-storage";
+import { validateUrduAudienceScript } from "@/lib/video-language";
+import { fetchGeminiWithRetry, toGeminiRequestError } from "@/lib/gemini-retry";
+import { generateWithGroqPrimary } from "@/lib/video-generation-provider-fallback";
+import {
+  buildNarrativeContract,
+  buildNarrativeContractPrompt,
+  type NarrativeContract,
+  validateNarrativeConsistency
+} from "@/lib/narrative-consistency";
 
 export const runtime = "nodejs";
 
@@ -17,10 +26,14 @@ const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const DEEPGRAM_TTS_ENDPOINT = "https://api.deepgram.com/v1/speak";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b";
 const DEFAULT_DEEPGRAM_TTS_MODEL = "aura-2-thalia-en";
 const MAX_SCENES = 5;
 const MAX_AUDIO_LINES = 18;
+const GEMINI_STORY_TIMEOUT_MS = 45_000;
+const GEMINI_REPAIR_TIMEOUT_MS = 12_000;
+const GROQ_STORY_TIMEOUT_MS = 18_000;
+const STORY_MAX_OUTPUT_TOKENS = 8_192;
 
 type VoiceModel = {
   description: string;
@@ -555,6 +568,7 @@ function assignCharacterVoices(scenes: MovieScene[], appearancesByCharacter: Map
 }
 
 function buildGeminiPrompt(request: Required<Pick<VideoGenerationRequest, "scenario">> & {
+  contract: NarrativeContract;
   genres: string[];
   language: VideoLanguage;
   sceneCount?: number;
@@ -589,11 +603,18 @@ Creative constraints:
 - The movie may blend multiple genres. Assign each scene a sceneGenre such as "Sci-Fi + Comedy" or "Mystery + Suspense" when useful.
 - The movie may shift tones scene by scene. Assign each scene a sceneTone based on what is happening in that moment.
 - Make it feel like a proper short film, with a clear beginning, escalation, climax, and ending.
+${buildNarrativeContractPrompt(request.contract, request.sceneCount ?? 3)}
+- Preserve established facts across scenes. A later scene may develop a relationship, reveal a truth, or change a location only through an on-screen event; it must not silently overwrite earlier facts.
+- Use scenes to advance the story rather than restating the premise. The final scene must address the conflict's consequence, even for an intentionally open or ambiguous ending.
+- When a central moral decision appears in the final scene, show what the protagonist chooses and at least one immediate consequence. An open ending is allowed only when the unresolved question is deliberate and the audience can see what changed or what it cost.
+- If a sacrifice, irreversible loss, or major revelation matters in a short story, foreshadow its stakes before the final scene and show a visible consequence after it. Do not introduce loved ones or a sacrifice only at the climax solely to manufacture emotion.
 - Each scene must include cinematic narration and character dialogue.
 - Use multiple speaking characters when the story naturally needs them.
 - Give every character a stable name, role, and voice direction.
 - Give every named speaking character a fixed, detailed visual appearance description (face, hair, build, clothing, distinguishing features) that stays exactly the same every time that character appears, for use in AI image generation reference prompts.
 - Dialogues must be speakable by a text-to-speech system. Do not put stage directions inside dialogue lines.
+- Dialogue must be complete, natural spoken English (or the requested audience language), with a clear speaker, intention, and grammatical referent. Avoid malformed self-directed lines such as "I forgive me."
+- A character may reverse a stated decision only when narration or dialogue shows the new information, pressure, or emotional reason for that reversal. Do not have dialogue promise one action while the same scene silently shows the opposite.
 - Keep each dialogue line under 180 characters.
 - Keep narration under 450 characters per scene.
 - Produce image and sound prompts for future visual/audio modules.
@@ -750,8 +771,38 @@ function normalizeScene(scene: unknown, index: number): MovieScene {
   };
 }
 
+function normalizeMovieScript(parsed: Record<string, unknown>, params: {
+  genres: string[];
+  language: VideoLanguage;
+  tones: string[];
+  sceneCount?: number;
+}) {
+  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+  if (rawScenes.length === 0) throw new Error("The provider returned no scenes.");
+
+  const sceneLimit = params.sceneCount ? Math.min(params.sceneCount, MAX_SCENES) : MAX_SCENES;
+  const scenes = rawScenes.slice(0, sceneLimit).map(normalizeScene);
+  const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
+
+  const script = {
+    characterVoices: voiceResult.characterVoices,
+    estimatedRuntime: textValue(parsed.estimatedRuntime, `${scenes.length * 45} seconds`),
+    genre: textValue(parsed.genre, params.genres.join(" + ")),
+    logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
+    scenes: voiceResult.scenes,
+    title: textValue(parsed.title, "Untitled Omni-Narrative Film"),
+    tone: textValue(parsed.tone, params.tones.join(" + "))
+  };
+  if (params.language === "ur") {
+    const urduError = validateUrduAudienceScript(script);
+    if (urduError) throw new Error(urduError);
+  }
+  return script;
+}
+
 async function generateMovieScript(params: {
   apiKey: string;
+  contract: NarrativeContract;
   genres: string[];
   language: VideoLanguage;
   model: string;
@@ -759,9 +810,8 @@ async function generateMovieScript(params: {
   scenario: string;
   tones: string[];
 }) {
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${encodeURIComponent(params.model)}:generateContent`,
-    {
+  const response = await fetchGeminiWithRetry({
+    request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(params.model)}:generateContent`, {
       body: JSON.stringify({
         contents: [
           {
@@ -770,7 +820,9 @@ async function generateMovieScript(params: {
           }
         ],
         generationConfig: {
+          maxOutputTokens: STORY_MAX_OUTPUT_TOKENS,
           responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 0 },
           temperature: 0.85
         }
       }),
@@ -778,51 +830,33 @@ async function generateMovieScript(params: {
         "Content-Type": "application/json",
         "x-goog-api-key": params.apiKey
       },
-      method: "POST"
-    }
-  );
+      method: "POST",
+      signal
+    }),
+    timeoutMs: GEMINI_STORY_TIMEOUT_MS
+  });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini request failed (${response.status}): ${errorText.slice(0, 500)}`);
+    throw await toGeminiRequestError(response, "video script generation");
   }
 
   const payload = await response.json() as unknown;
   const text = extractGeminiText(payload);
   const parsed = parseJsonFromText(text);
-  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
-
-  if (rawScenes.length === 0) {
-    throw new Error("Gemini returned no scenes.");
-  }
-
-  const sceneLimit = params.sceneCount ? Math.min(params.sceneCount, MAX_SCENES) : MAX_SCENES;
-  const scenes = rawScenes.slice(0, sceneLimit).map(normalizeScene);
-  const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
-
-  return {
-    characterVoices: voiceResult.characterVoices,
-    estimatedRuntime: textValue(parsed.estimatedRuntime, `${scenes.length * 45} seconds`),
-    genre: textValue(parsed.genre, params.genres.join(" + ")),
-    logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
-    scenes: voiceResult.scenes,
-    title: textValue(parsed.title, "Untitled Omni-Narrative Film"),
-    tone: textValue(parsed.tone, params.tones.join(" + "))
-  };
+  return normalizeMovieScript(parsed, params);
 }
 
-async function generateMovieScriptWithGroq(params: {
+async function fetchGroqStoryJson(params: {
   apiKey: string;
-  genres: string[];
-  language: VideoLanguage;
   model: string;
-  sceneCount?: number;
-  scenario: string;
-  tones: string[];
+  prompt: string;
+  temperature: number;
 }) {
-  const response = await fetch(
-    GROQ_ENDPOINT,
-    {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GROQ_STORY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(GROQ_ENDPOINT, {
       body: JSON.stringify({
         messages: [
           {
@@ -831,52 +865,178 @@ async function generateMovieScriptWithGroq(params: {
           },
           {
             role: "user",
-            content: buildGeminiPrompt(params)
+            content: params.prompt
           }
         ],
+        max_completion_tokens: STORY_MAX_OUTPUT_TOKENS,
         model: params.model,
         response_format: { type: "json_object" },
-        temperature: 0.85
+        temperature: params.temperature
       }),
       headers: {
         Authorization: `Bearer ${params.apiKey}`,
         "Content-Type": "application/json"
       },
-      method: "POST"
+      method: "POST",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      // Provider internals never leave this server route.
+      throw new Error("Groq story generation request failed.");
     }
-  );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Groq fallback request failed (${response.status}): ${errorText.slice(0, 500)}`);
+    return parseJsonFromText(extractGroqText(await response.json() as unknown));
+  } catch {
+    throw new Error("Groq story generation is unavailable.");
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const payload = await response.json() as unknown;
-  const text = extractGroqText(payload);
-  const parsed = parseJsonFromText(text);
-  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
-
-  if (rawScenes.length === 0) {
-    throw new Error("Groq fallback returned no scenes.");
-  }
-
-  const sceneLimit = params.sceneCount ? Math.min(params.sceneCount, MAX_SCENES) : MAX_SCENES;
-  const scenes = rawScenes.slice(0, sceneLimit).map(normalizeScene);
-  const voiceResult = assignCharacterVoices(scenes, parseCharacterAppearances(parsed));
-
-  return {
-    characterVoices: voiceResult.characterVoices,
-    estimatedRuntime: textValue(parsed.estimatedRuntime, `${scenes.length * 45} seconds`),
-    genre: textValue(parsed.genre, params.genres.join(" + ")),
-    logline: textValue(parsed.logline, "A cinematic short generated from the user's scenario."),
-    scenes: voiceResult.scenes,
-    title: textValue(parsed.title, "Untitled Omni-Narrative Film"),
-    tone: textValue(parsed.tone, params.tones.join(" + "))
-  };
 }
 
-async function generateMovieScriptWithFallback(params: {
-  geminiApiKey: string;
+async function generateMovieScriptWithGroq(params: {
+  apiKey: string;
+  contract: NarrativeContract;
+  genres: string[];
+  language: VideoLanguage;
+  model: string;
+  sceneCount?: number;
+  scenario: string;
+  tones: string[];
+}) {
+  const parsed = await fetchGroqStoryJson({
+    apiKey: params.apiKey,
+    model: params.model,
+    prompt: buildGeminiPrompt(params),
+    temperature: 0.85
+  });
+  return normalizeMovieScript(parsed, params);
+}
+
+/**
+ * A single, narrowly-scoped repair pass for a generated script. If it cannot
+ * produce a structurally usable improvement, the first usable script remains
+ * the response; generation must never be replaced by an error-prone repair.
+ */
+async function repairMovieScriptWithGemini(params: {
+  apiKey: string;
+  contract: NarrativeContract;
+  original: ReturnType<typeof normalizeMovieScript>;
+  genres: string[];
+  language: VideoLanguage;
+  tones: string[];
+  sceneCount?: number;
+}) {
+  const report = validateNarrativeConsistency({
+    contract: params.contract,
+    expectedSceneCount: params.sceneCount,
+    scenes: params.original.scenes
+  });
+  if (!report.shouldRepair) return params.original;
+
+  const model = getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL;
+  const repairPrompt = `You are repairing one existing Omni-Narrative Engine movie script. Return JSON only, using the same response shape as the original generator.
+
+${buildNarrativeContractPrompt(params.contract, params.sceneCount ?? params.original.scenes.length)}
+
+Detected consistency issues:
+${report.issues.map((issue) => `- ${issue}`).join("\n")}
+
+Preserve all usable character identities, locations, dialogue intent, and scene count. Change only what is necessary to restore coherence. Do not force a happy ending: a tragic, bittersweet, hopeful, ambiguous, or open ending is valid when its consequence is clear.
+
+Existing script:
+${JSON.stringify(params.original)}`;
+
+  try {
+    const response = await fetchGeminiWithRetry({
+      request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": params.apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: repairPrompt }] }],
+          generationConfig: {
+            maxOutputTokens: STORY_MAX_OUTPUT_TOKENS,
+            responseMimeType: "application/json",
+            thinkingConfig: { thinkingBudget: 0 },
+            temperature: 0.3
+          }
+        }),
+        signal
+      }),
+      timeoutMs: GEMINI_REPAIR_TIMEOUT_MS
+    });
+    if (!response.ok) return params.original;
+
+    const parsed = parseJsonFromText(extractGeminiText(await response.json() as unknown));
+    const repaired = normalizeMovieScript(parsed, params);
+    const repairedReport = validateNarrativeConsistency({
+      contract: params.contract,
+      expectedSceneCount: params.sceneCount,
+      scenes: repaired.scenes
+    });
+    return repairedReport.usable && repairedReport.issues.length < report.issues.length
+      ? repaired
+      : params.original;
+  } catch {
+    return params.original;
+  }
+}
+
+/** Keeps the primary provider primary even when a targeted repair is needed. */
+async function repairMovieScriptWithGroq(params: {
+  apiKey: string;
+  contract: NarrativeContract;
+  original: ReturnType<typeof normalizeMovieScript>;
+  genres: string[];
+  language: VideoLanguage;
+  model: string;
+  tones: string[];
+  sceneCount?: number;
+}) {
+  const report = validateNarrativeConsistency({
+    contract: params.contract,
+    expectedSceneCount: params.sceneCount,
+    scenes: params.original.scenes
+  });
+  if (!report.shouldRepair) return params.original;
+
+  const repairPrompt = `You are repairing one existing Omni-Narrative Engine movie script. Return JSON only, using the same response shape as the original generator.
+
+${buildNarrativeContractPrompt(params.contract, params.sceneCount ?? params.original.scenes.length)}
+
+Detected consistency issues:
+${report.issues.map((issue) => `- ${issue}`).join("\n")}
+
+Preserve all usable character identities, locations, dialogue intent, and scene count. Change only what is necessary to restore coherence. Do not force a happy ending: a tragic, bittersweet, hopeful, ambiguous, or open ending is valid when its consequence is clear.
+
+Existing script:
+${JSON.stringify(params.original)}`;
+
+  try {
+    const parsed = await fetchGroqStoryJson({
+      apiKey: params.apiKey,
+      model: params.model,
+      prompt: repairPrompt,
+      temperature: 0.3
+    });
+    const repaired = normalizeMovieScript(parsed, params);
+    const repairedReport = validateNarrativeConsistency({
+      contract: params.contract,
+      expectedSceneCount: params.sceneCount,
+      scenes: repaired.scenes
+    });
+    return repairedReport.usable && repairedReport.issues.length < report.issues.length
+      ? repaired
+      : params.original;
+  } catch {
+    return params.original;
+  }
+}
+
+async function generateMovieScriptWithProviderFallback(params: {
+  geminiApiKey?: string;
+  groqApiKey?: string;
+  contract: NarrativeContract;
   genres: string[];
   language: VideoLanguage;
   sceneCount?: number;
@@ -884,43 +1044,53 @@ async function generateMovieScriptWithFallback(params: {
   tones: string[];
 }) {
   const geminiModel = getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL;
-  const groqApiKey = getEnvValue([
-    "GROQ_FALLBACK_API",
-    "GROQ_API_KEY",
-    "groq_fallback_api"
-  ]);
+  const groqModel = getEnvValue(["GROQ_MODEL", "GROQ_FALLBACK_MODEL"]) || DEFAULT_GROQ_MODEL;
 
-  try {
-    return await generateMovieScript({
-      apiKey: params.geminiApiKey,
-      genres: params.genres,
-      language: params.language,
-      model: geminiModel,
-      sceneCount: params.sceneCount,
-      scenario: params.scenario,
-      tones: params.tones
-    });
-  } catch (geminiError) {
-    if (!groqApiKey) {
-      throw geminiError;
-    }
-
-    try {
-      return await generateMovieScriptWithGroq({
-        apiKey: groqApiKey,
+  return generateWithGroqPrimary({
+    groq: params.groqApiKey ? async () => {
+      const initial = await generateMovieScriptWithGroq({
+        apiKey: params.groqApiKey!,
+        contract: params.contract,
         genres: params.genres,
         language: params.language,
-        model: getEnvValue(["GROQ_FALLBACK_MODEL", "GROQ_MODEL"]) || DEFAULT_GROQ_MODEL,
+        model: groqModel,
         sceneCount: params.sceneCount,
         scenario: params.scenario,
         tones: params.tones
       });
-    } catch (groqError) {
-      const geminiMessage = geminiError instanceof Error ? geminiError.message : "Gemini request failed.";
-      const groqMessage = groqError instanceof Error ? groqError.message : "Groq fallback failed.";
-      throw new Error(`${geminiMessage} Groq fallback also failed: ${groqMessage}`);
-    }
-  }
+      return repairMovieScriptWithGroq({
+        apiKey: params.groqApiKey!,
+        contract: params.contract,
+        genres: params.genres,
+        language: params.language,
+        model: groqModel,
+        original: initial,
+        sceneCount: params.sceneCount,
+        tones: params.tones
+      });
+    } : undefined,
+    gemini: params.geminiApiKey ? async () => {
+      const initial = await generateMovieScript({
+        apiKey: params.geminiApiKey!,
+        contract: params.contract,
+        genres: params.genres,
+        language: params.language,
+        model: geminiModel,
+        sceneCount: params.sceneCount,
+        scenario: params.scenario,
+        tones: params.tones
+      });
+      return repairMovieScriptWithGemini({
+        apiKey: params.geminiApiKey!,
+        contract: params.contract,
+        genres: params.genres,
+        language: params.language,
+        original: initial,
+        sceneCount: params.sceneCount,
+        tones: params.tones
+      });
+    } : undefined
+  });
 }
 
 function applySituationalSpeechPacing(line: MovieDialogueLine, scene: MovieScene) {
@@ -1089,27 +1259,48 @@ export async function POST(request: Request) {
       );
     }
 
+    // Video Studio creates/loads an owned draft before requesting speech from
+    // /api/video/tts. This legacy inline path had no project target and wrote
+    // audio to the default Storage prefix, so it must not be used by clients.
+    if (body.includeAudio !== false) {
+      return NextResponse.json(
+        { error: "Inline audio generation is unavailable. Generate the saved script first, then request audio for its owned video draft." },
+        { status: 400 }
+      );
+    }
+
     const geminiApiKey = getEnvValue([
       "GEMINI_API_KEY",
       "GOOGLE_API_KEY",
       "GOOGLE_GENERATIVE_AI_API_KEY",
       "gemini llm api key"
     ]);
+    const groqApiKey = getEnvValue([
+      "GROQ_API_KEY",
+      "GROQ_FALLBACK_API",
+      "groq_fallback_api"
+    ]);
 
-    if (!geminiApiKey) {
+    if (!groqApiKey && !geminiApiKey) {
       return NextResponse.json(
-        { error: "Gemini API key is missing. Add GEMINI_API_KEY in .env.local." },
+        { error: "No story-generation provider is configured. Add GROQ_API_KEY or GEMINI_API_KEY on the server." },
         { status: 500 }
       );
+    }
+    if (!groqApiKey && geminiApiKey) {
+      console.warn("Video story generation: GROQ_API_KEY is not configured; using Gemini.");
     }
 
     const genres = listValue(body.genre, ["Cinematic Drama"]);
     const tones = listValue(body.tone, ["Immersive and emotional"]);
     const language: VideoLanguage = body.language === "ur" ? "ur" : "en";
-    const includeAudio = body.includeAudio !== false;
+    const includeAudio = false;
     const sceneCount = body.sceneCount !== undefined ? clampSceneCount(body.sceneCount) : undefined;
-    const script = await generateMovieScriptWithFallback({
+    const contract = buildNarrativeContract(scenario);
+    const script = await generateMovieScriptWithProviderFallback({
       geminiApiKey,
+      groqApiKey,
+      contract,
       genres,
       language,
       sceneCount,

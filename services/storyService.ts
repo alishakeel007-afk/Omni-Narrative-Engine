@@ -11,6 +11,13 @@ import type {
   StoryScene,
   StorySetupData
 } from "@/types/story";
+import { normalizeGeneratedScene } from "@/lib/story-scene";
+
+async function readSceneResponse(response: Response, sceneNumber: number): Promise<StoryScene> {
+  const payload = await response.json().catch(() => null) as { error?: unknown; scene?: unknown } | null;
+  if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "Story generation failed.");
+  return normalizeGeneratedScene(payload?.scene, sceneNumber);
+}
 
 function getEmptyScene(setup: StorySetupData = DEFAULT_STORY_SETUP): StoryScene {
   return {
@@ -51,7 +58,9 @@ export function createInitialStoryState(setup: StorySetupData = DEFAULT_STORY_SE
     selectedChoice: "",
     selectedChoiceType: null,
     setup,
-    dynamicCast: []
+    dynamicCast: [],
+    persistedMemories: [],
+    recoverySource: setup.projectId ? "offline-cache" : "local"
   };
 }
 
@@ -69,12 +78,7 @@ export async function generateInitialSceneFromAI(setup: StorySetupData): Promise
     }),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to generate initial scene from AI.");
-  }
-
-  const { scene } = await response.json();
-  return scene as StoryScene;
+  return readSceneResponse(response, 1);
 }
 
 export async function generateNextSceneFromAI(params: {
@@ -98,17 +102,14 @@ export async function generateNextSceneFromAI(params: {
       choice: params.choice,
       memoryTimeline: params.memoryTimeline,
       currentScene: params.currentScene,
+      playerState: { ...params.healthStatus, inventory: params.inventory },
+      recentSceneHistory: params.pastScenes.slice(-3),
       sceneNumber: nextIndex + 1,
       draftId: params.setup.draftId
     }),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to generate next scene from AI.");
-  }
-
-  const { scene } = await response.json();
-  const nextScene = scene as StoryScene;
+  const nextScene = await readSceneResponse(response, nextIndex + 1);
 
   const resultSummary = nextScene.resultSummary || `${params.choice} changes the tension of the scene and pushes the story toward ${nextScene.location}.`;
   
@@ -139,12 +140,15 @@ export async function generateAlternativeOptionsFromAI(scene: StoryScene, setup:
     }),
   });
 
-  if (response.ok) {
-    const { suggestions } = await response.json();
-    if (suggestions && suggestions.length > 0) {
-      return suggestions;
-    }
+  const payload = await response.json().catch(() => null) as { error?: unknown; suggestions?: unknown } | null;
+  if (!response.ok) {
+    throw new Error(typeof payload?.error === "string" ? payload.error : "Unable to generate more choices.");
   }
-
-  return ["Wait for a moment to see what happens", "Examine your surroundings carefully", "Proceed cautiously forward"];
+  if (!Array.isArray(payload?.suggestions) || payload.suggestions.length === 0) {
+    throw new Error("The AI did not return alternative choices.");
+  }
+  return payload.suggestions
+    .filter((suggestion): suggestion is string => typeof suggestion === "string" && suggestion.trim().length >= 3)
+    .slice(0, 3)
+    .map((suggestion) => suggestion.trim());
 }

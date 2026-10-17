@@ -8,6 +8,7 @@ type PreviewDialogueLine = {
 type PreviewScene = {
   sceneNumber: number;
   backgroundMusicUrl?: string;
+  narrationAudioUrl?: string;
   dialogues: PreviewDialogueLine[];
 };
 
@@ -18,6 +19,7 @@ export function PreviewFinalAudioButton({
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   
   const voiceRef = useRef<HTMLAudioElement | null>(null);
   
@@ -28,11 +30,13 @@ export function PreviewFinalAudioButton({
   // Track which BGM player is currently "active"
   const activeBgmRef = useRef<'A' | 'B'>('A');
   const currentSceneNumber = useRef<number | null>(null);
+  const fadeTimers = useRef(new Map<HTMLAudioElement, ReturnType<typeof setInterval>>());
 
   // Flatten dialogues into a sequence, tracking their parent scene
   const dialogueSequence = useMemo(() => {
     const seq: { scene: PreviewScene; audioUrl: string }[] = [];
     for (const scene of scenes) {
+      if (scene.narrationAudioUrl) seq.push({ scene, audioUrl: scene.narrationAudioUrl });
       for (const dialogue of scene.dialogues) {
         if (dialogue.audioUrl) {
           seq.push({ scene, audioUrl: dialogue.audioUrl });
@@ -48,31 +52,30 @@ export function PreviewFinalAudioButton({
     if (voiceRef.current) voiceRef.current.pause();
     if (bgmRefA.current) bgmRefA.current.pause();
     if (bgmRefB.current) bgmRefB.current.pause();
+    for (const timer of fadeTimers.current.values()) clearInterval(timer);
+    fadeTimers.current.clear();
     currentSceneNumber.current = null;
   };
 
   const fadeAudio = (audio: HTMLAudioElement, targetVolume: number, duration: number = 1000) => {
-    return new Promise<void>((resolve) => {
-      const startVolume = audio.volume;
-      const steps = 20;
-      const stepTime = duration / steps;
-      const volumeStep = (targetVolume - startVolume) / steps;
-      let currentStep = 0;
+    const priorTimer = fadeTimers.current.get(audio);
+    if (priorTimer) clearInterval(priorTimer);
 
-      const fadeInterval = setInterval(() => {
-        currentStep++;
-        const newVolume = Math.max(0, Math.min(1, startVolume + (volumeStep * currentStep)));
-        audio.volume = newVolume;
-
-        if (currentStep >= steps) {
-          clearInterval(fadeInterval);
-          if (targetVolume === 0) {
-            audio.pause();
-          }
-          resolve();
-        }
-      }, stepTime);
-    });
+    const startVolume = audio.volume;
+    const steps = 20;
+    const stepTime = duration / steps;
+    const volumeStep = (targetVolume - startVolume) / steps;
+    let currentStep = 0;
+    const fadeInterval = setInterval(() => {
+      currentStep++;
+      audio.volume = Math.max(0, Math.min(1, startVolume + (volumeStep * currentStep)));
+      if (currentStep >= steps) {
+        clearInterval(fadeInterval);
+        fadeTimers.current.delete(audio);
+        if (targetVolume === 0) audio.pause();
+      }
+    }, stepTime);
+    fadeTimers.current.set(audio, fadeInterval);
   };
 
   const playBackgroundMusicForScene = (scene: PreviewScene) => {
@@ -89,10 +92,12 @@ export function PreviewFinalAudioButton({
     if (!nextAudio || !currentAudio) return;
 
     if (newMusicUrl) {
+      nextAudio.pause();
+      nextAudio.currentTime = 0;
       nextAudio.src = newMusicUrl;
       nextAudio.loop = true;
       nextAudio.volume = 0;
-      nextAudio.play().catch(() => {});
+      nextAudio.play().catch(() => setPlaybackError("Background music could not be played. Speech preview can continue."));
       
       // Crossfade: Fade in new, fade out old
       fadeAudio(nextAudio, 0.3, 1000);
@@ -109,6 +114,7 @@ export function PreviewFinalAudioButton({
   };
 
   const playSequence = () => {
+    setPlaybackError(null);
     setIsPlaying(true);
     setCurrentLineIndex(0);
     currentSceneNumber.current = null;
@@ -130,7 +136,10 @@ export function PreviewFinalAudioButton({
 
       if (voiceRef.current) {
         voiceRef.current.src = currentItem.audioUrl;
-        voiceRef.current.play().catch(() => stopSequence());
+        voiceRef.current.play().catch(() => {
+          setPlaybackError("A narration or dialogue track could not be played. Check the audio URL and retry.");
+          stopSequence();
+        });
         
         // Duck the active BGM when voice starts
         const activeBgm = activeBgmRef.current === 'A' ? bgmRefA.current : bgmRefB.current;
@@ -160,6 +169,11 @@ export function PreviewFinalAudioButton({
 
   const disabled = dialogueSequence.length === 0 && !scenes.some(s => !!s.backgroundMusicUrl);
 
+  useEffect(() => () => {
+    for (const timer of fadeTimers.current.values()) clearInterval(timer);
+    fadeTimers.current.clear();
+  }, []);
+
   return (
     <>
       <button
@@ -174,6 +188,7 @@ export function PreviewFinalAudioButton({
       <audio ref={voiceRef} onEnded={handleVoiceEnded} className="hidden" />
       <audio ref={bgmRefA} className="hidden" />
       <audio ref={bgmRefB} className="hidden" />
+      {playbackError ? <p role="alert" className="mt-2 text-xs font-medium text-red-800">{playbackError}</p> : null}
     </>
   );
 }

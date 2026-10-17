@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  experimental: {
+    // The Windows environment used for local production verification denies
+    // Next's separate webpack compiler process (`spawn EPERM`). Keeping the
+    // compiler in this process changes build execution only, not runtime
+    // application behavior.
+    webpackBuildWorker: false,
+  },
+};
 
 export default nextConfig;

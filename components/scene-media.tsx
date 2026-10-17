@@ -55,11 +55,14 @@ export function SceneMedia({
   const [musicLoading, setMusicLoading] = useState(false);
   const [musicError, setMusicError] = useState<string | null>(null);
 
-  const generatedForScene = useRef<number | null>(null);
+  const generatedForScene = useRef<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const sceneKey = `${draftId ?? projectId ?? "unsaved"}:${sceneNumber}`;
 
   useEffect(() => {
-    if (generatedForScene.current === sceneNumber) return;
-    generatedForScene.current = sceneNumber;
+    const generationKey = `${sceneKey}:${retryNonce}`;
+    if (generatedForScene.current === generationKey) return;
+    generatedForScene.current = generationKey;
 
     setImageUrl(existingImageUrl ?? null);
     setNarrationUrl(existingNarrationUrl ?? null);
@@ -79,6 +82,11 @@ export function SceneMedia({
             sceneId: `scene-${sceneNumber}`,
             imagePrompt,
             sceneTitle: imageLabel,
+            narration: narrationText,
+            // Interactive Story owns its in-progress scene in browser state.
+            // The server still runs this context through the shared semantic
+            // visual planner before it reaches an image provider.
+            storyDescription: narrationText,
             location,
             mood: sceneMood,
             projectId,
@@ -124,46 +132,14 @@ export function SceneMedia({
       }
     }
 
-    async function fetchMusic() {
-      if (existingMusicUrl) return;
-      setMusicLoading(true);
-      setMusicError(null);
-      try {
-        const res = await fetch("/api/background-music", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mood: sceneMood,
-            soundDesign: audioMoodPrompt,
-            sceneTitle: imageLabel,
-            sceneId: `scene-${sceneNumber}`,
-            draftId,
-            sceneNumber,
-            projectId
-          })
-        });
-        const data = await res.json();
-        if (!mounted) return;
-        if (!res.ok || !data.audioUrl) throw new Error(data.error ?? "Background music generation failed.");
-        setMusicUrl(data.audioUrl);
-        onUpdate?.({ musicUrl: data.audioUrl });
-      } catch (err) {
-        if (!mounted) return;
-        setMusicError(err instanceof Error ? err.message : "Background music generation failed.");
-      } finally {
-        if (mounted) setMusicLoading(false);
-      }
-    }
-
     fetchImage();
     fetchNarration();
-    fetchMusic();
 
     return () => {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneNumber]);
+  }, [sceneKey, retryNonce]);
 
   return (
     <div className="space-y-4">
@@ -198,6 +174,11 @@ export function SceneMedia({
         <p className="mt-3 text-sm text-white/90">
           {narrationLabel} • {narrationDuration}
         </p>
+        {narrationError ? (
+          <button type="button" onClick={() => setRetryNonce((value) => value + 1)} disabled={narrationLoading} className="mt-3 text-sm font-medium text-gold disabled:opacity-50">
+            Retry unavailable media
+          </button>
+        ) : null}
       </div>
 
       <div className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
@@ -207,10 +188,15 @@ export function SceneMedia({
             <audio controls src={musicUrl} className="w-full" />
           ) : (
             <p className="text-sm text-white/70">
-              {musicLoading ? "Generating background music..." : musicError ?? `Ambient ${backgroundMusicMood}`}
+              {musicLoading ? "Selecting approved background music..." : musicError ?? `No saved music. Scene-aware music is optional.`}
             </p>
           )}
         </div>
+        {imageError || musicError ? (
+          <button type="button" onClick={() => setRetryNonce((value) => value + 1)} disabled={imageLoading || musicLoading} className="mt-3 text-sm font-medium text-gold disabled:opacity-50">
+            Retry unavailable media
+          </button>
+        ) : null}
       </div>
     </div>
   );

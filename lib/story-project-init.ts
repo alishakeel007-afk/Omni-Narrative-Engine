@@ -9,6 +9,13 @@ export async function initializeStoryProject(params: {
   genres: string[];
   tones: string[];
   numberOfScenes: number;
+  characters?: Array<{
+    name: string;
+    role: string;
+    personalityTone?: string;
+    traits?: string[];
+    appearancePrompt?: string;
+  }>;
 }): Promise<{ projectId: string; draftId: string } | null> {
   try {
     const response = await fetch("/api/story/projects", {
@@ -22,6 +29,7 @@ export async function initializeStoryProject(params: {
           genres: params.genres,
           tones: params.tones,
           numberOfScenes: Math.max(1, Math.min(20, params.numberOfScenes)),
+          characters: params.characters ?? [],
         },
       }),
     });

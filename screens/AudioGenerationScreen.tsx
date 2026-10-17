@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Clapperboard,
@@ -19,16 +19,47 @@ import {
   loadCreateStoryDraft,
   saveCreateStoryDraft
 } from "@/lib/create-story-storage";
+import { loadCustomStoryFromDatabase, saveCustomStoryToDatabase } from "@/lib/custom-story-db";
+import { applyCustomVoiceResponse, buildCustomVoiceRequest, customDraftToMovieScenes, customSceneMusicDecision, isCurrentCustomDialogueAudio, isCurrentCustomNarrationAudio } from "@/lib/custom-story-multimedia";
+import { buildSceneVisualContext } from "@/lib/image/scene-visual-context";
+import { customAudioFingerprint, customDialogueVoiceConfiguration } from "@/lib/custom-story-audio-freshness";
 import type { CreateStoryDraft } from "@/types/create-story";
 import { logActivity } from "@/lib/log-activity";
 
 export default function AudioGenerationScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [draft, setDraft] = useState<CreateStoryDraft | null>(null);
+  const [generatingMusic, setGeneratingMusic] = useState(false);
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const requestedProjectId = searchParams.get("project");
 
   useEffect(() => {
-    setDraft(loadCreateStoryDraft());
-  }, []);
+    let cancelled = false;
+    const restore = async () => {
+      const restored = requestedProjectId ? await loadCustomStoryFromDatabase(requestedProjectId) : loadCreateStoryDraft();
+      if (!cancelled) setDraft(restored);
+    };
+    void restore();
+    return () => { cancelled = true; };
+  }, [requestedProjectId]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development" || !draft) return;
+    for (const scene of draft.scenes) {
+      for (const dialogue of scene.dialogues) {
+        console.info("Custom dialogue player diagnostic", {
+          sceneId: scene.id,
+          dialogueId: dialogue.id,
+          speaker: dialogue.characterName,
+          ttsTextFingerprint: customAudioFingerprint(dialogue.text, customDialogueVoiceConfiguration(dialogue), draft.language),
+          storedClipFingerprint: dialogue.audioFingerprint ?? "missing",
+          storageObject: dialogue.audioStoragePath?.split("/").pop() ?? "unverified",
+          playerSource: dialogue.audioStoragePath?.split("/").pop() ?? "none",
+        });
+      }
+    }
+  }, [draft]);
 
   const totalDialogueLines = useMemo(
     () =>
@@ -43,6 +74,11 @@ export default function AudioGenerationScreen() {
   const persistDraft = (nextDraft: CreateStoryDraft) => {
     setDraft(nextDraft);
     saveCreateStoryDraft(nextDraft);
+    if (nextDraft.projectId && nextDraft.draftId) {
+      // Serialize updates so an older generation result cannot overwrite a
+      // newer authored edit or regenerated media state.
+      saveChain.current = saveChain.current.then(async () => { await saveCustomStoryToDatabase(nextDraft); });
+    }
   };
 
   const generateVoices = async () => {
@@ -58,59 +94,23 @@ export default function AudioGenerationScreen() {
     });
 
     try {
-      // Map create-story draft to the format expected by /api/video/tts
-      const mappedScenes = draft.scenes.map((scene) => {
-        const dialoguesToGenerate = scene.dialogues
-          .filter((d) => d.text.trim())
-          .map((d) => {
-            const char = draft.characters.find((c) => c.id === d.characterId);
-            return {
-              id: d.id,
-              character: d.characterName,
-              delivery: "neutral",
-              line: d.text,
-              voiceProfile: {
-                deepgramModel: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female")
-                  ? "aura-asteria-en"
-                  : "aura-orion-en",
-                description: d.voiceStyle || char?.voiceStyle || "Character voice",
-                gender: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female") ? "female" : "male",
-                tone: "neutral"
-              }
-            };
-          });
-
-        if (draft.includeNarration && scene.storyDescription.trim()) {
-          dialoguesToGenerate.unshift({
-            id: "narrator",
-            character: "Narrator",
-            delivery: "neutral",
-            line: scene.storyDescription,
-            voiceProfile: {
-              deepgramModel: "aura-asteria-en",
-              description: "Narrator voice",
-              gender: "female",
-              tone: "neutral"
-            }
-          });
-        }
-
-        return {
-          id: scene.id,
-          sceneNumber: scene.sceneNumber,
-          title: scene.title,
-          sceneTone: scene.sceneTone || draft.tones[0] || "cinematic",
-          mood: scene.sceneTone || draft.tones[0] || "cinematic",
-          sceneGenre: scene.sceneGenre || draft.genres[0] || "cinematic",
-          narration: scene.storyDescription || scene.selectedSuggestion,
-          dialogues: dialoguesToGenerate
-        };
-      });
+      const voiceRequest = buildCustomVoiceRequest(draft);
+      if (!voiceRequest.scenes.some((scene) => scene.dialogues.length > 0)) {
+        persistDraft({ ...draft, audio: { ...draft.audio, voiceStatus: "ready", voiceMessage: "Existing narration and dialogue clips are already available." } });
+        return;
+      }
 
       const res = await fetch("/api/video/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes: mappedScenes })
+        // This workflow is browser-local by design. It must never create
+        // unassociated Supabase Storage media.
+        body: JSON.stringify({
+          script: voiceRequest,
+          language: draft.language,
+          scriptLanguage: draft.language,
+          ...(draft.projectId && draft.draftId ? { projectId: draft.projectId, draftId: draft.draftId } : { transient: true }),
+        })
       });
 
       const data = await res.json();
@@ -120,36 +120,18 @@ export default function AudioGenerationScreen() {
       }
 
       // Map the returned audioUrls back to our draft
-      const updatedScenes = draft.scenes.map((scene, sceneIndex) => {
-        const returnedScene = data.scenes?.[sceneIndex];
-        if (!returnedScene) return scene;
-
-        const narrationDialogue = draft.includeNarration ? returnedScene.dialogues?.[0] : null;
-        const mappedDialogues = scene.dialogues.map((dialogue, dialogueIndex) => {
-          // If narration is included, the character dialogues are shifted by 1 in the returned array
-          const returnedDialogue = returnedScene.dialogues?.[draft.includeNarration ? dialogueIndex + 1 : dialogueIndex];
-          if (returnedDialogue && returnedDialogue.audioUrl) {
-            return { ...dialogue, audioUrl: returnedDialogue.audioUrl };
-          }
-          return dialogue;
-        });
-
-        return {
-          ...scene,
-          narrationAudioUrl: narrationDialogue?.audioUrl,
-          dialogues: mappedDialogues
-        };
-      });
-
       const generatedCount = data.audio?.generatedCount ?? 0;
+      const providerErrors = Array.isArray(data.audio?.errors) ? data.audio.errors.filter((value: unknown): value is string => typeof value === "string" && Boolean(value.trim())) : [];
 
       persistDraft({
         ...draft,
-        scenes: updatedScenes,
+        ...applyCustomVoiceResponse(draft, data),
         audio: {
           ...draft.audio,
-          voiceMessage: `Generated ${generatedCount} voice lines successfully.`,
-          voiceStatus: "ready"
+          voiceMessage: providerErrors.length
+            ? `${generatedCount} voice line(s) generated; ${providerErrors.length} clip(s) need retry.`
+            : `Generated ${generatedCount} voice lines successfully.`,
+          voiceStatus: providerErrors.length ? "error" : "ready"
         }
       });
 
@@ -168,59 +150,37 @@ export default function AudioGenerationScreen() {
     }
   };
 
-  const generateBackgroundMusic = async () => {
-    if (!draft || draft.audio.backgroundMusicStatus === "generating") return;
-
-    persistDraft({
-      ...draft,
-      audio: {
-        ...draft.audio,
-        backgroundMusicMessage: "Generating cinematic background score...",
-        backgroundMusicStatus: "generating"
-      }
-    });
-
-    try {
-      const res = await fetch("/api/background-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mood: draft.tones[0] || "cinematic",
-          sceneTitle: draft.storyTitle,
-          soundDesign: `A ${draft.genres.join(" ")} soundtrack`,
-          sceneId: `draft-${draft.storyTitle}`
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate music");
-      }
-
-      persistDraft({
-        ...draft,
-        audio: {
-          ...draft.audio,
-          backgroundMusicMessage: "Background music generated successfully.",
-          backgroundMusicStatus: "ready",
-          backgroundMusicUrl: data.audioUrl
-        }
-      });
-
-      await logActivity("audio_generated", { type: "music", storyTitle: draft.storyTitle });
-
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      persistDraft({
-        ...draft,
-        audio: {
-          ...draft.audio,
-          backgroundMusicMessage: `Failed: ${msg}`,
-          backgroundMusicStatus: "idle"
-        }
-      });
+  const generateMissingMusic = async () => {
+    if (!draft || generatingMusic) return;
+    if (!draft.projectId || !draft.draftId) {
+      persistDraft({ ...draft, audio: { ...draft.audio, backgroundMusicStatus: "idle", backgroundMusicMessage: "Save this Custom project to My Projects before generating a cinematic score." } });
+      return;
     }
+    setGeneratingMusic(true);
+    let failures = 0; let generated = 0;
+    const nextScenes = [...draft.scenes];
+    for (const [index, scene] of nextScenes.entries()) {
+      const decision = customSceneMusicDecision(scene);
+      if (decision.outcome === "silence") { nextScenes[index] = { ...scene, backgroundMusicStatus: "silent", backgroundMusicUrl: undefined }; continue; }
+      if (scene.backgroundMusicUrl && scene.backgroundMusicStatus === "ready") continue;
+      try {
+        nextScenes[index] = { ...scene, backgroundMusicStatus: "generating" };
+        const { createSampleScoreRecipe, renderSampleBasedScore } = await import("@/lib/audio/sample-score");
+        const rendered = await renderSampleBasedScore(createSampleScoreRecipe({ category: decision.category, sceneTitle: scene.title, mood: scene.sceneTone, genres: draft.genres, seed: Date.now() + index }));
+        const form = new FormData();
+        form.set("projectId", draft.projectId); form.set("draftId", draft.draftId); form.set("sceneId", scene.id); form.set("sceneNumber", String(scene.sceneNumber)); form.set("file", new File([rendered.wav], `scene-${scene.sceneNumber}.wav`, { type: "audio/wav" }));
+        const response = await fetch("/api/story/custom/music", { method: "POST", body: form });
+        const payload = await response.json() as { audioUrl?: string; provider?: string; error?: string };
+        if (!response.ok || !payload.audioUrl) throw new Error(payload.error ?? "Could not save score.");
+        nextScenes[index] = { ...scene, backgroundMusicUrl: payload.audioUrl, backgroundMusicStatus: "ready", backgroundMusicProvider: payload.provider, backgroundMusicPrompt: decision.reason };
+        generated += 1;
+      } catch {
+        failures += 1;
+        nextScenes[index] = { ...scene, backgroundMusicStatus: "error" };
+      }
+    }
+    persistDraft({ ...draft, scenes: nextScenes, audio: { ...draft.audio, backgroundMusicStatus: failures ? "error" : "ready", backgroundMusicMessage: failures ? `${generated} score(s) saved; some scenes need retry.` : generated ? `${generated} cinematic score(s) saved.` : "Existing scores and intentional silence were kept." } });
+    setGeneratingMusic(false);
   };
 
   const generateVisuals = async (forceRegenerateAll = false) => {
@@ -237,17 +197,41 @@ export default function AudioGenerationScreen() {
     let errorsOccurred = false;
     const updatedScenes = draft.scenes.map((scene) =>
       forceRegenerateAll
-        ? { ...scene, generatedImageUrl: undefined, generatedImagePrompt: undefined, generatedImageStatus: "idle" as const, generatedImageError: undefined }
+        // A regeneration is a replacement attempt. Keep the last good image
+        // visible until the server has attached a successful replacement.
+        ? { ...scene, generatedImageStatus: "idle" as const, generatedImageError: undefined }
         : { ...scene }
     );
 
     for (const scene of updatedScenes) {
-      if (scene.generatedImageStatus === "ready" || scene.generatedImageUrl) continue;
+      if (!forceRegenerateAll && (scene.generatedImageStatus === "ready" || scene.generatedImageUrl)) continue;
 
       scene.generatedImageStatus = "generating";
-      const sceneCharacterNames = scene.activeCharacterIds
-        .map((id) => draft.characters.find((c) => c.id === id)?.name)
-        .filter((name): name is string => Boolean(name));
+      const previous = draft.scenes
+        .filter((candidate) => candidate.sceneNumber < scene.sceneNumber)
+        .sort((left, right) => right.sceneNumber - left.sceneNumber)[0];
+      const visualContext = buildSceneVisualContext({
+        scene: {
+          title: scene.title,
+          storyDescription: scene.storyDescription,
+          selectedSuggestion: scene.selectedSuggestion,
+          mood: scene.sceneTone,
+          dialogueCharacterNames: scene.dialogues.map((dialogue) => dialogue.characterName),
+          activeCharacterIds: scene.activeCharacterIds,
+          visualDirection: scene.visualDirection,
+        },
+        characters: draft.characters.map((character) => ({
+          id: character.id,
+          name: character.name,
+          role: character.role,
+          personalityTone: character.personalityTone,
+        })),
+        priorScene: previous ? {
+          title: previous.title,
+          imagePrompt: previous.generatedImagePrompt,
+          visualPrompt: previous.storyDescription || previous.selectedSuggestion,
+        } : undefined,
+      });
 
       try {
         const res = await fetch("/api/video/image", {
@@ -255,12 +239,17 @@ export default function AudioGenerationScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sceneId: scene.id,
-            imagePrompt: scene.storyDescription || scene.selectedSuggestion || scene.title,
+            imagePrompt: visualContext.imagePrompt,
             sceneTitle: scene.title,
-            mood: scene.sceneTone,
+            ...(visualContext.visualPrompt ? { visualPrompt: visualContext.visualPrompt } : {}),
+            location: visualContext.location,
+            mood: visualContext.mood,
             genres: draft.genres,
             existingHash: undefined,
-            characterNames: sceneCharacterNames
+            characterNames: visualContext.characterNames,
+            characterAppearances: visualContext.characterAppearances,
+            continuityNotes: visualContext.continuityNotes,
+            ...(draft.projectId && draft.draftId ? { projectId: draft.projectId, draftId: draft.draftId, customSceneId: scene.id } : { transient: true })
           })
         });
         const data = await res.json();
@@ -273,7 +262,7 @@ export default function AudioGenerationScreen() {
         scene.generatedImageError = undefined;
       } catch (err) {
         errorsOccurred = true;
-        scene.generatedImageStatus = "error";
+        scene.generatedImageStatus = scene.generatedImageUrl ? "ready" : "error";
         scene.generatedImageError = err instanceof Error ? err.message : "Visual generation failed";
       }
     }
@@ -298,14 +287,14 @@ export default function AudioGenerationScreen() {
     const nextDraft = {
       ...draft,
       video: {
-        message: "Generated video preview will appear here after backend integration.",
+        message: "Browser story preview is ready. Final MP4 export is not included.",
         status: "ready" as const
       }
     };
 
     persistDraft(nextDraft);
     await logActivity("video_previewed", { storyTitle: draft.storyTitle });
-    router.push("/video-preview?mode=custom");
+    router.push(`/video-preview?mode=custom${draft.projectId ? `&project=${encodeURIComponent(draft.projectId)}` : ""}`);
   };
 
   if (!draft) {
@@ -325,13 +314,10 @@ export default function AudioGenerationScreen() {
   }
 
   const voiceReady = draft.audio.voiceStatus === "ready";
-  const musicReady = draft.audio.backgroundMusicStatus === "ready";
   const visualsReady = draft.scenes.length > 0 && draft.scenes.every((s) => Boolean(s.generatedImageUrl));
-  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && musicReady && visualsReady;
+  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && visualsReady;
 
-  const currentStep: AiStoryStudioStep = musicReady
-    ? 6
-    : visualsReady
+  const currentStep: AiStoryStudioStep = visualsReady
       ? 5
       : voiceReady
         ? 4
@@ -405,26 +391,20 @@ export default function AudioGenerationScreen() {
             <div className="flex flex-col gap-1">
               <button
                 type="button"
-                onClick={generateBackgroundMusic}
-                disabled={draft.audio.backgroundMusicStatus === "generating" || draft.audio.voiceStatus !== "ready"}
+                onClick={() => void generateMissingMusic()}
+                disabled={generatingMusic}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-starlight/20 bg-starlight/10 px-5 py-3 text-sm font-semibold text-starlight transition-all duration-300 hover:bg-starlight/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
               >
-                {draft.audio.backgroundMusicStatus === "generating" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Music2 className="h-4 w-4" />
-                )}
-                {draft.audio.backgroundMusicStatus === "ready" ? "Regenerate Music" : "Generate Music"}
+                {generatingMusic ? <Loader2 className="h-4 w-4 animate-spin" /> : <Music2 className="h-4 w-4" />}
+                Generate Missing Music
               </button>
-              {draft.audio.voiceStatus !== "ready" && (
-                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Generate voices first</p>
-              )}
+              <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Optional; intentional silence is preserved</p>
             </div>
 
             <div className="flex flex-col gap-1">
               <button
                 type="button"
-                onClick={() => router.push("/story-builder")}
+                onClick={() => router.push(`/story-builder${draft.projectId ? `?project=${encodeURIComponent(draft.projectId)}` : ""}`)}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition-all duration-300 hover:border-gold/25 hover:text-white hover:scale-[1.02] active:scale-[0.98]"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -436,13 +416,14 @@ export default function AudioGenerationScreen() {
               <PreviewFinalAudioButton
                 scenes={draft.scenes.map(scene => ({
                   sceneNumber: scene.sceneNumber,
-                  backgroundMusicUrl: draft.audio.backgroundMusicUrl,
-                  dialogues: scene.dialogues
+                  backgroundMusicUrl: scene.backgroundMusicStatus === "silent" ? undefined : scene.backgroundMusicUrl,
+                  dialogues: [
+                    ...(isCurrentCustomNarrationAudio(draft, scene) ? [{ audioUrl: scene.narrationAudioUrl! }] : []),
+                    ...scene.dialogues.filter((dialogue) => isCurrentCustomDialogueAudio(draft, dialogue))
+                  ]
                 }))}
               />
-              {draft.audio.backgroundMusicStatus !== "ready" && (
-                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Music required</p>
-              )}
+              <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Music is optional</p>
             </div>
 
             <div className="flex flex-col gap-1">
@@ -453,7 +434,7 @@ export default function AudioGenerationScreen() {
                 className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition-all duration-300 hover:bg-gold/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
               >
                 <Clapperboard className="h-4 w-4" />
-                Generate Video
+                Open Story Preview
               </button>
               {!canGenerateVideo && (
                 <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio and visuals</p>
@@ -525,8 +506,21 @@ export default function AudioGenerationScreen() {
                     </span>
                   </div>
                   <h3 className="font-[var(--font-heading)] text-2xl text-white">{scene.title}</h3>
+                  <CustomVisualBriefSummary scene={scene} characters={draft.characters} />
                 </div>
-                <PlaySceneAudioButton audioUrls={scene.dialogues.map(d => (d as any).audioUrl)} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => persistDraft({ ...draft, scenes: draft.scenes.map((item) => item.id === scene.id ? { ...item, backgroundMusicStatus: item.backgroundMusicStatus === "silent" ? "idle" : "silent" } : item) })}
+                    className="rounded-full border border-starlight/20 bg-starlight/10 px-3 py-2 text-xs font-semibold text-starlight"
+                  >
+                    {scene.backgroundMusicStatus === "silent" ? "Use Scene Music" : "Intentional Silence"}
+                  </button>
+                  <PlaySceneAudioButton audioUrls={[
+                    ...(isCurrentCustomNarrationAudio(draft, scene) ? [scene.narrationAudioUrl!] : []),
+                    ...scene.dialogues.filter((dialogue) => isCurrentCustomDialogueAudio(draft, dialogue)).flatMap((dialogue) => dialogue.audioUrl ? [dialogue.audioUrl] : []),
+                  ]} />
+                </div>
               </div>
               <div className="grid gap-5 p-6 lg:grid-cols-2">
                 {scene.dialogues.map((dialogue) => (
@@ -538,11 +532,11 @@ export default function AudioGenerationScreen() {
                     <p className="mt-3 text-sm leading-7 text-white/72">
                       "{dialogue.text || "No dialogue written yet."}"
                     </p>
-                    {(dialogue as any).audioUrl ? (
-                      <audio controls src={(dialogue as any).audioUrl} className="mt-3 w-full" />
+                    {isCurrentCustomDialogueAudio(draft, dialogue) ? (
+                      <audio controls src={dialogue.audioUrl} className="mt-3 w-full" />
                     ) : (
                       <p className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-white/75">
-                        Waiting for voice generation.
+                        {dialogue.audioUrl ? "Outdated — regenerate this dialogue to match the displayed text." : "Waiting for voice generation."}
                       </p>
                     )}
                   </div>
@@ -553,6 +547,30 @@ export default function AudioGenerationScreen() {
         </section>
       </ScreenLayout>
     </ProtectedRoute>
+  );
+}
+
+function CustomVisualBriefSummary({ scene, characters }: { scene: CreateStoryDraft["scenes"][number]; characters: CreateStoryDraft["characters"] }) {
+  const { brief } = buildSceneVisualContext({
+    scene: {
+      id: scene.id,
+      title: scene.title,
+      storyDescription: scene.storyDescription,
+      selectedSuggestion: scene.selectedSuggestion,
+      mood: scene.sceneTone,
+      dialogueCharacterNames: scene.dialogues.map((dialogue) => dialogue.characterName),
+      activeCharacterIds: scene.activeCharacterIds,
+      visualDirection: scene.visualDirection,
+    },
+    characters: characters.map((character) => ({ id: character.id, name: character.name, role: character.role, personalityTone: character.personalityTone })),
+  });
+  return (
+    <details className="mt-3 max-w-xl rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/80">
+      <summary className="cursor-pointer font-medium text-starlight">Review visual brief before generating</summary>
+      <p className="mt-2"><span className="font-semibold text-white">Required:</span> {brief.requiredVisualEvents.join(" ") || "No visual event authored."}</p>
+      <p className="mt-1"><span className="font-semibold text-white">Characters:</span> {brief.presentCharacterNames.join(", ") || "None identified"}</p>
+      {brief.warnings.map((warning) => <p key={warning} role="alert" className="mt-2 rounded border border-amber-300/50 bg-amber-100/10 p-2 font-medium text-amber-100">{warning}</p>)}
+    </details>
   );
 }
 

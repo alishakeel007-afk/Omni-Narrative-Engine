@@ -16,6 +16,7 @@ import { ChoiceCard } from "@/components/choice-card";
 import { CustomChoiceInput } from "@/components/custom-choice-input";
 import { LoadingSceneGenerator } from "@/components/loading-scene-generator";
 import { StorySceneCard } from "@/components/story-scene-card";
+import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { useStory } from "@/context/StoryContext";
 import { buildPrimaryCharacterProfile } from "@/lib/story-engine";
@@ -49,7 +50,9 @@ export default function StoryPlay() {
     selectSuggestedChoice,
     selectCustomChoice,
     setCustomChoiceInput,
-    updateCurrentSceneMedia
+    updateCurrentSceneMedia,
+    generationError,
+    pendingSaveCount
   } = useStory();
 
   const scene = state.currentScene;
@@ -63,7 +66,7 @@ export default function StoryPlay() {
   const isCustomMode = setup.mode === "custom";
 
   return (
-    <ScreenLayout
+    <ProtectedRoute><ScreenLayout
       eyebrow="Active Story Loop"
       title={setup.storyTitle}
       description={
@@ -73,6 +76,14 @@ export default function StoryPlay() {
       }
       maxWidth="max-w-7xl"
     >
+      <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-starlight/70">Selected project</p>
+          <p className="mt-1 text-sm font-semibold text-white">{state.projectTitle || setup.storyTitle}{state.draftVersion ? ` · Draft ${state.draftVersion}` : ""}</p>
+        </div>
+        <p className="text-xs text-white/60">{pendingSaveCount() > 0 ? "Saving changes…" : state.recoverySource === "database" ? "Loaded from saved database project" : state.recoverySource === "offline-cache" ? "Restored from browser/offline cache" : "Unsaved local state"}</p>
+      </section>
+      {state.recoveryError ? <div role="alert" className="mb-5 rounded-[1rem] border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{state.recoveryError} <Link href="/dashboard" className="font-semibold underline">Return to Dashboard</Link></div> : null}
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
         <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
           <section className="glass-panel rounded-[1.5rem] p-5">
@@ -187,6 +198,12 @@ export default function StoryPlay() {
             existingMusicUrl={state.generatedMedia?.musicUrl}
             onMediaUpdate={updateCurrentSceneMedia}
           />
+
+          {generationError ? (
+            <div role="alert" className="rounded-[1rem] border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100">
+              {generationError} Your current scene and saved progress are unchanged; correct the issue and try again.
+            </div>
+          ) : null}
 
           {isCustomMode ? (
             <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6">
@@ -366,7 +383,7 @@ export default function StoryPlay() {
       </div>
 
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
-    </ScreenLayout>
+    </ScreenLayout></ProtectedRoute>
   );
 }
 

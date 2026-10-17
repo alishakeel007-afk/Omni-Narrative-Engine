@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, Check, Eye, Loader2, MessageSquareText,
+  ArrowDown, ArrowLeft, ArrowUp, Check, Eye, Loader2, MessageSquareText,
   Plus, RefreshCw, Sparkles, Trash2, Wand2, X
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -12,6 +12,7 @@ import { AiStoryStudioStepper } from "@/components/ai-story-studio-stepper";
 import {
   createEmptyScene, createId, loadCreateStoryDraft, saveCreateStoryDraft
 } from "@/lib/create-story-storage";
+import { loadCustomStoryFromDatabase, prepareCustomDraftForPersistence, saveCustomStoryToDatabase } from "@/lib/custom-story-db";
 import type { CreateStoryDialogue, CreateStoryDraft, CreateStoryScene } from "@/types/create-story";
 import { logActivity } from "@/lib/log-activity";
 
@@ -49,6 +50,7 @@ const BUILDER_VOICE_OPTIONS = [
 
 export default function StoryBuilderScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [draft, setDraft] = useState<CreateStoryDraft | null>(null);
   const [activeSceneId, setActiveSceneId] = useState("");
   const [error, setError] = useState("");
@@ -57,9 +59,25 @@ export default function StoryBuilderScreen() {
   const [loadingDialogue, setLoadingDialogue] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [newSceneCharacterName, setNewSceneCharacterName] = useState("");
+  const [saveState, setSaveState] = useState<"local" | "saving" | "saved" | "failed">("local");
+  const [saveMessage, setSaveMessage] = useState("");
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const saveRevisionRef = useRef(0);
+  const requestedProjectId = searchParams.get("project");
 
   useEffect(() => {
-    const loadedDraft = loadCreateStoryDraft();
+    let cancelled = false;
+    const restore = async () => {
+      const databaseDraft = requestedProjectId ? await loadCustomStoryFromDatabase(requestedProjectId) : null;
+      // A direct project link must never silently fall back to another local project.
+      const loadedDraft = requestedProjectId
+        ? databaseDraft
+        : loadCreateStoryDraft();
+      if (cancelled) return;
+      if (!loadedDraft) {
+        setError("This Custom Mode project could not be restored. Return to My Projects and try again.");
+        return;
+      }
     const nextDraft =
       loadedDraft.scenes.length > 0
         ? loadedDraft
@@ -78,7 +96,11 @@ export default function StoryBuilderScreen() {
     setDraft(nextDraft);
     setActiveSceneId(nextDraft.scenes[0]?.id ?? "");
     saveCreateStoryDraft(nextDraft);
-  }, []);
+      setSaveState(nextDraft.projectId && nextDraft.draftId ? "saved" : "local");
+    };
+    void restore();
+    return () => { cancelled = true; };
+  }, [requestedProjectId]);
 
   const activeScene = useMemo(() => draft?.scenes.find((s) => s.id === activeSceneId) ?? draft?.scenes[0] ?? null, [activeSceneId, draft]);
   const voiceOptions = useMemo(
@@ -98,6 +120,19 @@ export default function StoryBuilderScreen() {
       (scene.storyDescription?.trim().length || scene.selectedSuggestion?.trim().length)
     );
   }, [draft?.scenes]);
+
+  const queueDatabaseSave = (nextDraft: CreateStoryDraft) => {
+    if (!nextDraft.projectId || !nextDraft.draftId) return;
+    const revision = ++saveRevisionRef.current;
+    setSaveState("saving");
+    saveChainRef.current = saveChainRef.current.then(async () => {
+      const result = await saveCustomStoryToDatabase(nextDraft);
+      if (revision !== saveRevisionRef.current) return;
+      setSaveState(result.success ? "saved" : "failed");
+    }).catch(() => {
+      if (revision === saveRevisionRef.current) setSaveState("failed");
+    });
+  };
 
   const persistDraft = (nextDraft: CreateStoryDraft) => {
     const withAudio = {
@@ -122,6 +157,35 @@ export default function StoryBuilderScreen() {
     } satisfies CreateStoryDraft;
     setDraft(withAudio);
     saveCreateStoryDraft(withAudio);
+    queueDatabaseSave(withAudio);
+  };
+
+  const saveToMyProjects = async () => {
+    if (!draft || saveState === "saving") return;
+    setSaveState("saving");
+    setSaveMessage("");
+    const result = await saveCustomStoryToDatabase(draft);
+    if (!result.success || !result.projectId || !result.draftId) {
+      setSaveState("failed");
+      setSaveMessage(result.error ?? "The project could not be saved. Your local draft is still safe.");
+      return;
+    }
+    // Match the server snapshot: data/blob previews are deliberately local
+    // only and cannot be resumed safely from another browser.
+    const persisted = { ...prepareCustomDraftForPersistence(draft).draft, projectId: result.projectId, draftId: result.draftId };
+    setDraft(persisted);
+    saveCreateStoryDraft(persisted);
+    setSaveState("saved");
+    setSaveMessage(result.omittedTransientMedia
+      ? "Story saved. Temporary local previews were not uploaded; regenerate them from the saved project when needed."
+      : "");
+  };
+
+  const updateStoryTitle = (storyTitle: string) => {
+    if (!draft) return;
+    // The title belongs to the browser-local draft, so it follows every
+    // scene/stage transition without implying server-side project persistence.
+    persistDraft({ ...draft, storyTitle });
   };
 
   const updateScene = (
@@ -131,7 +195,13 @@ export default function StoryBuilderScreen() {
     if (!draft) return;
     persistDraft({
       ...draft,
-      scenes: draft.scenes.map((s) => (s.id === sceneId ? { ...s, ...partial } : s))
+      scenes: draft.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        const narrationChanged =
+          (partial.storyDescription !== undefined && partial.storyDescription !== s.storyDescription) ||
+          (partial.selectedSuggestion !== undefined && partial.selectedSuggestion !== s.selectedSuggestion);
+        return { ...s, ...partial, ...(narrationChanged && s.narrationAudioUrl ? { narrationAudioOutdated: true } : {}) };
+      })
     });
     setError("");
   };
@@ -145,7 +215,9 @@ export default function StoryBuilderScreen() {
           ? {
               ...s,
               dialogues: s.dialogues.map((d) =>
-                d.id === dialogueId ? { ...d, text } : d
+                d.id === dialogueId
+                  ? { ...d, text, ...(text !== d.text && d.audioUrl ? { audioOutdated: true } : {}) }
+                  : d
               )
             }
           : s
@@ -253,7 +325,9 @@ export default function StoryBuilderScreen() {
           ? {
               ...scene,
               dialogues: scene.dialogues.map((dialogue) =>
-                dialogue.id === dialogueId ? { ...dialogue, voiceStyle } : dialogue
+                dialogue.id === dialogueId
+                  ? { ...dialogue, voiceStyle, ...(voiceStyle !== dialogue.voiceStyle && dialogue.audioUrl ? { audioOutdated: true } : {}) }
+                  : dialogue
               )
             }
           : scene
@@ -298,7 +372,9 @@ export default function StoryBuilderScreen() {
           return {
             ...scene,
             dialogues: scene.dialogues.map((dialogue) =>
-              dialogue.id === dialogueId ? { ...dialogue, text: "" } : dialogue
+              dialogue.id === dialogueId
+                ? { ...dialogue, text: "", ...(dialogue.audioUrl ? { audioOutdated: true } : {}) }
+                : dialogue
             )
           };
         }
@@ -312,16 +388,24 @@ export default function StoryBuilderScreen() {
   };
 
   const selectSuggestion = (scene: CreateStoryScene, suggestion: string) => {
+    const hasManualContent = Boolean(scene.storyDescription.trim() || scene.selectedSuggestion.trim());
+    if (hasManualContent && !window.confirm("Replace this scene's existing writing with the selected AI suggestion? You can still edit it afterward.")) {
+      return;
+    }
     updateScene(scene.id, { selectedSuggestion: suggestion, storyDescription: suggestion });
+  };
+
+  const clearSuggestions = (sceneId: string) => {
+    if (!draft) return;
+    persistDraft({
+      ...draft,
+      scenes: draft.scenes.map((scene) => scene.id === sceneId ? { ...scene, suggestions: [] } : scene),
+    });
   };
 
   // --- AI Scene Suggestions ---
   const regenerateSuggestions = async (scene: CreateStoryScene) => {
     if (!draft || loadingSuggestions) return;
-    if (!scene.title.trim()) {
-      setError("Write a scene title first so AI can regenerate suggestions around it.");
-      return;
-    }
     setLoadingSuggestions(true);
     setError("");
     try {
@@ -330,7 +414,10 @@ export default function StoryBuilderScreen() {
         .map((s) => ({
           sceneNumber: s.sceneNumber,
           title: s.title,
-          description: s.storyDescription || s.selectedSuggestion
+          description: s.storyDescription || s.selectedSuggestion,
+          dialogues: s.dialogues
+            .filter((dialogue) => dialogue.text.trim())
+            .map((dialogue) => ({ characterName: dialogue.characterName, text: dialogue.text })),
         }));
 
       const res = await fetch("/api/story/suggest-scene", {
@@ -340,9 +427,7 @@ export default function StoryBuilderScreen() {
           storyTitle: draft.storyTitle,
           genres: draft.genres,
           tones: [scene.sceneTone || draft.tones[0] || "Dramatic"],
-          characters: draft.characters
-            .filter((character) => scene.activeCharacterIds.includes(character.id))
-            .map((c) => ({
+          characters: draft.characters.map((c) => ({
             name: c.name, role: c.role, personalityTone: c.personalityTone
           })),
           currentSceneDescription: scene.storyDescription || scene.selectedSuggestion,
@@ -354,16 +439,17 @@ export default function StoryBuilderScreen() {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.suggestions) {
-        setError(data.error || "AI suggestions failed. Showing local suggestions.");
+      const data = await res.json() as { error?: string; suggestions?: unknown[] };
+      const suggestions = data.suggestions;
+      if (!res.ok || !Array.isArray(suggestions) || suggestions.length !== 3) {
+        setError(data.error || "Could not generate three scene suggestions. Your writing was kept unchanged.");
         return;
       }
 
       persistDraft({
         ...draft,
         scenes: draft.scenes.map((s) =>
-          s.id === scene.id ? { ...s, suggestions: data.suggestions } : s
+          s.id === scene.id ? { ...s, suggestions: suggestions.map((suggestion: unknown) => String(suggestion)) } : s
         )
       });
     } catch {
@@ -424,7 +510,9 @@ export default function StoryBuilderScreen() {
           const aiLine = characterLines[usedCount] ?? characterLines[0];
           usedCounts.set(dialogue.characterId, usedCount + 1);
 
-          return aiLine ? { ...dialogue, text: aiLine.text } : dialogue;
+          return aiLine
+            ? { ...dialogue, text: aiLine.text, ...(aiLine.text !== dialogue.text && dialogue.audioUrl ? { audioOutdated: true } : {}) }
+            : dialogue;
         });
       };
 
@@ -517,6 +605,17 @@ export default function StoryBuilderScreen() {
     await logActivity("scene_deleted", { storyTitle: draft.storyTitle });
   };
 
+  const moveScene = (sceneId: string, direction: -1 | 1) => {
+    if (!draft) return;
+    const index = draft.scenes.findIndex((scene) => scene.id === sceneId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= draft.scenes.length) return;
+    const scenes = [...draft.scenes];
+    [scenes[index], scenes[nextIndex]] = [scenes[nextIndex], scenes[index]];
+    // Preserve each browser-local scene ID while changing display order.
+    persistDraft({ ...draft, scenes: scenes.map((scene, sceneIndex) => ({ ...scene, sceneNumber: sceneIndex + 1 })) });
+  };
+
   // --- End Story ---
   const endStory = () => {
     if (!draft) return;
@@ -540,14 +639,17 @@ export default function StoryBuilderScreen() {
       if (!proceed) return;
     }
     saveCreateStoryDraft(draft);
-    router.push("/audio-generation");
+    router.push(`/audio-generation${draft.projectId ? `?project=${encodeURIComponent(draft.projectId)}` : ""}`);
   };
 
   if (!draft || !activeScene) {
     return (
       <ProtectedRoute>
         <ScreenLayout eyebrow="AI Story Studio" title="Loading Story Builder" description="Restoring your custom scene draft.">
-          <div className="glass-panel rounded-[1.5rem] p-6 text-sm text-white/70">Opening the builder...</div>
+          <div className={`glass-panel rounded-[1.5rem] p-6 text-sm ${error ? "border-red-400/35 bg-red-500/15 text-red-100" : "text-white/70"}`}>
+            {error || "Opening the builder..."}
+            {error ? <button type="button" onClick={() => router.push("/projects")} className="ml-3 underline">Return to My Projects</button> : null}
+          </div>
         </ScreenLayout>
       </ProtectedRoute>
     );
@@ -570,7 +672,14 @@ export default function StoryBuilderScreen() {
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="glass-panel rounded-[1.4rem] p-5">
             <p className="text-xs uppercase tracking-[0.26em] text-starlight/70">Current Film</p>
-            <h2 className="mt-2 font-[var(--font-heading)] text-2xl text-white">{draft.storyTitle}</h2>
+            <label className="mt-3 block text-sm font-semibold text-white" htmlFor="custom-story-title">Story Title</label>
+            <input
+              id="custom-story-title"
+              value={draft.storyTitle}
+              onChange={(event) => updateStoryTitle(event.target.value)}
+              className="input mt-2 max-w-xl text-lg font-semibold"
+              placeholder="Name your story"
+            />
             <div className="mt-3 flex flex-wrap gap-2">
               {[...draft.genres, ...draft.tones, `${draft.scenes.length} scene${draft.scenes.length === 1 ? "" : "s"}`].map((item) => (
                 <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/72">
@@ -579,13 +688,28 @@ export default function StoryBuilderScreen() {
               ))}
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className={`text-sm ${saveState === "failed" ? "text-red-200" : "text-white/75"}`}>
+              {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved to My Projects" : saveState === "failed" ? "Save failed — your local draft is safe" : "Browser-local draft"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void saveToMyProjects()}
+              disabled={saveState === "saving"}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-5 py-3 text-sm font-semibold text-slate-950 transition disabled:opacity-60"
+            >
+              {saveState === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {draft.projectId ? (saveState === "failed" ? "Retry Save" : "Save Changes") : "Save to My Projects"}
+            </button>
+            {saveMessage ? <p role="status" className={`basis-full text-xs ${saveState === "failed" ? "text-red-200" : "text-amber-100"}`}>{saveMessage}</p> : null}
+          </div>
           <button
             type="button"
-            onClick={() => router.push("/setup")}
+                    onClick={() => router.push("/dashboard")}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/80 transition hover:border-gold/25 hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Setup
+            Back to Dashboard
           </button>
         </div>
 
@@ -613,7 +737,11 @@ export default function StoryBuilderScreen() {
 
                   {/* Delete button */}
                   {draft.scenes.length > 1 && (
-                    <div className="absolute right-2 top-2">
+                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                      <div className="flex rounded-full border border-white/10 bg-slate-950/70 p-0.5">
+                        <button type="button" aria-label={`Move ${scene.title} earlier`} disabled={scene.sceneNumber === 1} onClick={(event) => { event.stopPropagation(); moveScene(scene.id, -1); }} className="rounded-full p-1 text-white/75 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                        <button type="button" aria-label={`Move ${scene.title} later`} disabled={scene.sceneNumber === draft.scenes.length} onClick={(event) => { event.stopPropagation(); moveScene(scene.id, 1); }} className="rounded-full p-1 text-white/75 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                      </div>
                       {deleteConfirmId === scene.id ? (
                         <div className="flex gap-1">
                           <button
@@ -704,9 +832,13 @@ export default function StoryBuilderScreen() {
                       {loadingSuggestions
                         ? <Loader2 className="h-3 w-3 animate-spin" />
                         : <RefreshCw className="h-3 w-3" />}
-                      {loadingSuggestions ? "Generating..." : "Regenerate from Title"}
+                      {loadingSuggestions ? "Finding three directions..." : "Suggest 3 Next Scenes"}
                     </button>
                   </div>
+                  <p className="mb-3 text-sm leading-6 text-white/75">Optional creative assistance. It uses your earlier scenes, character details, dialogue, and current direction; it never changes this scene until you select an option.</p>
+                  {activeScene.suggestions.length === 0 ? (
+                    <div className="rounded-[1.2rem] border border-white/10 bg-black/15 p-4 text-sm text-white/70">Write this scene yourself, or ask for three alternative next-scene directions.</div>
+                  ) : null}
                   <div className="grid gap-3 lg:grid-cols-3">
                     {activeScene.suggestions.map((suggestion, index) => (
                       <button
@@ -729,6 +861,7 @@ export default function StoryBuilderScreen() {
                       </button>
                     ))}
                   </div>
+                  {activeScene.suggestions.length > 0 ? <button type="button" onClick={() => clearSuggestions(activeScene.id)} className="mt-3 text-xs font-semibold text-white/75 underline decoration-starlight/50 underline-offset-4 hover:text-white">Ignore these suggestions</button> : null}
                 </div>
               </div>
             </article>

@@ -10,6 +10,23 @@ html {
   scroll-behavior: smooth;
 }
 
+/* A shared visible focus treatment keeps every workflow usable by keyboard. */
+:where(a, button, input, textarea, select, [role="tab"]):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 body {
   @apply min-h-screen bg-midnight text-slate-950 antialiased;
   background: linear-gradient(180deg, #f8fafc 0%, #ffffff 52%, #f8fafc 100%);

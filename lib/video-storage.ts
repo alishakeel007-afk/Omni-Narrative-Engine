@@ -1,4 +1,6 @@
 import type { MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
+import type { MusicCategory } from "@/lib/audio/music-policy";
+import { isDialogueEmotion, type DialogueEmotion } from "@/lib/audio/emotion-informed-delivery";
 
 export const VIDEO_DRAFT_STORAGE_KEY = "omni-narrative-engine-video-draft";
 export const VIDEO_VOICE_RESULT_STORAGE_KEY = "omni-narrative-engine-video-voice-result";
@@ -31,6 +33,12 @@ export type VideoStudioMusicState = {
   trackUrl: string;
 };
 
+export type PersistedMusicDecision = {
+  outcome: "silence" | "music";
+  category?: MusicCategory;
+  reason: string;
+};
+
 export type VideoStudioFlowState = {
   acceptedStory: string;
   generatedStory: string;
@@ -38,11 +46,18 @@ export type VideoStudioFlowState = {
   images: VideoStudioImageState;
   language: VideoLanguage;
   music: VideoStudioMusicState;
+  musicDecisions: Record<string, PersistedMusicDecision>;
+  /** Persisted in StoryDraft.videoStudioState to keep derived line emotion across reloads. */
+  dialogueEmotions?: Record<string, DialogueEmotion>;
   roughIdea: string;
   sceneCount: number;
   scenesNeedRegeneration: boolean;
   script: VideoGenerationResponse | null;
+  /** Language used to generate the current script; separate from setup selection. */
+  scriptLanguage?: VideoLanguage;
   stage: VideoStudioStage;
+  /** Last non-preview stage, used to return safely from the Stage 8 route. */
+  returnStage?: VideoStudioStage;
   tones: string[];
   updatedAt: string;
   videoOutdated: boolean;
@@ -86,6 +101,12 @@ export const VIDEO_STAGE_LABELS: Array<{ id: VideoStudioStage; label: string }> 
   { id: "preview", label: "Video Preview" }
 ];
 
+/** The Guided workflow is linear; navigation must never skip authored stages. */
+export function previousVideoStudioStage(stage: VideoStudioStage): VideoStudioStage | undefined {
+  const index = VIDEO_STAGE_LABELS.findIndex((item) => item.id === stage);
+  return index > 0 ? VIDEO_STAGE_LABELS[index - 1]?.id : undefined;
+}
+
 function toStringArray(value: unknown, fallback: string[]) {
   if (Array.isArray(value)) {
     const values = value
@@ -124,6 +145,23 @@ function toStatus(value: unknown): VideoStudioStatus {
 
 function toVideoLanguage(value: unknown): VideoLanguage {
   return value === "ur" ? "ur" : "en";
+}
+
+function toMusicDecisions(value: unknown): Record<string, PersistedMusicDecision> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const categories = new Set<MusicCategory>(["ambient", "suspense", "emotional", "action", "hopeful"]);
+  return Object.fromEntries(Object.entries(value).flatMap(([sceneNumber, decision]) => {
+    if (!decision || typeof decision !== "object") return [];
+    const source = decision as Partial<PersistedMusicDecision>;
+    if ((source.outcome !== "silence" && source.outcome !== "music") || typeof source.reason !== "string") return [];
+    if (source.outcome === "music" && (!source.category || !categories.has(source.category))) return [];
+    return [[sceneNumber, { outcome: source.outcome, category: source.category, reason: source.reason }]];
+  }));
+}
+
+function toDialogueEmotions(value: unknown): Record<string, DialogueEmotion> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, emotion]) => isDialogueEmotion(emotion)));
 }
 
 function normalizeScene(scene: MovieScene, index: number): MovieScene {
@@ -197,11 +235,15 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
       title: "",
       trackUrl: ""
     },
+    musicDecisions: {},
+    dialogueEmotions: {},
     roughIdea: DEFAULT_VIDEO_SCENARIO,
     sceneCount: 0,
     scenesNeedRegeneration: false,
     script: null,
+    scriptLanguage: undefined,
     stage: "setup",
+    returnStage: undefined,
     tones: [DEFAULT_VIDEO_TONES[0]],
     updatedAt: new Date().toISOString(),
     videoOutdated: false,
@@ -243,11 +285,15 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
       title: toCleanString(source.music?.title, ""),
       trackUrl: toCleanString(source.music?.trackUrl, "")
     },
+    musicDecisions: toMusicDecisions(source.musicDecisions),
+    dialogueEmotions: toDialogueEmotions(source.dialogueEmotions),
     roughIdea: toCleanString(source.roughIdea, fallback.roughIdea),
     sceneCount,
     scenesNeedRegeneration: Boolean(source.scenesNeedRegeneration),
     script,
+    scriptLanguage: script ? toVideoLanguage(source.scriptLanguage ?? source.language) : undefined,
     stage: toStage(source.stage),
+    returnStage: source.returnStage && source.returnStage !== "preview" ? toStage(source.returnStage) : undefined,
     tones: toStringArray(source.tones, fallback.tones),
     updatedAt: toCleanString(source.updatedAt, fallback.updatedAt),
     videoOutdated: Boolean(source.videoOutdated),

@@ -4,6 +4,9 @@ import { getEnvValue } from "@/lib/env";
 import { retrieveRelevantMemories, buildMemoryContextBlock } from "@/lib/memory/memory-service";
 import { getCharacterContextBlock, upsertCharacterState } from "@/lib/story-database";
 import { buildPrompt } from "@/lib/story-prompt";
+import { prisma } from "@/lib/prisma";
+import { normalizeGeneratedScene } from "@/lib/story-scene";
+import { fetchGeminiWithRetry, toGeminiRequestError } from "@/lib/gemini-retry";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -52,9 +55,8 @@ function parseSceneJson(rawText: string) {
 
 async function requestGeminiScene(params: { apiKey: string; prompt: string }) {
   const model = getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL;
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
-    {
+  const response = await fetchGeminiWithRetry({
+    request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,12 +66,12 @@ async function requestGeminiScene(params: { apiKey: string; prompt: string }) {
         contents: [{ role: "user", parts: [{ text: params.prompt }] }],
         generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
       }),
-    }
-  );
+      signal,
+    })
+  });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 300)}`);
+    throw await toGeminiRequestError(response, "story generation");
   }
 
   const payload = await response.json();
@@ -121,10 +123,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { setup, choice, memoryTimeline, currentScene, sceneNumber, draftId } = body;
+    const { setup, choice, memoryTimeline, currentScene, playerState, recentSceneHistory, sceneNumber, draftId } = body;
 
     if (!setup || !choice) {
       return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
+    }
+    if (draftId && setup.draftId && setup.draftId !== draftId) {
+      return NextResponse.json({ error: "Story setup does not match the requested draft." }, { status: 400 });
     }
 
     const geminiApiKey = getGeminiKey();
@@ -137,9 +142,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedSceneNumber = Number.isInteger(sceneNumber) && sceneNumber > 0 ? sceneNumber : 1;
     let memoryContextBlock = "";
     let characterContextBlock = "";
     if (draftId) {
+      const ownedDraft = await prisma.storyDraft.findFirst({
+        where: { id: draftId, project: { userId: session.userId } },
+        select: { id: true }
+      });
+      if (!ownedDraft) return NextResponse.json({ error: "Story draft not found or access denied." }, { status: 404 });
       const queryText = `Current context: ${currentScene?.location || ''} ${currentScene?.mood || ''}. Choice: ${choice}`;
       const memories = await retrieveRelevantMemories(draftId, queryText, 8);
       memoryContextBlock = buildMemoryContextBlock(memories);
@@ -151,7 +162,9 @@ export async function POST(request: Request) {
       choice,
       memoryTimeline: memoryTimeline || [],
       currentScene: currentScene || null,
-      sceneNumber: sceneNumber || 1,
+      playerState: playerState && typeof playerState === "object" ? playerState : undefined,
+      recentSceneHistory: Array.isArray(recentSceneHistory) ? recentSceneHistory : [],
+      sceneNumber: normalizedSceneNumber,
       memoryContextBlock,
       characterContextBlock,
     });
@@ -161,7 +174,7 @@ export async function POST(request: Request) {
 
     if (geminiApiKey) {
       try {
-        sceneData = await requestGeminiScene({ apiKey: geminiApiKey, prompt });
+        sceneData = normalizeGeneratedScene(await requestGeminiScene({ apiKey: geminiApiKey, prompt }), normalizedSceneNumber);
         provider = "Gemini";
       } catch (geminiError) {
         if (!groqApiKey) {
@@ -169,7 +182,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: message }, { status: 500 });
         }
         try {
-          sceneData = await requestGroqScene({ apiKey: groqApiKey, prompt });
+          sceneData = normalizeGeneratedScene(await requestGroqScene({ apiKey: groqApiKey, prompt }), normalizedSceneNumber);
           provider = "Groq fallback";
         } catch (groqError) {
           const geminiMessage = geminiError instanceof Error ? geminiError.message : "Gemini generation failed.";
@@ -181,12 +194,9 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      sceneData = await requestGroqScene({ apiKey: groqApiKey, prompt });
+      sceneData = normalizeGeneratedScene(await requestGroqScene({ apiKey: groqApiKey, prompt }), normalizedSceneNumber);
       provider = "Groq fallback";
     }
-
-    // Ensure sceneNumber is injected back
-    sceneData.sceneNumber = sceneNumber || 1;
 
     // Auto-sync characters if draftId is present
     if (draftId && Array.isArray(sceneData.cast)) {

@@ -41,7 +41,8 @@ export async function updateSession(request: NextRequest) {
     '/story',
     '/audio-generation',
     '/video-preview',
-    '/video'
+    '/video',
+    '/projects'
   ];
 
   const pathname = request.nextUrl.pathname;
