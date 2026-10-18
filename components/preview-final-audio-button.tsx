@@ -12,7 +12,7 @@ type PreviewScene = {
 };
 
 export function PreviewFinalAudioButton({
-  scenes
+  scenes = []
 }: {
   scenes: PreviewScene[];
 }) {
@@ -33,7 +33,7 @@ export function PreviewFinalAudioButton({
   const dialogueSequence = useMemo(() => {
     const seq: { scene: PreviewScene; audioUrl: string }[] = [];
     for (const scene of scenes) {
-      for (const dialogue of scene.dialogues) {
+      for (const dialogue of scene.dialogues ?? []) {
         if (dialogue.audioUrl) {
           seq.push({ scene, audioUrl: dialogue.audioUrl });
         }

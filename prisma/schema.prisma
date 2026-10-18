@@ -22,6 +22,96 @@ model StoryProject {
   @@index([userId])
 }
 
+// Conversational Film Studio keeps its data independent of legacy auth tables.
+model FilmWorkspace {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  state     Json
+  revision  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  references FilmReference[]
+  sceneThreads FilmSceneThread[]
+  sceneJobs FilmSceneJob[]
+  sceneRevisions FilmSceneRevision[]
+
+  @@index([userId, updatedAt])
+}
+
+model FilmSceneRevision {
+  id String @id @default(uuid())
+  workspaceId String
+  sceneId String
+  key String
+  snapshot Json
+  createdAt DateTime @default(now())
+  workspace FilmWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobs FilmSceneJob[]
+  @@unique([workspaceId, sceneId, key])
+}
+
+model FilmSceneThread {
+  id String @id @default(uuid())
+  workspaceId String
+  sceneId String
+  title String
+  parentTakeId String?
+  parentJobId String?
+  createdAt DateTime @default(now())
+  workspace FilmWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobs FilmSceneJob[]
+  @@index([workspaceId, sceneId])
+}
+
+model FilmSceneJob {
+  id String @id @default(uuid())
+  workspaceId String
+  userId String
+  sceneId String
+  threadId String
+  sceneRevisionId String
+  requestId String
+  kind String
+  status String @default("queued")
+  phase String @default("prepare")
+  text String
+  sequence Int @default(0)
+  snapshot Json
+  result Json?
+  providerTake Json?
+  dependsOnId String?
+  error String?
+  cancelRequested Boolean @default(false)
+  attempts Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace FilmWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  thread FilmSceneThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sceneRevision FilmSceneRevision @relation(fields: [sceneRevisionId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, requestId])
+  @@unique([threadId, sequence])
+  @@index([status, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model FilmSceneSlot {
+  id Int @id
+  jobId String? @unique
+  token String?
+  leaseUntil DateTime @default(dbgenerated("'1970-01-01'::timestamp"))
+}
+
+model FilmReference {
+  id          String @id @default(uuid())
+  workspaceId String
+  content     String
+  createdAt   DateTime @default(now())
+  workspace   FilmWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
 model StoryDraft {
   id               String      @id @default(uuid())
   storyProjectId   String

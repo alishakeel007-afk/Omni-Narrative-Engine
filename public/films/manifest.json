@@ -1,0 +1,25 @@
+{
+  "provenance": "Original AI-generated landscape footage, generated with Magic Hour LTX 2.5.",
+  "native4k": false,
+  "note": "Native 4K generation was rejected by the account tier. 4K files are Lanczos-upscaled delivery versions, not native 4K detail.",
+  "films": [
+    {
+      "id": "emerald-world",
+      "sourceResolution": "854x480",
+      "webResolution": "1280x720",
+      "deliveryResolution": "3840x2160",
+      "deliveryUpscaled": true,
+      "durationSeconds": 5,
+      "audio": false
+    },
+    {
+      "id": "forest-light",
+      "sourceResolution": "854x480",
+      "webResolution": "1280x720",
+      "deliveryResolution": "3840x2160",
+      "deliveryUpscaled": true,
+      "durationSeconds": 5,
+      "audio": false
+    }
+  ]
+}

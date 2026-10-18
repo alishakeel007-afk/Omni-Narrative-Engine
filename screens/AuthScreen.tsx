@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { DEFAULT_AUTH_REDIRECT, getSafeRedirectPath } from "@/lib/auth-redirect";
+import {
+  DEFAULT_AUTH_REDIRECT,
+  getSafeRedirectPath,
+} from "@/lib/auth-redirect";
 import ScreenLayout from "@/screens/ScreenLayout";
+import { StudioEntryNotice } from "@/components/public/studio-entry-notice";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -26,6 +30,7 @@ export default function AuthScreen() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNextPath(getSafeRedirectPath(params.get("next")));
+    if (params.get("error")) setError(params.get("error")!);
   }, []);
 
   useEffect(() => {
@@ -54,97 +59,100 @@ export default function AuthScreen() {
       await login(email.trim(), password);
       router.push(nextPath as Route);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to log in.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to log in.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <ScreenLayout
-      eyebrow="Login"
-      title="Return to Your Story"
-      description="Log in to access your dashboard, continue saved stories, and manage your Omni-Narrative sessions."
-      maxWidth="max-w-md"
-    >
-      <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Login</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
-            Return to Your Story
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            Log in to access your dashboard, continue your saved story, and manage your AI-driven narrative sessions.
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            <Field label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-gold/30"
-                placeholder="you@example.com"
-              />
-            </Field>
-
-            <Field label="Password">
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none focus:border-gold/30"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
-                  aria-label="Toggle password visibility"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </Field>
-
-            {error ? (
-              <div className="rounded-[1.2rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
+    <ScreenLayout title="Welcome back.">
+      <p className="public-form-eyebrow">YOUR NEXT CHAPTER</p>
+      <h1>Welcome back.</h1>
+      <p className="public-form-intro">
+        Your ideas, your characters, your unfinished adventures.
+        <br />
+        Let’s pick up where you left off.
+      </p>
+      <StudioEntryNotice nextPath={nextPath} />
+      <form
+        noValidate
+        onSubmit={handleSubmit}
+        className="public-auth-form"
+        aria-busy={isSubmitting}
+      >
+        <Field label="Email address">
+          <input
+            type="email"
+            name="email"
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label="Password">
+          <div className="public-password-input">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Your password"
+              required
               disabled={isSubmitting}
-              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
             >
-              {isSubmitting ? "Logging in..." : "Login"}
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
-          </form>
-
-          <div className="mt-6 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route} className="text-slate-600 transition hover:text-gold">
-              Create an account
-            </Link>
-            <Link href="/forgot-password" className="text-slate-600 transition hover:text-gold">
-              Forgot Password?
-            </Link>
           </div>
+        </Field>
+        <div className="public-form-row">
+          <span>A story worth coming back to.</span>
+          <Link href="/forgot-password">Forgot password?</Link>
         </div>
+        {error && (
+          <p className="public-auth-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={isSubmitting} className="public-button">
+          {isSubmitting ? "Opening your studio…" : "Return to my story"}
+          <ArrowUpRight size={17} />
+        </button>
+      </form>
+      <div className="public-auth-divider">A NEW STORY?</div>
+      <p className="public-auth-switch">
+        New to OmniNarrative?{" "}
+        <Link href={`/signup?next=${encodeURIComponent(nextPath)}` as Route}>
+          Start creating
+        </Link>
+      </p>
     </ScreenLayout>
   );
 }
-
 function Field({
   label,
-  children
+  children,
 }: {
   label: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-3 block text-sm font-semibold text-slate-900">{label}</span>
+    <label className="public-auth-field">
+      <span>{label}</span>
       {children}
     </label>
   );

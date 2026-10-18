@@ -176,7 +176,7 @@ export function SceneMedia({
             className="h-64 w-full rounded-[1.3rem] object-cover"
           />
         ) : (
-          <div className="flex h-64 items-end rounded-[1.3rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(141,183,255,0.22),transparent_30%),linear-gradient(180deg,#161b39,#0a1022)] p-4">
+          <div className="flex h-64 items-end rounded-[1.3rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(179,179,179,0.22),transparent_30%),linear-gradient(180deg,#1c1c1c,#101010)] p-4">
             <p className="text-sm text-white/85">
               {imageLoading ? "Generating scene visual..." : imageError ?? imageLabel}
             </p>

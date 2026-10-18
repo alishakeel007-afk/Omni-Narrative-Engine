@@ -21,6 +21,7 @@ import {
   type VideoStudioFlowState,
   type VideoStudioStage
 } from "@/lib/video-storage";
+import { SceneVideoGenerator } from "@/components/scene-video-generator";
 import type { CreateStoryDraft } from "@/types/create-story";
 
 export default function VideoPreviewScreen() {
@@ -70,7 +71,7 @@ export default function VideoPreviewScreen() {
         <ScreenLayout
           eyebrow="Guided Video Studio"
           title="Video Preview"
-          description="The real video backend is not connected yet. Your generated story, dialogues, voices, and music status stay saved while you edit backward."
+          description="Generate and download scene clips below. Your story, voices, and music stay saved separately."
           maxWidth="max-w-6xl"
         >
           <section className="glass-panel rounded-[2rem] p-5 sm:p-7">
@@ -109,12 +110,12 @@ export default function VideoPreviewScreen() {
               <button
                 type="button"
                 onClick={() =>
-                  setNotice("Video download will be available after backend integration.")
+                  setNotice("Use Download scene clip below each completed scene.")
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/85"
               >
                 <Download className="h-4 w-4" />
-                Download Video
+                Download Instructions
               </button>
               <button
                 type="button"
@@ -165,6 +166,7 @@ export default function VideoPreviewScreen() {
                 )}
                 <h3 className="text-lg font-semibold text-white">{scene.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-white/90">{scene.narration}</p>
+                <SceneVideoGenerator voiceUrls={(videoFlow.voiceResult?.scenes.find(item => item.sceneNumber === scene.sceneNumber)?.dialogues ?? scene.dialogues).map(line => line.audioUrl).filter((value): value is string => !!value)} musicUrl={scene.backgroundMusicUrl || videoFlow.music.trackUrl} title={`${videoFlow.script!.title} - Scene ${scene.sceneNumber}: ${scene.title}`} prompt={[scene.visualPrompt, scene.imagePrompt, scene.narration, scene.directorNotes, scene.sceneTone].filter(Boolean).join(". ").slice(0, 12000)} />
               </article>
             ))}
           </section>
@@ -213,7 +215,7 @@ function CreateStoryPreview({
       <ScreenLayout
         eyebrow="AI Story Studio"
         title="Video Preview"
-        description="The video backend is intentionally not connected yet. This page preserves the final preview step and all navigation."
+        description="Generate and download video clips for each scene below."
         maxWidth="max-w-6xl"
       >
         <AiStoryStudioStepper currentStep={5} />
@@ -236,12 +238,12 @@ function CreateStoryPreview({
             <button
               type="button"
               onClick={() =>
-                setNotice("Video download will be available after backend integration.")
+                setNotice("Use Download scene clip below each completed scene.")
               }
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white/85"
             >
               <Download className="h-4 w-4" />
-              Download Video
+              Download Instructions
             </button>
             <button
               type="button"
@@ -291,6 +293,7 @@ function CreateStoryPreview({
               <p className="mt-3 text-sm leading-7 text-white/90">
                 {scene.storyDescription || scene.selectedSuggestion}
               </p>
+              <SceneVideoGenerator voiceUrls={scene.dialogues.map(line => line.audioUrl).filter((value): value is string => !!value)} musicUrl={draft.audio.backgroundMusicUrl} title={`${draft.storyTitle} - Scene ${scene.sceneNumber}: ${scene.title}`} prompt={[scene.storyDescription || scene.selectedSuggestion, scene.generatedImagePrompt, scene.sceneGenre, scene.sceneTone].filter(Boolean).join(". ").slice(0, 12000)} />
             </article>
           ))}
         </section>
@@ -310,10 +313,10 @@ function VideoFrame({ imageUrl }: { imageUrl?: string }) {
           <Film className="h-8 w-8" />
         </div>
         <h2 className="mt-6 font-[var(--font-heading)] text-3xl text-white">
-          Generated video preview will appear here
+          Your scene videos
         </h2>
         <p className="mt-4 max-w-xl text-sm leading-7 text-white/90">
-          The final render will be connected after backend video generation is ready.
+          Generate each scene below, then play or download the completed clips.
         </p>
       </div>
     </div>

@@ -2,14 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Clapperboard,
-  Loader2,
-  Mic2,
-  Music2,
-  Sparkles
-} from "lucide-react";
+import { ArrowLeft, Clapperboard, Loader2, Mic2, Music2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
 import { PreviewFinalAudioButton } from "@/components/preview-final-audio-button";
@@ -21,6 +14,7 @@ import {
 } from "@/lib/create-story-storage";
 import type { CreateStoryDraft } from "@/types/create-story";
 import { logActivity } from "@/lib/log-activity";
+import { taskQueue } from "@/lib/orchestration";
 
 export default function AudioGenerationScreen() {
   const router = useRouter();
@@ -28,6 +22,14 @@ export default function AudioGenerationScreen() {
 
   useEffect(() => {
     setDraft(loadCreateStoryDraft());
+
+    const syncDraft = () => {
+      setDraft(loadCreateStoryDraft());
+    };
+    window.addEventListener("custom-draft-updated", syncDraft);
+    return () => {
+      window.removeEventListener("custom-draft-updated", syncDraft);
+    };
   }, []);
 
   const totalDialogueLines = useMemo(
@@ -57,115 +59,7 @@ export default function AudioGenerationScreen() {
       }
     });
 
-    try {
-      // Map create-story draft to the format expected by /api/video/tts
-      const mappedScenes = draft.scenes.map((scene) => {
-        const dialoguesToGenerate = scene.dialogues
-          .filter((d) => d.text.trim())
-          .map((d) => {
-            const char = draft.characters.find((c) => c.id === d.characterId);
-            return {
-              id: d.id,
-              character: d.characterName,
-              delivery: "neutral",
-              line: d.text,
-              voiceProfile: {
-                deepgramModel: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female")
-                  ? "aura-asteria-en"
-                  : "aura-orion-en",
-                description: d.voiceStyle || char?.voiceStyle || "Character voice",
-                gender: (d.voiceStyle || char?.voiceStyle || "").toLowerCase().includes("female") ? "female" : "male",
-                tone: "neutral"
-              }
-            };
-          });
-
-        if (draft.includeNarration && scene.storyDescription.trim()) {
-          dialoguesToGenerate.unshift({
-            id: "narrator",
-            character: "Narrator",
-            delivery: "neutral",
-            line: scene.storyDescription,
-            voiceProfile: {
-              deepgramModel: "aura-asteria-en",
-              description: "Narrator voice",
-              gender: "female",
-              tone: "neutral"
-            }
-          });
-        }
-
-        return {
-          id: scene.id,
-          sceneNumber: scene.sceneNumber,
-          title: scene.title,
-          sceneTone: scene.sceneTone || draft.tones[0] || "cinematic",
-          mood: scene.sceneTone || draft.tones[0] || "cinematic",
-          sceneGenre: scene.sceneGenre || draft.genres[0] || "cinematic",
-          narration: scene.storyDescription || scene.selectedSuggestion,
-          dialogues: dialoguesToGenerate
-        };
-      });
-
-      const res = await fetch("/api/video/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes: mappedScenes })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate voices");
-      }
-
-      // Map the returned audioUrls back to our draft
-      const updatedScenes = draft.scenes.map((scene, sceneIndex) => {
-        const returnedScene = data.scenes?.[sceneIndex];
-        if (!returnedScene) return scene;
-
-        const narrationDialogue = draft.includeNarration ? returnedScene.dialogues?.[0] : null;
-        const mappedDialogues = scene.dialogues.map((dialogue, dialogueIndex) => {
-          // If narration is included, the character dialogues are shifted by 1 in the returned array
-          const returnedDialogue = returnedScene.dialogues?.[draft.includeNarration ? dialogueIndex + 1 : dialogueIndex];
-          if (returnedDialogue && returnedDialogue.audioUrl) {
-            return { ...dialogue, audioUrl: returnedDialogue.audioUrl };
-          }
-          return dialogue;
-        });
-
-        return {
-          ...scene,
-          narrationAudioUrl: narrationDialogue?.audioUrl,
-          dialogues: mappedDialogues
-        };
-      });
-
-      const generatedCount = data.audio?.generatedCount ?? 0;
-
-      persistDraft({
-        ...draft,
-        scenes: updatedScenes,
-        audio: {
-          ...draft.audio,
-          voiceMessage: `Generated ${generatedCount} voice lines successfully.`,
-          voiceStatus: "ready"
-        }
-      });
-
-      await logActivity("audio_generated", { type: "voice", storyTitle: draft.storyTitle, lines: generatedCount });
-
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      persistDraft({
-        ...draft,
-        audio: {
-          ...draft.audio,
-          voiceMessage: `Failed: ${msg}`,
-          voiceStatus: "idle"
-        }
-      });
-    }
+    taskQueue.dispatch("custom-voice-only", { draft });
   };
 
   const generateBackgroundMusic = async () => {
@@ -180,116 +74,7 @@ export default function AudioGenerationScreen() {
       }
     });
 
-    try {
-      const res = await fetch("/api/background-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mood: draft.tones[0] || "cinematic",
-          sceneTitle: draft.storyTitle,
-          soundDesign: `A ${draft.genres.join(" ")} soundtrack`,
-          sceneId: `draft-${draft.storyTitle}`
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate music");
-      }
-
-      persistDraft({
-        ...draft,
-        audio: {
-          ...draft.audio,
-          backgroundMusicMessage: "Background music generated successfully.",
-          backgroundMusicStatus: "ready",
-          backgroundMusicUrl: data.audioUrl
-        }
-      });
-
-      await logActivity("audio_generated", { type: "music", storyTitle: draft.storyTitle });
-
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      persistDraft({
-        ...draft,
-        audio: {
-          ...draft.audio,
-          backgroundMusicMessage: `Failed: ${msg}`,
-          backgroundMusicStatus: "idle"
-        }
-      });
-    }
-  };
-
-  const generateVisuals = async (forceRegenerateAll = false) => {
-    if (!draft || draft.visuals.status === "generating") return;
-
-    persistDraft({
-      ...draft,
-      visuals: {
-        message: "Generating scene visuals...",
-        status: "generating"
-      }
-    });
-
-    let errorsOccurred = false;
-    const updatedScenes = draft.scenes.map((scene) =>
-      forceRegenerateAll
-        ? { ...scene, generatedImageUrl: undefined, generatedImagePrompt: undefined, generatedImageStatus: "idle" as const, generatedImageError: undefined }
-        : { ...scene }
-    );
-
-    for (const scene of updatedScenes) {
-      if (scene.generatedImageStatus === "ready" || scene.generatedImageUrl) continue;
-
-      scene.generatedImageStatus = "generating";
-      const sceneCharacterNames = scene.activeCharacterIds
-        .map((id) => draft.characters.find((c) => c.id === id)?.name)
-        .filter((name): name is string => Boolean(name));
-
-      try {
-        const res = await fetch("/api/video/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sceneId: scene.id,
-            imagePrompt: scene.storyDescription || scene.selectedSuggestion || scene.title,
-            sceneTitle: scene.title,
-            mood: scene.sceneTone,
-            genres: draft.genres,
-            existingHash: undefined,
-            characterNames: sceneCharacterNames
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.imageUrl) {
-          throw new Error(data.error ?? `Failed to generate visual for "${scene.title}".`);
-        }
-        scene.generatedImageUrl = data.imageUrl;
-        scene.generatedImagePrompt = data.prompt;
-        scene.generatedImageStatus = "ready";
-        scene.generatedImageError = undefined;
-      } catch (err) {
-        errorsOccurred = true;
-        scene.generatedImageStatus = "error";
-        scene.generatedImageError = err instanceof Error ? err.message : "Visual generation failed";
-      }
-    }
-
-    persistDraft({
-      ...draft,
-      scenes: updatedScenes,
-      visuals: {
-        message: errorsOccurred
-          ? "Scene visuals generated, but some scenes failed."
-          : "All scene visuals are ready.",
-        status: updatedScenes.some((s) => s.generatedImageUrl) ? "ready" : "error"
-      }
-    });
-
-    await logActivity("visuals_generated", { storyTitle: draft.storyTitle });
+    taskQueue.dispatch("custom-music-only", { draft });
   };
 
   const generateVideo = async () => {
@@ -326,23 +111,16 @@ export default function AudioGenerationScreen() {
 
   const voiceReady = draft.audio.voiceStatus === "ready";
   const musicReady = draft.audio.backgroundMusicStatus === "ready";
-  const visualsReady = draft.scenes.length > 0 && draft.scenes.every((s) => Boolean(s.generatedImageUrl));
-  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && musicReady && visualsReady;
+  const canGenerateVideo = draft.scenes.length > 0 && voiceReady && musicReady;
 
-  const currentStep: AiStoryStudioStep = musicReady
-    ? 6
-    : visualsReady
-      ? 5
-      : voiceReady
-        ? 4
-        : 3;
+  const currentStep: AiStoryStudioStep = draft.audio.voiceStatus === "ready" ? 4 : 3;
 
   return (
     <ProtectedRoute>
       <ScreenLayout
         eyebrow="AI Story Studio"
         title="Audio Generation"
-        description="Review the final story, assign voice placeholders, generate character voices, preview scene visuals, and background music, then continue to video preview."
+        description="Review the final story, assign voice placeholders, generate character voices and background music separately, then continue to video preview."
         maxWidth="max-w-7xl"
       >
         <AiStoryStudioStepper currentStep={currentStep} />
@@ -361,7 +139,6 @@ export default function AudioGenerationScreen() {
               <Stat label="Scenes" value={String(draft.scenes.length)} />
               <Stat label="Characters" value={String(draft.characters.length)} />
               <Stat label="Voices" value={draft.audio.voiceStatus} />
-              <Stat label="Visuals" value={draft.visuals.status} />
               <Stat label="Music" value={draft.audio.backgroundMusicStatus} />
             </div>
           </div>
@@ -384,22 +161,6 @@ export default function AudioGenerationScreen() {
               {draft.audio.voiceStatus === "idle" && (
                 <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter">Required for music</p>
               )}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => generateVisuals(false)}
-                disabled={draft.visuals.status === "generating"}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold transition-all duration-300 hover:bg-gold/15 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
-              >
-                {draft.visuals.status === "generating" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {visualsReady ? "Regenerate Visuals" : "Preview Visuals"}
-              </button>
             </div>
 
             <div className="flex flex-col gap-1">
@@ -435,9 +196,8 @@ export default function AudioGenerationScreen() {
             <div className="flex flex-col gap-1">
               <PreviewFinalAudioButton
                 scenes={draft.scenes.map(scene => ({
-                  sceneNumber: scene.sceneNumber,
-                  backgroundMusicUrl: draft.audio.backgroundMusicUrl,
-                  dialogues: scene.dialogues
+                  ...scene,
+                  backgroundMusicUrl: draft.audio.backgroundMusicUrl
                 }))}
               />
               {draft.audio.backgroundMusicStatus !== "ready" && (
@@ -456,23 +216,17 @@ export default function AudioGenerationScreen() {
                 Generate Video
               </button>
               {!canGenerateVideo && (
-                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio and visuals</p>
+                <p className="mt-1 text-center text-[10px] text-white/75 uppercase tracking-tighter italic">Complete all audio</p>
               )}
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
             <StatusPanel
               icon={<Mic2 className="h-4 w-4" />}
               label="Voice Status"
               message={draft.audio.voiceMessage}
               status={draft.audio.voiceStatus}
-            />
-            <StatusPanel
-              icon={<Sparkles className="h-4 w-4" />}
-              label="Visuals Status"
-              message={draft.visuals.message}
-              status={draft.visuals.status}
             />
             <div className="flex flex-col gap-3">
               <StatusPanel
@@ -498,22 +252,6 @@ export default function AudioGenerationScreen() {
         <section className="mt-8 space-y-6">
           {draft.scenes.map((scene) => (
             <article key={scene.id} className="glass-panel overflow-hidden rounded-[2rem]">
-              {scene.generatedImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={scene.generatedImageUrl}
-                  alt={scene.title}
-                  className="h-56 w-full object-cover"
-                />
-              ) : scene.generatedImageStatus === "generating" ? (
-                <div className="flex h-40 items-center justify-center bg-black/20 text-sm text-white/60">
-                  Generating scene visual...
-                </div>
-              ) : scene.generatedImageStatus === "error" ? (
-                <div className="flex h-40 flex-col items-center justify-center gap-2 bg-black/20 px-4 text-center text-sm text-red-300">
-                  <span>{scene.generatedImageError || "Visual generation failed."}</span>
-                </div>
-              ) : null}
               <div className="border-b border-white/10 bg-white/[0.03] p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                   <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -586,7 +324,7 @@ function StatusPanel({
         {status === "generating" ? (
           <Loader2 className="h-4 w-4 animate-spin text-starlight" />
         ) : (
-          <Sparkles className="h-4 w-4 text-starlight" />
+          <Clapperboard className="h-4 w-4 text-starlight" />
         )}
         <p className="text-sm font-semibold capitalize text-white">{status}</p>
       </div>

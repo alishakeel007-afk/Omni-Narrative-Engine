@@ -1,13 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeRedirectPath } from "@/lib/auth-redirect";
 
 export type AuthUser = {
   id: string;
@@ -23,7 +18,12 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
-  signup: (fullName: string, email: string, password: string) => Promise<AuthUser>;
+  signup: (
+    fullName: string,
+    email: string,
+    password: string,
+    nextPath?: string,
+  ) => Promise<AuthUser | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -35,12 +35,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         const authUser: AuthUser = {
           id: user.id,
           name: user.user_metadata?.full_name || "User",
-          email: user.email || ""
+          email: user.email || "",
         };
         setCurrentUser(authUser);
         return authUser;
@@ -57,9 +59,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshUser();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      refreshUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      setCurrentUser(
+        user
+          ? {
+              id: user.id,
+              name: user.user_metadata?.full_name || "User",
+              email: user.email || "",
+            }
+          : null,
+      );
+      setLoading(false);
     });
 
     return () => {
@@ -67,26 +81,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signup = async (name: string, email: string, password: string) => {
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+    nextPath?: string,
+  ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}${getSafeRedirectPath(nextPath)}`,
         data: {
           full_name: name,
-        }
-      }
+        },
+      },
     });
 
     if (error) throw error;
     if (!data.user) throw new Error("Signup failed");
+    if (!data.session) return null;
 
     const authUser: AuthUser = {
       id: data.user.id,
       name: data.user.user_metadata?.full_name || name,
-      email: data.user.email || email
+      email: data.user.email || email,
     };
-    
+
     setCurrentUser(authUser);
     return authUser;
   };
@@ -103,9 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authUser: AuthUser = {
       id: data.user.id,
       name: data.user.user_metadata?.full_name || "User",
-      email: data.user.email || email
+      email: data.user.email || email,
     };
-    
+
     setCurrentUser(authUser);
     return authUser;
   };
@@ -137,9 +158,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       refreshUser,
-      signup
+      signup,
     }),
-    [currentUser, loading]
+    [currentUser, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

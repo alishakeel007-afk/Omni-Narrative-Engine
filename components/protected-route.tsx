@@ -5,11 +5,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export function ProtectedRoute({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, loading } = useAuth();
@@ -18,7 +14,9 @@ export function ProtectedRoute({
     if (loading) return;
 
     if (!currentUser) {
-      router.replace(`/auth?next=${encodeURIComponent(pathname)}` as Route);
+      router.replace(
+        `/auth?next=${encodeURIComponent(pathname + window.location.search)}` as Route,
+      );
     }
   }, [currentUser, loading, pathname, router]);
 

@@ -1,5 +1,7 @@
 node_modules
 .next
+.next-dev
+/.studio-typecheck.log
 out
 dist
 .env
@@ -27,6 +29,11 @@ pnpm-debug.log*
 
 # Local run-verification screenshots
 /.run-screenshots
+/.studio-worker
+/workers/character/.venv*/
+/workers/character/__pycache__/
+/.venv-modal/
+/workers/video/__pycache__/
 
 # Local Claude Code harness state
 /.claude

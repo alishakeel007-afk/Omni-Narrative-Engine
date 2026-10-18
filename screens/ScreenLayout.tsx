@@ -1,13 +1,15 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
+import { PublicAccountShell } from "@/components/public/public-shell";
 
 export default function ScreenLayout({
   eyebrow,
   title,
   description,
   children,
-  maxWidth = "max-w-4xl"
+  maxWidth = "max-w-4xl",
 }: {
   eyebrow?: React.ReactNode;
   title?: React.ReactNode;
@@ -15,13 +17,26 @@ export default function ScreenLayout({
   children: React.ReactNode;
   maxWidth?: string;
 }) {
+  const pathname = usePathname();
+  if (
+    [
+      "/auth",
+      "/signup",
+      "/forgot-password",
+      "/reset-password",
+      "/verify-email",
+    ].includes(pathname)
+  )
+    return <PublicAccountShell title={title}>{children}</PublicAccountShell>;
   return (
     <section className="relative px-4 py-16 sm:px-6 lg:px-8">
       <div className={`mx-auto ${maxWidth}`}>
         {(eyebrow || title || description) && (
           <div className="mb-10">
             {eyebrow ? (
-              <p className="text-xs uppercase tracking-[0.32em] text-slate-500">{eyebrow}</p>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
+                {eyebrow}
+              </p>
             ) : null}
 
             {title ? (
@@ -31,7 +46,9 @@ export default function ScreenLayout({
             ) : null}
 
             {description ? (
-              <p className="mt-4 text-sm leading-7 text-slate-600">{description}</p>
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                {description}
+              </p>
             ) : null}
           </div>
         )}

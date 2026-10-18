@@ -2,28 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  Clapperboard,
-  Edit3,
-  Loader2,
-  Mic2,
-  Music2,
-  Plus,
-  RefreshCcw,
-  Sparkles,
-  Trash2,
-  Wand2,
-  X
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Clapperboard, Edit3, Loader2, Mic2, Music2, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 import { usePipeline } from "@/hooks/usePipeline";
 import { TaskProgressBar } from "@/components/TaskProgressBar";
 import { 
   VIDEO_STUDIO_FULL_PIPELINE, 
   VIDEO_VOICE_ONLY_PIPELINE, 
-  VIDEO_MUSIC_ONLY_PIPELINE 
+  VIDEO_MUSIC_ONLY_PIPELINE,
+  taskQueue
 } from "@/lib/orchestration";
 import { PlaySceneAudioButton } from "@/components/play-scene-audio-button";
 import { PreviewFinalAudioButton } from "@/components/preview-final-audio-button";
@@ -81,6 +67,14 @@ export default function VideoStudioScreen() {
 
   useEffect(() => {
     setFlow(loadVideoStudioFlow());
+
+    const syncFlow = () => {
+      setFlow(loadVideoStudioFlow());
+    };
+    window.addEventListener("video-flow-updated", syncFlow);
+    return () => {
+      window.removeEventListener("video-flow-updated", syncFlow);
+    };
   }, []);
 
   const visibleScript = flow?.voiceResult ?? flow?.script ?? null;
@@ -758,28 +752,12 @@ export default function VideoStudioScreen() {
     if (!flow?.script || voicePipeline.status === "running" || fullPipeline.status === "running") return;
 
     setError("");
-    
-    // We can run the voice only pipeline here
-    const result = await voicePipeline.run({ script: flow.script });
-
-    if (result.success && result.finalResult) {
-       const voiceResult = result.finalResult;
-       persistFlow({
-         ...flow,
-         script: voiceResult,
-         videoOutdated: true,
-         voiceNeedsRegeneration: false,
-         voiceResult
-       });
-    } else if (result.error) {
-       setError(result.error);
-    }
+    taskQueue.dispatch("video-voice-only", { script: flow.script });
   };
 
   const generateBackgroundMusic = async () => {
     if (!flow?.script || musicPipeline.status === "running" || fullPipeline.status === "running") return;
 
-    const primaryScene = flow.script.scenes[0];
     setError("");
     persistFlow({
       ...flow,
@@ -790,31 +768,7 @@ export default function VideoStudioScreen() {
       }
     });
 
-    const result = await musicPipeline.run({ script: flow.script });
-    
-    if (result.success && result.finalResult) {
-      persistFlow({
-        ...flow,
-        music: {
-          message: "Background music is ready.",
-          mood: primaryScene?.mood ?? flow.tones.join(", "),
-          status: "ready",
-          title: "Generated Background Score", // Ideally we'd get this from the updated scenes, but this is a simplification
-          trackUrl: result.finalResult.scenes.find(s => s.backgroundMusicUrl)?.backgroundMusicUrl || ""
-        },
-        script: result.finalResult,
-        videoOutdated: true
-      });
-    } else if (result.error) {
-      persistFlow({
-        ...flow,
-        music: {
-          ...flow.music,
-          message: result.error,
-          status: "error"
-        }
-      });
-    }
+    taskQueue.dispatch("video-music-only", { script: flow.script });
   };
 
   const openPreview = () => {
@@ -833,7 +787,7 @@ export default function VideoStudioScreen() {
         <div className="px-4 py-16 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-xl">
             <div className="glass-panel rounded-[2rem] p-8 text-center">
-              <Sparkles className="mx-auto h-8 w-8 text-gold" />
+              <Clapperboard className="mx-auto h-8 w-8 text-gold" />
               <h1 className="mt-4 font-[var(--font-heading)] text-3xl text-white">
                 Loading Video Studio
               </h1>
@@ -1231,7 +1185,7 @@ function StoryIdeaStage({
   return (
     <section className="rounded-3xl border border-slate-700/50 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-xl">
       <SectionHeader
-        icon={<Wand2 className="h-7 w-7 text-white" />}
+        icon={<Clapperboard className="h-7 w-7 text-white" />}
         label="Stage 2"
         title="Rough Story Idea"
       />
@@ -1250,7 +1204,7 @@ function StoryIdeaStage({
           Back to Setup
         </SecondaryButton>
         <PrimaryButton disabled={isGenerating} onClick={onGenerate}>
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
           Generate Story with AI
         </PrimaryButton>
       </div>
@@ -1276,7 +1230,7 @@ function StoryReviewStage({
   return (
     <section className="glass-panel rounded-[2rem] p-6">
       <SectionHeader
-        icon={<Sparkles className="h-7 w-7 text-white" />}
+        icon={<Clapperboard className="h-7 w-7 text-white" />}
         label="Stage 3"
         title="Generated Story Review"
       />
@@ -1560,8 +1514,10 @@ function MusicStage({
         </SecondaryButton>
         <div className="flex">
           <PreviewFinalAudioButton
-            backgroundMusicUrl={flow.music.trackUrl}
-            voiceAudioUrls={flow.script?.scenes.flatMap(scene => scene.dialogues.map(d => d.audioUrl)).filter((url): url is string => !!url) || []}
+            scenes={(flow.voiceResult?.scenes ?? flow.script?.scenes ?? []).map(scene => ({
+              ...scene,
+              backgroundMusicUrl: scene.backgroundMusicUrl || flow.music.trackUrl
+            }))}
           />
         </div>
         <PrimaryButton
@@ -1648,7 +1604,7 @@ function InfoPanel({ title, text }: { title: string; text: string }) {
   return (
     <section className="glass-panel flex min-h-[24rem] items-center rounded-[2rem] p-8">
       <div>
-        <Sparkles className="h-10 w-10 text-gold" />
+        <Clapperboard className="h-10 w-10 text-gold" />
         <h2 className="mt-5 font-[var(--font-heading)] text-3xl text-white">{title}</h2>
         <p className="mt-4 text-sm leading-7 text-white/90">{text}</p>
       </div>
@@ -2011,7 +1967,7 @@ function DialogueReview({
             onClick={() => onGenerateAdditionalDialogue(sceneNumber)}
             className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-60"
           >
-            {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clapperboard className="h-3.5 w-3.5" />}
             Generate More Lines
           </button>
         </div>
@@ -2102,7 +2058,7 @@ function DialogueReview({
                 {generatingDialogueLineId === dialogue.id ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Sparkles className="h-3 w-3" />
+                  <Clapperboard className="h-3 w-3" />
                 )}
                 AI Line
               </button>

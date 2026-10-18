@@ -16,7 +16,7 @@ export async function uploadImageToStorage(params: {
   const path = `${params.projectId || "default"}/${params.sceneId}-${Date.now()}.png`;
 
   const { publicUrl } = await uploadToSupabaseStorage({
-    bucket: "images",
+    bucket: process.env.SUPABASE_IMAGE_BUCKET || "generated-images",
     path,
     body: params.imageBuffer,
     contentType: params.contentType,

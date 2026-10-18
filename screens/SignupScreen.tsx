@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowUpRight, Check, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { DEFAULT_AUTH_REDIRECT, getSafeRedirectPath } from "@/lib/auth-redirect";
+import {
+  DEFAULT_AUTH_REDIRECT,
+  getSafeRedirectPath,
+} from "@/lib/auth-redirect";
 import ScreenLayout from "@/screens/ScreenLayout";
+import { StudioEntryNotice } from "@/components/public/studio-entry-notice";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -19,7 +23,7 @@ function validatePassword(password: string) {
     hasMinimumLength: password.length >= 8,
     hasNumber: /\d/.test(password),
     hasSpecialCharacter: /[^A-Za-z0-9]/.test(password),
-    hasUppercase: /[A-Z]/.test(password)
+    hasUppercase: /[A-Z]/.test(password),
   };
 }
 
@@ -31,6 +35,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -77,153 +82,201 @@ export default function SignupScreen() {
 
     try {
       setIsSubmitting(true);
-      await signup(fullName.trim(), email.trim(), password);
+      const user = await signup(
+        fullName.trim(),
+        email.trim(),
+        password,
+        nextPath,
+      );
+      if (!user) {
+        setConfirmationSent(true);
+        return;
+      }
       router.push(nextPath as Route);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to create account.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to create account.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <ScreenLayout
-      eyebrow="Signup"
-      title="Create Your Account"
-      description="Register with email and password to save your story progress and access the Omni-Narrative experience."
-      maxWidth="max-w-lg"
-    >
-      <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Signup</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-slate-900">
-            Create Your Account
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            Register with email and password to save your story progress and access the protected Omni-Narrative Engine experience.
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            <Field label="Full Name">
-              <input
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-gold/30"
-                placeholder="Your full name"
-              />
-            </Field>
-
-            <Field label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-gold/30"
-                placeholder="you@example.com"
-              />
-            </Field>
-
-            <Field label="Password">
-              <PasswordInput
-                value={password}
-                onChange={setPassword}
-                showPassword={showPassword}
-                onToggle={() => setShowPassword((current) => !current)}
-              />
-            </Field>
-
-            <Field label="Confirm Password">
-              <PasswordInput
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                showPassword={showConfirmPassword}
-                onToggle={() => setShowConfirmPassword((current) => !current)}
-              />
-            </Field>
-
-            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">Password Rules</p>
-              <ul className="mt-3 space-y-2">
-                {[
-                  ["At least 8 characters", passwordRules.hasMinimumLength],
-                  ["At least 1 uppercase letter", passwordRules.hasUppercase],
-                  ["At least 1 lowercase letter", passwordRules.hasLowercase],
-                  ["At least 1 number", passwordRules.hasNumber],
-                  ["At least 1 special character", passwordRules.hasSpecialCharacter]
-                ].map(([label, passed]) => (
-                  <li key={String(label)} className={passed ? "text-green-600" : "text-slate-500"}>
-                    {passed ? "Passed:" : "Required:"} {label}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {error ? (
-              <div className="rounded-[1.2rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              {isSubmitting ? "Creating account..." : "Sign Up"}
-            </button>
-          </form>
-
-          <div className="mt-6 text-sm text-slate-600">
-            Already have an account?{' '}
-            <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route} className="text-slate-600 transition hover:text-gold">
-              Login here
-            </Link>
-          </div>
+    <ScreenLayout title="Your next story starts here.">
+      <p className="public-form-eyebrow">A LITTLE CURIOSITY GOES A LONG WAY</p>
+      <h1>
+        {confirmationSent ? (
+          "One last little step."
+        ) : (
+          <>
+            Your next story
+            <br />
+            starts here.
+          </>
+        )}
+      </h1>
+      <p className="public-form-intro">
+        {confirmationSent
+          ? "Your studio is almost ready."
+          : "Create your space to imagine, explore, and bring a story to life. We’ll figure out the first idea together."}
+      </p>
+      <StudioEntryNotice nextPath={nextPath} />
+      {confirmationSent ? (
+        <div className="public-auth-success" role="status">
+          <strong>Check your inbox.</strong>We sent a confirmation link to{" "}
+          {email}. Open it in this browser to continue to your studio.
+          <br />
+          <button type="button" onClick={() => setConfirmationSent(false)}>
+            Use a different email
+          </button>
         </div>
+      ) : (
+        <form
+          noValidate
+          onSubmit={handleSubmit}
+          className="public-auth-form"
+          aria-busy={isSubmitting}
+        >
+          <Field label="Your name">
+            <input
+              name="name"
+              autoComplete="name"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="What should we call you?"
+              required
+              disabled={isSubmitting}
+            />
+          </Field>
+          <Field label="Email address">
+            <input
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              required
+              disabled={isSubmitting}
+            />
+          </Field>
+          <Field label="Password">
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              showPassword={showPassword}
+              onToggle={() => setShowPassword(!showPassword)}
+              disabled={isSubmitting}
+              label="password"
+            />
+          </Field>
+          <p className="public-password-help">
+            Use 8+ characters, uppercase and lowercase letters, a number, and a
+            symbol.
+          </p>
+          {password && (
+            <div
+              className="public-password-rules"
+              aria-label="Password requirements"
+            >
+              {[
+                ["8+ characters", passwordRules.hasMinimumLength],
+                ["Uppercase", passwordRules.hasUppercase],
+                ["Lowercase", passwordRules.hasLowercase],
+                ["Number", passwordRules.hasNumber],
+                ["Symbol", passwordRules.hasSpecialCharacter],
+              ].map(([label, passed]) => (
+                <span key={String(label)} className={passed ? "passed" : ""}>
+                  {passed && <Check size={10} />}
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
+          <Field label="Confirm password">
+            <PasswordInput
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              showPassword={showConfirmPassword}
+              onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+              disabled={isSubmitting}
+              label="confirm password"
+            />
+          </Field>
+          {error && (
+            <p className="public-auth-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="public-button"
+          >
+            {isSubmitting ? "Creating your studio…" : "Create my studio"}
+            <ArrowUpRight size={17} />
+          </button>
+        </form>
+      )}
+      <p className="public-auth-switch">
+        Already have a story here?{" "}
+        <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route}>
+          Log in
+        </Link>
+      </p>
     </ScreenLayout>
   );
 }
-
 function Field({
   label,
-  children
+  children,
 }: {
   label: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-3 block text-sm font-semibold text-slate-900">{label}</span>
+    <label className="public-auth-field">
+      <span>{label}</span>
       {children}
     </label>
   );
 }
-
 function PasswordInput({
   value,
   onChange,
   showPassword,
-  onToggle
+  onToggle,
+  disabled,
+  label,
 }: {
   value: string;
   onChange: (value: string) => void;
   showPassword: boolean;
   onToggle: () => void;
+  disabled: boolean;
+  label: string;
 }) {
   return (
-    <div className="relative">
+    <div className="public-password-input">
       <input
         type={showPassword ? "text" : "password"}
+        autoComplete="new-password"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none focus:border-gold/30"
+        required
+        minLength={8}
+        disabled={disabled}
       />
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
-        aria-label="Toggle password visibility"
+        aria-label={`${showPassword ? "Hide" : "Show"} ${label}`}
+        aria-pressed={showPassword}
       >
-        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
       </button>
     </div>
   );

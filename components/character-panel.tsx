@@ -22,7 +22,7 @@ export function CharacterPanel({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
-        <div className="rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(111,92,255,0.18),transparent_30%),linear-gradient(180deg,#131933,#090e21)] p-4">
+        <div className="rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(108,108,108,0.18),transparent_30%),linear-gradient(180deg,#1a1a1a,#0e0e0e)] p-4">
           <div className="flex h-72 items-end rounded-[1.3rem] border border-white/10 bg-black/20 p-4">
             <p className="text-sm text-white/85">{primaryCharacter.imageLabel}</p>
           </div>

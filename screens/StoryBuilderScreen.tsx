@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft, Check, Eye, Loader2, MessageSquareText,
-  Plus, RefreshCw, Sparkles, Trash2, Wand2, X
-} from "lucide-react";
+import { ArrowLeft, Check, Eye, Loader2, MessageSquareText, Plus, RefreshCw, Clapperboard, Trash2, X } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { AiStoryStudioStepper } from "@/components/ai-story-studio-stepper";
@@ -692,7 +689,7 @@ export default function StoryBuilderScreen() {
                 <div>
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-gold" />
+                      <Clapperboard className="h-4 w-4 text-gold" />
                       <p className="text-sm font-semibold text-white">AI Scene Suggestions</p>
                     </div>
                     <button
@@ -797,7 +794,7 @@ export default function StoryBuilderScreen() {
                     disabled={loadingDialogue}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-semibold text-white transition hover:bg-gold/90 disabled:opacity-60"
                   >
-                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
                     Generate with AI
                   </button>
                   <button
@@ -806,7 +803,7 @@ export default function StoryBuilderScreen() {
                     disabled={loadingDialogue}
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-60"
                   >
-                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {loadingDialogue ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
                     Generate More Lines
                   </button>
                   <button

@@ -1,6 +1,6 @@
 // ============================================================
 // lib/audio/tts-storage.ts
-// Uploads generated Deepgram TTS audio to the Supabase "audio" bucket
+// Uploads generated Deepgram TTS audio to the Supabase "generated-audio" bucket
 // using the service-role client. No base64 fallback: if the upload
 // fails, the caller must surface a real error, not inline data.
 // ============================================================
@@ -23,7 +23,7 @@ export async function uploadTtsAudioToStorage(params: {
   const path = `tts/${params.projectId || "default"}/${params.dialogueId}-${Date.now()}.${extension}`;
 
   const { publicUrl } = await uploadToSupabaseStorage({
-    bucket: "audio",
+    bucket: process.env.SUPABASE_AUDIO_BUCKET || "generated-audio",
     path,
     body: params.audioBuffer,
     contentType: params.contentType,

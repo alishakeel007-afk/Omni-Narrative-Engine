@@ -16,7 +16,7 @@ export async function uploadMusicToStorage(params: {
   const path = `music/${params.projectId || "default"}/${params.sceneId}-${Date.now()}.mp3`;
 
   const { publicUrl } = await uploadToSupabaseStorage({
-    bucket: "audio",
+    bucket: process.env.SUPABASE_AUDIO_BUCKET || "generated-audio",
     path,
     body: params.audioBuffer,
     contentType: params.contentType,

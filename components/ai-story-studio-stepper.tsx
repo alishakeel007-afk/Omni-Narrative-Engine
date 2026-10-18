@@ -27,7 +27,7 @@ export function AiStoryStudioStepper({ currentStep }: { currentStep: AiStoryStud
             key={step.id}
             className={`rounded-[1rem] border px-4 py-3 text-sm transition relative overflow-hidden ${
               isCurrent
-                ? "border-gold/45 bg-gold/15 text-gold shadow-[0_0_15px_rgba(255,215,0,0.15)]"
+                ? "border-gold/45 bg-gold/15 text-gold shadow-[0_0_15px_rgba(208,208,208,0.15)]"
                 : isPast
                   ? "border-starlight/25 bg-starlight/10 text-starlight"
                   : "border-white/5 bg-black/20 text-white/30 grayscale"
