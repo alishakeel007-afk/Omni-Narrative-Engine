@@ -1,0 +1,14 @@
+sequenceDiagram
+  participant B as Browser
+  participant API as Authenticated API
+  participant DB as PostgreSQL
+  B->>B: Update local working state
+  B->>API: Save project/draft snapshot
+  API->>API: Verify authenticated ownership
+  API->>DB: Transactional write/reconciliation
+  DB-->>API: Confirm save
+  API-->>B: Project and draft identity
+  B->>API: Resume using project ID
+  API->>DB: Load owned active draft
+  DB-->>API: Saved state and media
+  API-->>B: Restore correct workflow/stage

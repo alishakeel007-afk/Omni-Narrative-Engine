@@ -16,12 +16,65 @@ export async function processAndIndexSceneMemories(
   scene: StoryScene,
   userChoice: string
 ): Promise<void> {
-  // 1. Extract atomic facts from the structured scene
-  const memories = extractAtomicMemories(scene, userChoice);
-
-  if (memories.length === 0) return;
-
+  const memories = await persistSceneMemories(draftId, sceneId, scene, userChoice);
   await indexMemories(draftId, sceneId, userId, scene.sceneNumber, memories);
+}
+
+/** Stores draft-scoped facts before optional embedding, so a failed embedding
+ * never erases continuity information. */
+export async function persistSceneMemories(
+  draftId: string,
+  sceneId: string,
+  scene: StoryScene,
+  userChoice: string
+): Promise<AtomicMemory[]> {
+  return persistAtomicMemories(draftId, sceneId, extractAtomicMemories(scene, userChoice));
+}
+
+/**
+ * Stores a selected decision against the scene that offered it. The resulting
+ * scene supplies the outcome text, but it must not own the decision fact.
+ */
+export async function persistChoiceMemory(
+  draftId: string,
+  sourceSceneId: string,
+  resultingScene: StoryScene,
+  userChoice: string
+): Promise<AtomicMemory[]> {
+  return persistAtomicMemories(
+    draftId,
+    sourceSceneId,
+    extractAtomicMemories(resultingScene, userChoice).filter((memory) => memory.type === "CHOICE")
+  );
+}
+
+async function persistAtomicMemories(
+  draftId: string,
+  sceneId: string,
+  rawMemories: AtomicMemory[]
+): Promise<AtomicMemory[]> {
+  const memories = deduplicateAtomicMemories(rawMemories);
+  for (const mem of memories) {
+    const existing = await prisma.storyMemory.findFirst({
+      where: { draftId, sceneId, memoryType: mem.type, content: mem.content },
+      select: { id: true },
+    });
+    if (!existing) await prisma.storyMemory.create({
+      data: { draftId, sceneId, memoryType: mem.type, content: mem.content,
+        importanceScore: ["CHOICE", "PLOT", "CHARACTER"].includes(mem.type) ? 3 : 1 },
+    });
+  }
+  return memories;
+}
+
+export function deduplicateAtomicMemories(memories: AtomicMemory[]): AtomicMemory[] {
+  const seen = new Set<string>();
+  return memories.filter((memory) => {
+    const key = `${memory.type}\u0000${memory.content.trim()}`;
+    if (!memory.content.trim() || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function indexMemories(
@@ -50,16 +103,21 @@ export async function indexMemories(
       continue;
     }
 
-    // 4. Save to StoryMemory (Relational table)
-    const memRecord = await prisma.storyMemory.create({
+    // 4. Reuse a previous relational fact when an earlier embedding attempt
+    // failed. This makes retries repair incomplete indexing instead of adding
+    // duplicate timeline entries.
+    const memRecord = await prisma.storyMemory.findFirst({
+      where: { draftId, sceneId, memoryType: mem.type, content: mem.content },
+      select: { id: true },
+    }) ?? await prisma.storyMemory.create({
       data: {
         draftId,
         sceneId,
         memoryType: mem.type,
         content: mem.content,
-        // Plot and Choice are typically more important for recall
-        importanceScore: ["CHOICE", "PLOT"].includes(mem.type) ? 3 : 1,
+        importanceScore: ["CHOICE", "PLOT", "CHARACTER"].includes(mem.type) ? 3 : 1,
       },
+      select: { id: true },
     });
 
     // 5. Generate embedding via Gemini
@@ -141,12 +199,33 @@ export async function retrieveRelevantMemories(
       .filter((r) => r.similarity >= minSimilarity)
       .map((r) => `[${r.memoryType}] ${r.content}`);
 
-    return relevantMemories;
+    return mergeMemoryResults(relevantMemories, await retrieveRecentNarrativeFacts(draftId, topK), topK);
   } catch (err) {
     // Graceful fallback — RAG failure must never break story generation
     console.error("[Memory] RAG retrieval failed, continuing without memories:", err);
-    return [];
+    return retrieveRecentNarrativeFacts(draftId, topK);
   }
+}
+
+/** A draft-scoped, no-AI fallback for facts waiting for an embedding retry. */
+export async function retrieveRecentNarrativeFacts(draftId: string, limit = 8): Promise<string[]> {
+  const facts = await prisma.storyMemory.findMany({
+    where: { draftId },
+    orderBy: [{ importanceScore: "desc" }, { createdAt: "desc" }],
+    take: Math.max(limit * 3, limit),
+    select: { memoryType: true, content: true },
+  });
+  return mergeMemoryResults([], facts.map((fact) => `[${fact.memoryType}] ${fact.content}`), limit);
+}
+
+export function mergeMemoryResults(primary: string[], fallback: string[], limit: number): string[] {
+  const seen = new Set<string>();
+  return [...primary, ...fallback].filter((memory) => {
+    const key = memory.trim().toLocaleLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
 }
 
 /**

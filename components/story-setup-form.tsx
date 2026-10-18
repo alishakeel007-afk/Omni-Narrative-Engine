@@ -173,7 +173,7 @@ export function StorySetupForm() {
 
 function GuidedStorySetupForm() {
   const router = useRouter();
-  const { beginStoryFromSetup, saveSetupOnly, setup, updateSetup } = useStory();
+  const { beginStoryFromSetup, generationError, saveSetupOnly, setup, updateSetup } = useStory();
   const visibleStoryModes =
     setup.mode === "custom"
       ? storyModes.filter((mode) => mode.id === "custom")
@@ -192,29 +192,44 @@ function GuidedStorySetupForm() {
   const canBeginStory = missingRequiredFields.length === 0;
 
   const [isInitializing, setIsInitializing] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
 
   const handleBeginStory = async () => {
     if (!canBeginStory || isInitializing) return;
     setIsInitializing(true);
+    setInitializationError(null);
 
-    // Attempt to create a DB project/draft for persistence.
-    // If this fails, gameplay continues without DB persistence.
+    // Create the DB project/draft before generation so a completed opening
+    // scene can always be persisted and resumed.
     const dbResult = await initializeStoryProject({
       title: setup.storyTitle,
       mode: setup.mode,
       genres: setup.genres,
       tones: setup.moods,
       numberOfScenes: setup.numberOfScenes,
+      characters: setup.characters
+        .filter((character) => character.name.trim() && character.role.trim())
+        .map((character) => ({
+          name: character.name.trim(),
+          role: character.role.trim(),
+          personalityTone: character.personalityTone || "",
+          traits: character.traits || [],
+          appearancePrompt: undefined,
+        })),
     });
 
-    if (dbResult) {
-      updateSetup({ projectId: dbResult.projectId, draftId: dbResult.draftId });
-      saveSetupOnly({ projectId: dbResult.projectId, draftId: dbResult.draftId });
+    if (!dbResult) {
+      setInitializationError("Your story project could not be saved. Check your connection, sign in again if needed, and retry before starting.");
+      setIsInitializing(false);
+      return;
     }
 
+    const persistenceLink = { projectId: dbResult.projectId, draftId: dbResult.draftId };
+    saveSetupOnly(persistenceLink);
+
+    const started = await beginStoryFromSetup(persistenceLink);
     setIsInitializing(false);
-    beginStoryFromSetup();
-    router.push("/story/play");
+    if (started) router.push("/story/play");
   };
 
   const handleOpenDashboard = () => {
@@ -633,14 +648,26 @@ function GuidedStorySetupForm() {
           </div>
         )}
 
+        {initializationError ? (
+          <div role="alert" className="mt-4 rounded-[1rem] border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm leading-7 text-red-100">
+            {initializationError}
+          </div>
+        ) : null}
+
+        {generationError ? (
+          <div role="alert" className="mt-4 rounded-[1rem] border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm leading-7 text-red-100">
+            {generationError}
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-col gap-4 sm:flex-row">
           <button
             type="button"
             onClick={handleBeginStory}
-            disabled={!canBeginStory}
+            disabled={!canBeginStory || isInitializing}
             className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-7 py-4 text-center text-sm font-bold text-slate-950 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:grayscale"
           >
-            Begin Active Story
+            {isInitializing ? "Preparing Story..." : "Begin Active Story"}
           </button>
           <button
             type="button"
@@ -667,9 +694,10 @@ function GuidedStorySetupForm() {
             </div>
             <button
               onClick={handleBeginStory}
+              disabled={isInitializing}
               className="rounded-full bg-starlight px-6 py-2 text-xs font-black uppercase tracking-tighter text-slate-950 transition hover:scale-105 active:scale-95"
             >
-              Start Story
+              {isInitializing ? "Preparing..." : "Start Story"}
             </button>
           </div>
         </div>

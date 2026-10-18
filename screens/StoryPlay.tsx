@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BrainCircuit, Clapperboard, Gauge, History, ScrollText, UserRound } from "lucide-react";
+import { NotebookPen, Clapperboard, Gauge, History, ScrollText, UserRound } from "lucide-react";
 import ExportModal from "@/components/ExportModal";
 import { ChoiceCard } from "@/components/choice-card";
 import { CustomChoiceInput } from "@/components/custom-choice-input";
 import { LoadingSceneGenerator } from "@/components/loading-scene-generator";
 import { StorySceneCard } from "@/components/story-scene-card";
+import { ProtectedRoute } from "@/components/protected-route";
 import ScreenLayout from "@/screens/ScreenLayout";
 import { useStory } from "@/context/StoryContext";
 import { buildPrimaryCharacterProfile } from "@/lib/story-engine";
@@ -27,7 +28,7 @@ const attributeLabels: Array<[
 
 const workflowLinks = [
   { href: "/story/overview", icon: Clapperboard, label: "Overview" },
-  { href: "/story/memory", icon: BrainCircuit, label: "Memory" },
+  { href: "/story/memory", icon: NotebookPen, label: "Memory" },
   { href: "/story/history", icon: History, label: "History" },
   { href: "/story/state", icon: Gauge, label: "State" }
 ] as const;
@@ -40,7 +41,10 @@ export default function StoryPlay() {
     generateAlternativeOptions,
     selectSuggestedChoice,
     selectCustomChoice,
-    setCustomChoiceInput
+    setCustomChoiceInput,
+    updateCurrentSceneMedia,
+    generationError,
+    pendingSaveCount
   } = useStory();
 
   const scene = state.currentScene;
@@ -54,7 +58,7 @@ export default function StoryPlay() {
   const isCustomMode = setup.mode === "custom";
 
   return (
-    <ScreenLayout
+    <ProtectedRoute><ScreenLayout
       eyebrow="Active Story Loop"
       title={setup.storyTitle}
       description={
@@ -64,6 +68,14 @@ export default function StoryPlay() {
       }
       maxWidth="max-w-7xl"
     >
+      <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-starlight/70">Selected project</p>
+          <p className="mt-1 text-sm font-semibold text-white">{state.projectTitle || setup.storyTitle}{state.draftVersion ? ` · Draft ${state.draftVersion}` : ""}</p>
+        </div>
+        <p className="text-xs text-white/60">{pendingSaveCount() > 0 ? "Saving changes…" : state.recoverySource === "database" ? "Loaded from saved database project" : state.recoverySource === "offline-cache" ? "Restored from browser/offline cache" : "Unsaved local state"}</p>
+      </section>
+      {state.recoveryError ? <div role="alert" className="mb-5 rounded-[1rem] border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{state.recoveryError} <Link href="/dashboard" className="font-semibold underline">Return to Dashboard</Link></div> : null}
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
         <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
           <section className="glass-panel rounded-[1.5rem] p-5">
@@ -94,10 +106,24 @@ export default function StoryPlay() {
               </div>
             </div>
             <div className="mt-4 space-y-3">
-              {setup.characters.map((character, index) => (
+              {(state.dynamicCast?.length > 0 ? state.dynamicCast : setup.characters).map((character, index) => (
                 <div key={`${character.name}-${index}`} className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
-                  <p className="text-sm font-semibold text-white">{character.name || "Unnamed"}</p>
-                  <p className="mt-1 text-xs text-starlight">{character.role || "No role"}</p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{character.name || "Unnamed"}</p>
+                      <p className="mt-1 text-xs text-starlight">{character.role || "No role"}</p>
+                    </div>
+                    {("emotionalState" in character) && character.emotionalState && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/90">
+                        {character.emotionalState}
+                      </span>
+                    )}
+                  </div>
+                  {("visualAppearance" in character) && character.visualAppearance && (
+                    <p className="mt-2 text-xs italic text-white/60">
+                      {character.visualAppearance}
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {character.traits.map((trait) => (
                       <span key={`${character.name}-${trait}`} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
@@ -147,8 +173,29 @@ export default function StoryPlay() {
             mood={scene.mood}
             location={scene.location}
             imageLabel={state.generatedMedia?.imageLabel}
-            emotionDirectives={scene.emotionDirectives}
+            imagePrompt={state.generatedMedia?.imagePrompt}
+            narrationLabel={state.generatedMedia?.narrationLabel}
+            narrationDuration={state.generatedMedia?.narrationDuration}
+            audioMoodPrompt={state.generatedMedia?.audioMoodPrompt}
+            backgroundMusicMood={state.generatedMedia?.backgroundMusicMood}
+            sceneNumber={scene.sceneNumber}
+            draftId={setup.draftId}
+            projectId={setup.projectId}
+            characterNames={(state.dynamicCast?.length > 0 ? state.dynamicCast : setup.characters).map((c) => c.name).filter(Boolean)}
+            characterAppearances={(state.dynamicCast ?? [])
+              .map((c) => ("visualAppearance" in c ? c.visualAppearance : ""))
+              .filter((v): v is string => Boolean(v))}
+            existingImageUrl={state.generatedMedia?.imageUrl}
+            existingNarrationUrl={state.generatedMedia?.narrationAudioUrl}
+            existingMusicUrl={state.generatedMedia?.musicUrl}
+            onMediaUpdate={updateCurrentSceneMedia}
           />
+
+          {generationError ? (
+            <div role="alert" className="rounded-[1rem] border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100">
+              {generationError} Your current scene and saved progress are unchanged; correct the issue and try again.
+            </div>
+          ) : null}
 
           {isCustomMode ? (
             <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6">
@@ -283,6 +330,16 @@ export default function StoryPlay() {
                       {character.emotionalState}
                     </span>
                   </div>
+                  {("relationships" in character) && Array.isArray(character.relationships) && character.relationships.length > 0 && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <p className="text-[10px] uppercase tracking-wider text-starlight/75 mb-1">Dynamics</p>
+                      <ul className="space-y-1">
+                        {character.relationships.map((rel, idx) => (
+                          <li key={idx} className="text-xs text-white/70 before:content-['-'] before:mr-1 before:text-white/30">{rel}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -318,7 +375,7 @@ export default function StoryPlay() {
       </div>
 
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
-    </ScreenLayout>
+    </ScreenLayout></ProtectedRoute>
   );
 }
 

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEnvValue } from "@/lib/env";
-import type { StorySetupData, MemoryItem, StoryScene, PlayerPerformance } from "@/types/story";
-import { validateAndFixSceneCoherence } from "@/lib/coherence/validator";
-import { detectSceneEmotion } from "@/lib/emotion-engine";
-import { getDifficultyModifier } from "@/lib/difficulty-engine";
-import { retrieveRelevantMemories } from "@/lib/memory/rag-engine";
-import { getEmbedding } from "@/lib/memory/embeddings";
+import { retrieveRelevantMemories, buildMemoryContextBlock } from "@/lib/memory/memory-service";
+import { getCharacterContextBlock, upsertCharacterState } from "@/lib/story-database";
+import { buildPrompt } from "@/lib/story-prompt";
+import { prisma } from "@/lib/prisma";
+import { normalizeGeneratedScene } from "@/lib/story-scene";
+import { fetchGeminiWithRetry, toGeminiRequestError } from "@/lib/gemini-retry";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -21,111 +21,6 @@ function getGeminiKey() {
 
 function getGroqFallbackKey() {
   return getEnvValue(["GROQ_FALLBACK_API", "GROQ_API_KEY"]);
-}
-
-function buildPrompt(params: {
-  setup: StorySetupData;
-  choice: string;
-  memoryTimeline: MemoryItem[];
-  currentScene: StoryScene | null;
-  sceneNumber: number;
-  difficultyModifier?: string | null;
-  relevantMemories?: MemoryItem[];
-}) {
-  const { setup, choice, memoryTimeline, currentScene, sceneNumber, difficultyModifier, relevantMemories } = params;
-  
-  const charList = setup.characters
-    .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Traits: ${c.traits.join(", ")}, Affinity: ${c.relationshipScore ?? 50}, Status: ${c.statusState ?? "Normal"})`)
-    .join("\n");
-
-  const recentMemories = memoryTimeline.slice(-3).map((m) => `Scene ${m.sceneNumber} (${m.choiceType}): ${m.result}`).join("\n");
-  const semanticMemories = (relevantMemories || [])
-    .map((m) => `Semantically Relevant Memory (Scene ${m.sceneNumber}): Choice was "${m.userChoice}" -> consequence was "${m.result}".`)
-    .join("\n");
-
-  const memoryContext = `
-[RELEVANT MEMORIES (RAG)]
-${semanticMemories || "No previous semantic matches."}
-
-[RECENT TIMELINE]
-${recentMemories || "Beginning of the adventure."}`;
-
-  const currentSceneContext = currentScene 
-    ? `The story was just at: ${currentScene.location}. Mood was: ${currentScene.mood}. \nLast scene text: ${currentScene.text}`
-    : `Scenario: ${setup.scenarioDescription}`;
-
-  return `You are the Omni-Narrative Engine, a cinematic story director.
-
-Story Title: "${setup.storyTitle}"
-Genres: ${setup.genres.join(", ")}
-Tones/Moods: ${setup.moods.join(", ")}
-Difficulty: ${setup.difficulty}
-
-Characters:
-${charList}
-(Main character is ${setup.characterName})
-
-${memoryContext}
-
-${currentSceneContext}
-
-The user has made the following choice to continue the story:
-"${choice}"
-
-${difficultyModifier ? `\n${difficultyModifier}\n` : ""}
-Generate the next scene (Scene ${sceneNumber}). It must logically follow the previous events, respect the user's choice, and maintain narrative coherence.
-Keep character personalities consistent.
-If the choice involves risk or danger, reflect that in the text and mood.
-You MUST explicitly evaluate if the user's choice succeeded or failed based on their character's stats and the scenario.
-
-Return ONLY a JSON object. No markdown, no extra text.
-Use this exact shape:
-{
-  "choiceOutcome": "Success" | "Failure" | "Neutral",
-  "title": "A compelling title for the scene",
-  "chapter": "Current chapter name",
-  "location": "Specific location of this scene",
-  "mood": "Dominant emotion or atmosphere",
-  "text": "The narrative text of the scene (1-2 paragraphs). Must incorporate the consequences of the user's choice.",
-  "options": [
-    "A suggested action for the user to take next",
-    "Another distinct suggested action",
-    "A third suggested action"
-  ],
-  "cast": [
-    {
-      "name": "Character Name",
-      "role": "Role",
-      "emotionalState": "Current emotional state",
-      "visualAppearance": "Brief visual description",
-      "traits": ["Trait1", "Trait2"],
-      "relationships": ["Relationship detail"],
-      "imageLabel": "Short label for character image"
-    }
-  ],
-  "media": {
-    "audioMoodPrompt": "Prompt for background music generation",
-    "backgroundMusicMood": "Short mood description for music",
-    "imageLabel": "Short caption for the scene image",
-    "imagePrompt": "Detailed cinematic prompt for generating a scene illustration",
-    "narrationDuration": "Estimated seconds, e.g., '30s'",
-    "narrationLabel": "Short voice direction",
-    "playerState": "ready"
-  },
-  "characterUpdates": [
-    {
-      "name": "Character Name",
-      "affinityChange": 5, // positive/negative integer to alter the affinity score
-      "statusUpdate": "Describe any relationship or state shift, e.g., 'Injured' or 'Grateful'"
-    }
-  ]
-}
-
-Important Constraints:
-- options MUST be an array of exactly 3 strings representing distinct, actionable choices for the player.
-- cast MUST include the characters present in this scene.
-- DO NOT use markdown code blocks (like \`\`\`json). Return raw JSON.
-`;
 }
 
 function extractGeminiText(payload: unknown) {
@@ -160,9 +55,8 @@ function parseSceneJson(rawText: string) {
 
 async function requestGeminiScene(params: { apiKey: string; prompt: string }) {
   const model = getEnvValue(["GEMINI_MODEL"]) || DEFAULT_GEMINI_MODEL;
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
-    {
+  const response = await fetchGeminiWithRetry({
+    request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -172,12 +66,12 @@ async function requestGeminiScene(params: { apiKey: string; prompt: string }) {
         contents: [{ role: "user", parts: [{ text: params.prompt }] }],
         generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
       }),
-    }
-  );
+      signal,
+    })
+  });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 300)}`);
+    throw await toGeminiRequestError(response, "story generation");
   }
 
   const payload = await response.json();
@@ -229,17 +123,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { setup, choice, memoryTimeline, currentScene, sceneNumber, playerPerformance } = body as {
-      setup: StorySetupData;
-      choice: string;
-      memoryTimeline: MemoryItem[];
-      currentScene: any;
-      sceneNumber: number;
-      playerPerformance?: PlayerPerformance;
-    };
+    const { setup, choice, memoryTimeline, currentScene, playerState, recentSceneHistory, sceneNumber, draftId } = body;
 
     if (!setup || !choice) {
       return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
+    }
+    if (draftId && setup.draftId && setup.draftId !== draftId) {
+      return NextResponse.json({ error: "Story setup does not match the requested draft." }, { status: 400 });
     }
 
     const geminiApiKey = getGeminiKey();
@@ -252,21 +142,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const difficultyModifier = playerPerformance
-      ? getDifficultyModifier(setup.difficulty, playerPerformance.consecutiveSuccesses, playerPerformance.consecutiveFailures)
-      : null;
-
-    // Perform RAG retrieval over memoryTimeline based on player choice
-    const relevantMemories = await retrieveRelevantMemories(choice, memoryTimeline || [], 3);
+    const normalizedSceneNumber = Number.isInteger(sceneNumber) && sceneNumber > 0 ? sceneNumber : 1;
+    let memoryContextBlock = "";
+    let characterContextBlock = "";
+    if (draftId) {
+      const ownedDraft = await prisma.storyDraft.findFirst({
+        where: { id: draftId, project: { userId: session.userId } },
+        select: { id: true }
+      });
+      if (!ownedDraft) return NextResponse.json({ error: "Story draft not found or access denied." }, { status: 404 });
+      const queryText = `Current context: ${currentScene?.location || ''} ${currentScene?.mood || ''}. Choice: ${choice}`;
+      const memories = await retrieveRelevantMemories(draftId, queryText, 8);
+      memoryContextBlock = buildMemoryContextBlock(memories);
+      characterContextBlock = await getCharacterContextBlock(draftId);
+    }
 
     const prompt = buildPrompt({
       setup,
       choice,
       memoryTimeline: memoryTimeline || [],
       currentScene: currentScene || null,
-      sceneNumber: sceneNumber || 1,
-      difficultyModifier,
-      relevantMemories,
+      playerState: playerState && typeof playerState === "object" ? playerState : undefined,
+      recentSceneHistory: Array.isArray(recentSceneHistory) ? recentSceneHistory : [],
+      sceneNumber: normalizedSceneNumber,
+      memoryContextBlock,
+      characterContextBlock,
     });
 
     let sceneData;
@@ -274,7 +174,7 @@ export async function POST(request: Request) {
 
     if (geminiApiKey) {
       try {
-        sceneData = await requestGeminiScene({ apiKey: geminiApiKey, prompt });
+        sceneData = normalizeGeneratedScene(await requestGeminiScene({ apiKey: geminiApiKey, prompt }), normalizedSceneNumber);
         provider = "Gemini";
       } catch (geminiError) {
         if (!groqApiKey) {
@@ -282,7 +182,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: message }, { status: 500 });
         }
         try {
-          sceneData = await requestGroqScene({ apiKey: groqApiKey, prompt });
+          sceneData = normalizeGeneratedScene(await requestGroqScene({ apiKey: groqApiKey, prompt }), normalizedSceneNumber);
           provider = "Groq fallback";
         } catch (groqError) {
           const geminiMessage = geminiError instanceof Error ? geminiError.message : "Gemini generation failed.";
@@ -294,27 +194,21 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      sceneData = await requestGroqScene({ apiKey: groqApiKey, prompt });
+      sceneData = normalizeGeneratedScene(await requestGroqScene({ apiKey: groqApiKey, prompt }), normalizedSceneNumber);
       provider = "Groq fallback";
     }
 
-    // Ensure sceneNumber is injected back
-    sceneData.sceneNumber = sceneNumber || 1;
-
-    // Validate coherence, detect emotion, and generate embedding in parallel for speed
-    const memoryText = `Choice: ${choice} -> Consequence: ${sceneData.text}`;
-    const [validatedScene, emotionDirectives, memoryEmbedding] = await Promise.all([
-      validateAndFixSceneCoherence(sceneData, memoryTimeline || []),
-      detectSceneEmotion(sceneData.text, choice),
-      getEmbedding(memoryText)
-    ]);
-
-    sceneData = validatedScene;
-    if (emotionDirectives) {
-      sceneData.emotionDirectives = emotionDirectives;
-    }
-    if (memoryEmbedding && memoryEmbedding.length > 0) {
-      sceneData.embedding = memoryEmbedding;
+    // Auto-sync characters if draftId is present
+    if (draftId && Array.isArray(sceneData.cast)) {
+      await Promise.allSettled(
+        sceneData.cast.map((char: any) =>
+          upsertCharacterState(draftId, char.name, {
+            emotionalState: char.emotionalState,
+            visualAppearance: char.visualAppearance,
+            sceneNumber: sceneData.sceneNumber,
+          })
+        )
+      );
     }
 
     return NextResponse.json({ scene: sceneData, provider });

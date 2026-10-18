@@ -3,13 +3,13 @@ export type StoryMode = "guided" | "custom";
 export type ChoiceType = "AI Suggested" | "Custom";
 
 export type StorySetupCharacter = {
+  relationshipScore?: number;
+  statusState?: string;
   name: string;
   personalityTone: string;
   role: string;
   traits: string[];
   voiceStyle: string;
-  relationshipScore?: number;
-  statusState?: string;
 };
 
 export type StorySetupData = {
@@ -33,11 +33,15 @@ export type StorySetupData = {
   mood: string;
   moods: string[];
   numberOfScenes: number;
+  ownerId?: string;
   scenarioDescription: string;
   scenarioTitle: string;
   selectedTemplate: string;
   startingIdea: string;
   storyTitle: string;
+  // Phase 7: DB project/draft linkage
+  projectId?: string;
+  draftId?: string;
 };
 
 export type HealthStatus = {
@@ -46,7 +50,17 @@ export type HealthStatus = {
   resolve: number;
 };
 
+export type InventoryUpdate = {
+  action: "add" | "remove";
+  item: string;
+  reason?: string;
+} | null;
+
 export type StoryCharacter = {
+  relationshipScore?: number;
+  statusState?: string;
+  /** Stable database identity when this character was restored from a saved draft. */
+  id?: string;
   emotionalState: string;
   imageLabel: string;
   name: string;
@@ -54,9 +68,19 @@ export type StoryCharacter = {
   role: string;
   traits: string[];
   visualAppearance: string;
-  relationshipScore?: number;
-  statusState?: string;
+  /** Provider-neutral persisted voice selection; not interpreted by Interactive Story. */
+  voiceStyle?: string;
 };
+
+/** A safe, displayable subset of an ownership-checked StoryMemory record. */
+export type PersistedMemoryFact = {
+  id: string;
+  memoryType: string;
+  content: string;
+  importanceScore: number;
+};
+
+export type StoryRecoverySource = "database" | "offline-cache" | "local" | "none";
 
 export type GeneratedMedia = {
   audioMoodPrompt: string;
@@ -66,6 +90,9 @@ export type GeneratedMedia = {
   narrationDuration: string;
   narrationLabel: string;
   playerState: "ready" | "generating";
+  imageUrl?: string;
+  narrationAudioUrl?: string;
+  musicUrl?: string;
 };
 
 export interface EmotionDirectives {
@@ -76,10 +103,14 @@ export interface EmotionDirectives {
   voiceStyle: string;
 }
 
+export type PlayerPerformance = { consecutiveSuccesses: number; consecutiveFailures: number };
+export type CharacterUpdate = { name: string; affinityChange: number; statusUpdate: string };
+
 export type StoryScene = {
   choiceOutcome?: "Success" | "Failure" | "Neutral";
   emotionDirectives?: EmotionDirectives;
   embedding?: number[];
+  characterUpdates?: CharacterUpdate[];
   cast: StoryCharacter[];
   chapter: string;
   location: string;
@@ -89,16 +120,12 @@ export type StoryScene = {
   sceneNumber: number;
   text: string;
   title: string;
-  characterUpdates?: CharacterUpdate[];
-};
-
-export type CharacterUpdate = {
-  name: string;
-  affinityChange: number;
-  statusUpdate: string;
+  resultSummary?: string;
+  inventoryUpdate?: InventoryUpdate;
 };
 
 export type MemoryItem = {
+  embedding?: number[];
   choiceType: ChoiceType;
   location: string;
   mood: string;
@@ -107,16 +134,10 @@ export type MemoryItem = {
   timestamp: string;
   update: string;
   userChoice: string;
-  embedding?: number[];
-};
-
-export type PlayerPerformance = {
-  consecutiveSuccesses: number;
-  consecutiveFailures: number;
 };
 
 export type PersistedStoryState = {
-  playerPerformance: PlayerPerformance;
+  playerPerformance?: PlayerPerformance;
   currentScene: StoryScene;
   currentSceneIndex: number;
   customChoiceInput: string;
@@ -130,19 +151,13 @@ export type PersistedStoryState = {
   selectedChoice: string;
   selectedChoiceType: ChoiceType | null;
   setup: StorySetupData;
+  dynamicCast: StoryCharacter[];
+  /** Facts saved for this draft. These are distinct from the recent choice timeline. */
+  persistedMemories: PersistedMemoryFact[];
+  recoverySource: StoryRecoverySource;
+  recoveryError?: string;
+  draftVersion?: number;
+  projectTitle?: string;
 };
 
-export type DummySceneTemplate = {
-  chapter: string;
-  inventoryHint?: string;
-  location: string;
-  media: Omit<GeneratedMedia, "imageLabel" | "imagePrompt" | "audioMoodPrompt"> & {
-    baseAudioMoodPrompt: string;
-    baseImagePrompt: string;
-  };
-  mood: string;
-  optionSeeds: string[];
-  sceneNumber: number;
-  text: string;
-  title: string;
-};
+

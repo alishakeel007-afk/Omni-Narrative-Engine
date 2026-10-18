@@ -30,6 +30,8 @@ export function createId(prefix: string) {
 
 export function createDefaultDraft(): CreateStoryDraft {
   return {
+    clientImportId: createId("custom-import"),
+    language: "en",
     audio: {
       backgroundMusicMessage: "Background music has not been generated yet.",
       backgroundMusicStatus: "idle",
@@ -70,7 +72,12 @@ export function createDialoguesForCharacters(
         characterName: character?.name || dialogue.characterName || "Unnamed Character",
         id: dialogue.id || createId(`dialogue-${index + 1}`),
         text: dialogue.text ?? "",
-        voiceStyle: dialogue.voiceStyle || character?.voiceStyle || "Voice style placeholder"
+        voiceStyle: dialogue.voiceStyle || character?.voiceStyle || "Voice style placeholder",
+        // Keep durable media and its provenance together through local/database
+        // hydration; callers decide freshness from the fingerprint.
+        audioUrl: dialogue.audioUrl,
+        audioFingerprint: dialogue.audioFingerprint,
+        audioOutdated: dialogue.audioOutdated,
       };
     });
 
@@ -85,26 +92,6 @@ export function createDialoguesForCharacters(
     }));
 
   return [...normalizedExisting, ...missingCharacterDialogues];
-}
-
-export function createSceneSuggestions(params: {
-  characters: CreateStoryCharacter[];
-  genres: string[];
-  sceneNumber: number;
-  storyTitle: string;
-  tones: string[];
-}) {
-  const lead = params.characters[0]?.name || "the lead character";
-  const support = params.characters[1]?.name || "their closest ally";
-  const genre = params.genres.join(" and ") || "cinematic";
-  const tone = params.tones.join(" and ") || "emotional";
-  const title = params.storyTitle || "the story";
-
-  return [
-    `${lead} discovers a hidden clue that changes the direction of ${title}, pushing the scene into a ${tone.toLowerCase()} ${genre.toLowerCase()} turn.`,
-    `${support} challenges ${lead}'s plan, forcing the characters to reveal what they are afraid to lose before the scene ends.`,
-    `A new obstacle appears at the worst moment, making the characters choose between safety, truth, and the next step of the journey.`
-  ];
 }
 
 export function createEmptyScene(params: {
@@ -123,7 +110,9 @@ export function createEmptyScene(params: {
     sceneTone: params.tones[0] || "Dramatic",
     selectedSuggestion: "",
     storyDescription: "",
-    suggestions: createSceneSuggestions(params),
+    // Scene suggestions are intentionally empty until the author asks the AI
+    // for help. Manual writing remains the default Custom Mode experience.
+    suggestions: [],
     title: `Scene ${params.sceneNumber}`
   };
 }
@@ -175,21 +164,22 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
             sceneTone: scene.sceneTone || tones[0] || "Dramatic",
             selectedSuggestion: scene.selectedSuggestion || "",
             storyDescription: scene.storyDescription || "",
-            suggestions:
-              suggestions.length === 3
-                ? suggestions
-                : createSceneSuggestions({
-                    characters,
-                    genres,
-                    sceneNumber: index + 1,
-                    storyTitle,
-                    tones
-                  }),
+            // Preserve previously requested suggestions, but do not create new
+            // AI-like suggestions while restoring a browser-local draft.
+            suggestions,
             title: scene.title || `Scene ${index + 1}`,
             generatedImageUrl: scene.generatedImageUrl,
             generatedImagePrompt: scene.generatedImagePrompt,
             generatedImageStatus: scene.generatedImageStatus,
-            generatedImageError: scene.generatedImageError
+            generatedImageError: scene.generatedImageError,
+            narrationAudioUrl: scene.narrationAudioUrl,
+            narrationAudioFingerprint: scene.narrationAudioFingerprint,
+            narrationAudioStoragePath: scene.narrationAudioStoragePath,
+            narrationAudioOutdated: scene.narrationAudioOutdated,
+            backgroundMusicUrl: scene.backgroundMusicUrl,
+            backgroundMusicStatus: scene.backgroundMusicStatus,
+            backgroundMusicProvider: scene.backgroundMusicProvider,
+            backgroundMusicPrompt: scene.backgroundMusicPrompt
           };
         })
       : [];
@@ -206,8 +196,12 @@ export function normalizeCreateStoryDraft(value: Partial<CreateStoryDraft> | nul
       ...value?.visuals
     },
     characters,
+    clientImportId: typeof value?.clientImportId === "string" && value.clientImportId.trim()
+      ? value.clientImportId
+      : fallback.clientImportId,
     genres,
     numberOfScenes,
+    language: value?.language === "ur" ? "ur" as const : "en" as const,
     scenes,
     selectedMode: "create-your-own" as const,
     storyTitle,

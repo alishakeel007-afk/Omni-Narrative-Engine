@@ -43,7 +43,7 @@ export function HeroSection() {
           <span>
             A world waiting to be written
             <br />
-            <small>Original AI-generated film</small>
+            <small>Original cinematic preview</small>
           </span>
         </div>
         <div className="public-hero-motion">

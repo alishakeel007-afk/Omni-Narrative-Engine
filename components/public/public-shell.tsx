@@ -164,7 +164,7 @@ export function PublicAccountShell({
               </div>
             </div>
             <div className="public-account-film-label">
-              <span>Original AI-generated scene</span>
+              <span>Original cinematic scene</span>
               <MotionToggle compact />
             </div>
           </aside>

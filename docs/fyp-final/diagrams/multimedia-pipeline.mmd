@@ -1,0 +1,15 @@
+flowchart TD
+  S[Owned scene or explicit transient request] --> V{Media type}
+  V --> T[Voice: validate language/script/target]
+  T --> DG[Deepgram English]
+  T --> EL[ElevenLabs Urdu]
+  V --> I[Image: bounded prompt and owned target]
+  I --> IP[Configured image provider]
+  V --> M[Music: policy or intentional silence]
+  M --> Score[Local CC0 sample score]
+  DG --> Storage[Authenticated Storage upload]
+  EL --> Storage
+  IP --> Storage
+  Score --> Storage
+  Storage --> Assoc[Persist scene association]
+  Assoc --> Preview[Synchronized preview]

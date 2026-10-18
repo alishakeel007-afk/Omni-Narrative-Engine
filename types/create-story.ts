@@ -10,6 +10,12 @@ export type CreateStoryCharacter = {
 
 export type CreateStoryDialogue = {
   audioUrl?: string;
+  /** Fingerprint of the exact text/voice configuration that produced audioUrl. */
+  audioFingerprint?: string;
+  /** Stored object identity for persistent clips; absent legacy URLs are unverified. */
+  audioStoragePath?: string;
+  /** Retained legacy/generated audio is never discarded automatically. */
+  audioOutdated?: boolean;
   characterId: string;
   characterName: string;
   id: string;
@@ -32,6 +38,16 @@ export type CreateStoryScene = {
   generatedImagePrompt?: string;
   generatedImageStatus?: CreateStoryGenerationStatus;
   generatedImageError?: string;
+  visualDirection?: import("@/lib/image/scene-visual-context").SceneVisualDirection;
+  /** Existing Custom Mode narration clip; retained when saved account-side. */
+  narrationAudioUrl?: string;
+  narrationAudioFingerprint?: string;
+  narrationAudioStoragePath?: string;
+  narrationAudioOutdated?: boolean;
+  backgroundMusicUrl?: string;
+  backgroundMusicStatus?: CreateStoryGenerationStatus | "silent";
+  backgroundMusicProvider?: string;
+  backgroundMusicPrompt?: string;
 };
 
 export type CreateStoryAudioState = {
@@ -53,6 +69,13 @@ export type CreateStoryVideoState = {
 };
 
 export type CreateStoryDraft = {
+  /** Stable account project identity once this browser-local draft is imported. */
+  projectId?: string;
+  /** Active server draft identity once this browser-local draft is imported. */
+  draftId?: string;
+  /** Client-generated import key makes Save to My Projects idempotent. */
+  clientImportId: string;
+  language: "en" | "ur";
   audio: CreateStoryAudioState;
   visuals: CreateStoryVisualsState;
   characters: CreateStoryCharacter[];

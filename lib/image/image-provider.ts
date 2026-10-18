@@ -1,15 +1,26 @@
 // ============================================================
 // lib/image/image-provider.ts
 // Provider abstraction for AI Image Generation.
-// Supports Cloudflare Workers AI with fallback to Pollinations AI.
+// Cloudflare Workers AI is primary. Pollinations is an explicit opt-in fallback.
 // ============================================================
 
 import type { ImageGenerationRequest, GeneratedImage } from "./types";
-import { buildImagePrompt, buildImageSeed } from "./image-prompt";
+import { buildImageNegativePrompt, buildImagePrompt, buildImageSeed } from "./image-prompt";
 
 export interface ImageProvider {
   readonly name: string;
   generateImage(request: ImageGenerationRequest): Promise<GeneratedImage>;
+}
+
+export function isPollinationsFallbackEnabled(environment?: { IMAGE_FALLBACK_PROVIDER?: string; ENABLE_POLLINATIONS_FALLBACK?: string }): boolean {
+  const provider = environment?.IMAGE_FALLBACK_PROVIDER ?? process.env.IMAGE_FALLBACK_PROVIDER;
+  const enabled = environment?.ENABLE_POLLINATIONS_FALLBACK ?? process.env.ENABLE_POLLINATIONS_FALLBACK;
+  return provider?.toLowerCase() === "pollinations" && enabled === "true";
+}
+
+export function providerFailureMessage(provider: string, status: number, body: string): string {
+  const detail = body.replace(/[\r\n\t]+/g, " ").replace(/https?:\/\/\S+/g, "").trim().slice(0, 180);
+  return `${provider} failed (${status})${detail ? `: ${detail}` : ""}`;
 }
 
 /**
@@ -38,12 +49,24 @@ export class CloudflareImageProvider implements ImageProvider {
         Authorization: `Bearer ${this.apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, seed: buildImageSeed(request) }),
+      body: JSON.stringify({
+        prompt,
+        // SDXL Lightning documents both negative_prompt and guidance. These
+        // reinforce authored setting/cast constraints without inventing an
+        // unsupported reference-image workflow.
+        negative_prompt: buildImageNegativePrompt(request),
+        guidance: 8,
+        seed: buildImageSeed(request),
+        // A landscape frame better fits the existing scene-media UI. These
+        // values are within SDXL Lightning's documented limits.
+        width: request.width ?? 1024,
+        height: request.height ?? 576,
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Cloudflare AI error (${response.status}): ${errText.slice(0, 200)}`);
+      throw new Error(providerFailureMessage("Cloudflare Workers AI", response.status, errText));
     }
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
@@ -79,7 +102,7 @@ export class CloudflareImageProvider implements ImageProvider {
 }
 
 /**
- * Pollinations AI Provider (Reliable zero-config fallback)
+ * Pollinations AI Provider (explicitly enabled fallback only)
  */
 export class PollinationsImageProvider implements ImageProvider {
   readonly name = "Pollinations AI (Flux/SDXL)";
@@ -138,6 +161,5 @@ export function resolveImageProvider(): ImageProvider {
     return new CloudflareImageProvider(accountId, apiToken);
   }
 
-  // Fallback to zero-config Pollinations AI
-  return new PollinationsImageProvider();
+  throw new Error("Cloudflare Workers AI is not configured. Configure its account ID and API token before generating images.");
 }

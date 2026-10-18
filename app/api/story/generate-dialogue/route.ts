@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchGeminiWithRetry, toGeminiRequestError } from "@/lib/gemini-retry";
+import { prisma } from "@/lib/prisma";
+import { getCharacterContextBlock } from "@/lib/story-database";
+import { retrieveRecentNarrativeFacts, buildMemoryContextBlock } from "@/lib/memory/memory-service";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -34,6 +38,8 @@ function buildDialoguePrompt(params: {
   sceneNumber: number;
   storyTitle: string;
   tones: string[];
+  establishedCharacterContext?: string;
+  memoryContext?: string;
 }) {
   const charList = params.characters
     .map((c) => `- ${c.name} (Role: ${c.role}, Personality: ${c.personalityTone}, Voice: ${c.voiceStyle})`)
@@ -64,6 +70,9 @@ ${charList}
 Previous scenes context:
 ${prevContext}
 
+${params.establishedCharacterContext || ""}
+${params.memoryContext || ""}
+
 Current scene ${params.sceneNumber} description:
 ${params.sceneDescription}
 
@@ -75,6 +84,10 @@ CRITICAL COHERENCE CONSTRAINTS:
 Write ${params.linesPerCharacter} dialogue line${params.linesPerCharacter === 1 ? "" : "s"} for EACH character, relevant to this scene. Each line should:
 - Match the character's personality and role
 - Be consistent with previous scenes and dialogues
+- Only refer to information the speaker could reasonably know from the previous scenes or current scene description. Do not silently alter established relationships, motives, identities, or world rules.
+- Let relationship changes occur through a specific spoken or witnessed event in this scene; do not claim reconciliation, betrayal, or romance without support in the provided context.
+- Write complete, natural spoken sentences with a clear referent. Never use malformed self-directed phrasing such as "I forgive me."
+- Do not make a character announce a decision that the current scene immediately contradicts. If a character reverses course, make the reason visible in the scene context and in the line itself.
 - Be suitable for text-to-speech (no stage directions in the text)
 - Be under 200 characters
 - Feel natural and cinematic
@@ -155,9 +168,8 @@ async function requestGeminiDialogue(params: {
   prompt: string;
 }) {
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
-    {
+  const response = await fetchGeminiWithRetry({
+    request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,12 +179,12 @@ async function requestGeminiDialogue(params: {
         contents: [{ role: "user", parts: [{ text: params.prompt }] }],
         generationConfig: { temperature: 0.85, responseMimeType: "application/json" },
       }),
-    }
-  );
+      signal,
+    })
+  });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 300)}`);
+    throw await toGeminiRequestError(response, "dialogue generation");
   }
 
   const payload = await response.json() as unknown;
@@ -236,7 +248,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { storyTitle, genres, tones, characters, sceneDescription, sceneNumber, previousScenes } = body;
+    const { storyTitle, genres, tones, characters, sceneDescription, sceneNumber, previousScenes, draftId } = body;
     const linesPerCharacter = Math.max(1, Math.min(5, Number(body.linesPerCharacter) || 1));
 
     if (!characters || !Array.isArray(characters) || characters.length === 0) {
@@ -248,6 +260,18 @@ export async function POST(request: Request) {
         { error: "Scene description is required before generating dialogue." },
         { status: 400 }
       );
+    }
+
+    let establishedCharacterContext = "";
+    let memoryContext = "";
+    if (draftId) {
+      const ownedDraft = await prisma.storyDraft.findFirst({
+        where: { id: String(draftId), project: { userId: session.userId } }, select: { id: true },
+      });
+      if (!ownedDraft) return NextResponse.json({ error: "Story draft not found or access denied." }, { status: 404 });
+      establishedCharacterContext = await getCharacterContextBlock(ownedDraft.id);
+      // This reads persisted facts only; dialogue generation does not trigger an embedding request.
+      memoryContext = buildMemoryContextBlock(await retrieveRecentNarrativeFacts(ownedDraft.id, 8));
     }
 
     const geminiApiKey = getGeminiKey();
@@ -268,6 +292,8 @@ export async function POST(request: Request) {
       sceneNumber: sceneNumber || 1,
       storyTitle: storyTitle || "Untitled Story",
       tones: tones || ["Dramatic"],
+      establishedCharacterContext,
+      memoryContext,
     });
 
     if (geminiApiKey) {

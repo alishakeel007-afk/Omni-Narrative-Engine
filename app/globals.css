@@ -4,12 +4,28 @@
 
 :root {
   color-scheme: light;
+  --font-heading: var(--font-body);
   --brand-accent: #c1f17b;
   --brand-accent-rgb: 193 241 123;
   --brand-ink: #161616;
   --brand-muted: #6b6b6b;
   --brand-line: #e6e6e6;
   --brand-surface: #f7f7f7;
+}
+
+:where(a, button, input, textarea, select, [role="tab"]):focus-visible {
+  outline: 2px solid var(--brand-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html {
@@ -62,7 +78,7 @@ body {
   }
 
   .text-gradient {
-    @apply bg-gradient-to-r from-slate-950 via-slate-900 to-gold bg-clip-text text-transparent;
+    color: var(--brand-ink);
   }
 
   .input {

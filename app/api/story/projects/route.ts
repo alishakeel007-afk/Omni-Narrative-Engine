@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { createStoryProjectWithInitialDraft } from "@/lib/story-database";
+import { summarizeProject } from "@/lib/project-summary";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,13 @@ const createProjectSchema = z.object({
     tones: z.array(z.string()).default([]),
     numberOfScenes: z.number().int().min(1).max(20),
     includeNarration: z.boolean().optional(),
+    characters: z.array(z.object({
+      name: z.string().min(1).max(120),
+      role: z.string().min(1).max(120),
+      personalityTone: z.string().max(500).default(""),
+      traits: z.array(z.string().max(120)).max(20).default([]),
+      appearancePrompt: z.string().max(1000).optional(),
+    })).max(30).optional(),
   }),
 });
 
@@ -33,13 +41,28 @@ export async function GET() {
     orderBy: { updatedAt: "desc" },
     include: {
       drafts: {
-        orderBy: { versionNumber: "desc" },
+        // Keep the active draft in the bounded project-list payload even if
+        // an older project has more than five historical versions.
+        orderBy: [{ isActive: "desc" }, { versionNumber: "desc" }],
         take: 5,
+        include: {
+          scenes: {
+            select: {
+              id: true,
+              sceneNumber: true,
+              description: true,
+              mediaAssets: { select: { type: true, url: true, status: true } },
+              dialogues: { select: { text: true, audioUrl: true } },
+            },
+          },
+        },
       },
     },
   });
 
-  return NextResponse.json({ projects });
+  const summaries = projects.map(summarizeProject);
+
+  return NextResponse.json({ projects: summaries });
 }
 
 export async function POST(request: Request) {
