@@ -6,6 +6,7 @@
 // ============================================================
 
 import { uploadToSupabaseStorage } from "@/lib/supabase-storage";
+import { randomUUID } from "node:crypto";
 
 export async function uploadMusicToStorage(params: {
   audioBuffer: ArrayBuffer;
@@ -23,4 +24,19 @@ export async function uploadMusicToStorage(params: {
   });
 
   return publicUrl;
+}
+
+/** Stores a manually imported WAV under a generated, non-user-controlled path. */
+export async function uploadImportedMusicToStorage(params: {
+  audioBuffer: ArrayBuffer;
+  projectId: string;
+  sceneNumber: number;
+}) {
+  const path = `music/${params.projectId}/scene-${params.sceneNumber}/${randomUUID()}.wav`;
+  return uploadToSupabaseStorage({
+    bucket: "audio",
+    path,
+    body: params.audioBuffer,
+    contentType: "audio/wav",
+  });
 }

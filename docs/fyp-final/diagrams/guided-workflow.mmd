@@ -1,0 +1,14 @@
+flowchart LR
+  A[Setup] --> B[Story Idea]
+  B --> C[Story Review]
+  C --> D[Scenes and Dialogues]
+  D --> E[Voice Audio]
+  E --> F[Visual Generation]
+  F --> G[Background Music]
+  G --> H[Video Preview]
+  D --> Save[Guided save queue]
+  E --> Save
+  F --> Save
+  G --> Save
+  Save --> DB[(Owned project and draft)]
+  H --> Restore[Owned project restoration]

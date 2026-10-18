@@ -3,7 +3,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { ChoiceType } from "@prisma/client";
-import { processAndIndexSceneMemories } from "@/lib/memory/memory-service";
+import type { Prisma } from "@prisma/client";
+import { indexMemories, persistChoiceMemory, persistSceneMemories } from "@/lib/memory/memory-service";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,8 @@ const saveSchema = z.object({
   choice: z.object({
     text: z.string(),
     choiceType: z.enum(["AI Suggested", "Custom"]),
-  }),
+  }).optional(),
+  choiceSceneNumber: z.number().int().min(1).optional(),
   currentState: z.object({
     sceneNumber: z.number().int().min(0),
     healthStatus: z.object({
@@ -51,6 +53,10 @@ const saveSchema = z.object({
     }),
     inventory: z.array(z.string()),
   }),
+  setup: z.unknown().optional(),
+}).refine((value) => !value.choice || value.choiceSceneNumber !== undefined, {
+  message: "choiceSceneNumber is required when saving a selected choice.",
+  path: ["choiceSceneNumber"],
 });
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
@@ -92,7 +98,7 @@ export async function POST(
     );
   }
 
-  const { draftId, sceneNumber, scene, choice, currentState } = result.data;
+  const { draftId, sceneNumber, scene, choice, choiceSceneNumber, currentState, setup } = result.data;
 
   // 4. Verify draft belongs to this project
   const draft = await prisma.storyDraft.findFirst({
@@ -104,7 +110,10 @@ export async function POST(
     return NextResponse.json({ error: "Draft not found or does not belong to this project." }, { status: 403 });
   }
 
-  // 5. Upsert scene (idempotent by draftId + sceneNumber)
+  const optionTexts = [...new Set((scene.options ?? []).map((option) => option.trim()).filter(Boolean))];
+
+  // 5. Upsert the generated scene. Its offered choices belong to this scene;
+  // the selected choice that led here is persisted separately below.
   const savedScene = await prisma.scene.upsert({
     where: {
       draftId_sceneNumber: { draftId, sceneNumber },
@@ -116,21 +125,34 @@ export async function POST(
       description: scene.text,
       location: scene.location,
       mood: scene.mood,
-      choices: {
-        create: [{
-          choiceText: choice.text,
-          choiceType: choice.choiceType === "AI Suggested" ? ChoiceType.AI_SUGGESTED : ChoiceType.CUSTOM,
-          selected: true,
-          resultText: scene.resultSummary,
-        }],
-      },
+      choices: optionTexts.length ? { create: optionTexts.map((choiceText) => ({ choiceText, choiceType: ChoiceType.AI_SUGGESTED })) } : undefined,
     },
     update: {
-      // On duplicate save, update result summary only
+      title: scene.title,
       description: scene.text,
+      location: scene.location,
+      mood: scene.mood,
     },
     select: { id: true },
   });
+
+  let sourceScene: { id: string } | null = null;
+  if (choice && choiceSceneNumber) {
+    sourceScene = await prisma.scene.findFirst({ where: { draftId, sceneNumber: choiceSceneNumber }, select: { id: true } });
+    if (sourceScene) {
+      await prisma.choice.updateMany({ where: { sceneId: sourceScene.id }, data: { selected: false } });
+      const existingChoice = await prisma.choice.findFirst({ where: { sceneId: sourceScene.id, choiceText: choice.text }, select: { id: true } });
+      const data = { selected: true, resultText: scene.resultSummary };
+      if (existingChoice) await prisma.choice.update({ where: { id: existingChoice.id }, data });
+      else await prisma.choice.create({ data: { sceneId: sourceScene.id, choiceText: choice.text,
+        choiceType: choice.choiceType === "AI Suggested" ? ChoiceType.AI_SUGGESTED : ChoiceType.CUSTOM, ...data } });
+    }
+    if (!sourceScene) {
+      // The queue preserves FIFO order; a retry can safely recover if an older
+      // scene has not reached the database yet.
+      return NextResponse.json({ error: "The scene that offered this choice is not saved yet. Please retry." }, { status: 409 });
+    }
+  }
 
   // 6. Update draft progress state (health, inventory, sceneIndex)
   await prisma.storyDraft.update({
@@ -143,54 +165,63 @@ export async function POST(
         mana: currentState.healthStatus.mana,
         resolve: currentState.healthStatus.resolve,
         inventory: currentState.inventory,
+        setup: (setup ?? null) as Prisma.InputJsonValue,
       },
     },
   });
 
-  // 7. Fire-and-forget: index memories into pgvector
+  // 7. Store text facts before responding. Vector embedding remains optional.
   //    This is non-critical — a failure here must never fail the save.
-  setImmediate(async () => {
+  const sceneForMemory = {
+    sceneNumber, title: scene.title, chapter: scene.chapter ?? "", location: scene.location ?? "", mood: scene.mood ?? "",
+    text: scene.text, options: scene.options ?? [], resultSummary: scene.resultSummary, inventoryUpdate: scene.inventoryUpdate ?? null,
+    cast: (scene.cast ?? []).map((character) => ({ name: character.name, role: character.role ?? "", emotionalState: character.emotionalState ?? "", visualAppearance: character.visualAppearance ?? "", traits: character.traits ?? [], relationships: character.relationships ?? [], imageLabel: character.imageLabel ?? "" })),
+    media: { audioMoodPrompt: "", backgroundMusicMood: "", imageLabel: "", imagePrompt: "", narrationDuration: "", narrationLabel: "", playerState: "ready" as const },
+  };
+  let sceneMemories: Awaited<ReturnType<typeof persistSceneMemories>> = [];
+  let choiceMemories: Awaited<ReturnType<typeof persistChoiceMemory>> = [];
+  try {
+    // The generated scene owns its own facts. A decision belongs to the
+    // previous scene that presented it, not to the scene that followed it.
+    sceneMemories = await persistSceneMemories(draftId, savedScene.id, sceneForMemory, "");
+  } catch (err) {
+    console.error("[Save] Scene memory fact persistence failed; story save will continue:", err);
+  }
+  if (choice?.text && sourceScene) {
     try {
-      // Reconstruct a StoryScene-compatible object for the memory extractor
-      const sceneForMemory = {
-        sceneNumber,
-        title: scene.title,
-        chapter: scene.chapter ?? "",
-        location: scene.location ?? "",
-        mood: scene.mood ?? "",
-        text: scene.text,
-        options: scene.options ?? [],
-        resultSummary: scene.resultSummary,
-        inventoryUpdate: scene.inventoryUpdate ?? null,
-        cast: (scene.cast ?? []).map((character) => ({
-          name: character.name,
-          role: character.role ?? "",
-          emotionalState: character.emotionalState ?? "",
-          visualAppearance: character.visualAppearance ?? "",
-          traits: character.traits ?? [],
-          relationships: character.relationships ?? [],
-          imageLabel: character.imageLabel ?? "",
-        })),
-        media: {
-          audioMoodPrompt: "", backgroundMusicMood: "",
-          imageLabel: "", imagePrompt: "",
-          narrationDuration: "", narrationLabel: "",
-          playerState: "ready" as const,
-        },
-      };
-
-      await processAndIndexSceneMemories(
-        draftId,
-        savedScene.id,
-        user.id,
-        sceneForMemory,
-        choice.text
-      );
+      choiceMemories = await persistChoiceMemory(draftId, sourceScene.id, sceneForMemory, choice.text);
+    } catch (err) {
+      // Unlike optional embeddings, a selected decision is core persisted story
+      // state. Return a retryable failure so the queue does not claim success.
+      console.error("[Save] Choice memory persistence failed:", err);
+      return NextResponse.json({ error: "The selected choice could not be saved yet. Please retry." }, { status: 503 });
+    }
+  }
+  if (sceneMemories.length) setImmediate(async () => {
+    try {
+      await indexMemories(draftId, savedScene.id, user.id, sceneNumber, sceneMemories);
     } catch (err) {
       // Swallow silently — memory indexing is best-effort
       console.error("[Save] Background memory indexing failed:", err);
     }
   });
 
-  return NextResponse.json({ success: true, sceneId: savedScene.id }, { status: 200 });
+  if (choiceMemories.length && sourceScene && choiceSceneNumber) setImmediate(async () => {
+    try {
+      await indexMemories(draftId, sourceScene.id, user.id, choiceSceneNumber, choiceMemories);
+    } catch (err) {
+      console.error("[Save] Background choice-memory indexing failed:", err);
+    }
+  });
+
+  // Return only persisted display-safe facts. This lets the active Memory
+  // Board update after a confirmed save without inventing client-side facts.
+  const memorySceneIds = [savedScene.id, sourceScene?.id].filter((id): id is string => Boolean(id));
+  const persistedMemories = await prisma.storyMemory.findMany({
+    where: { draftId, sceneId: { in: memorySceneIds } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, memoryType: true, content: true, importanceScore: true },
+  });
+
+  return NextResponse.json({ success: true, sceneId: savedScene.id, memories: persistedMemories }, { status: 200 });
 }

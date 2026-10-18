@@ -23,7 +23,9 @@ export default function VideoVoiceScreen() {
 
     try {
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script }),
+        // Legacy video drafts are browser-local. Request transient audio so
+        // this compatibility screen cannot create unassociated Storage media.
+        body: JSON.stringify({ script, transient: true, language: "en", scriptLanguage: "en" }),
         headers: {
           "Content-Type": "application/json"
         },

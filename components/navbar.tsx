@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { ChevronDown, LogOut, Menu, Settings, User, X } from "lucide-react";
+import { ChevronDown, FolderOpen, LogOut, Menu, Settings, Clapperboard, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -36,7 +36,17 @@ function ProfileDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const initials = (userName || userEmail || "?").charAt(0).toUpperCase();
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  const initials = (userName || userEmail || "?")
+    .charAt(0)
+    .toUpperCase();
 
   const handleLink = (path: string) => {
     setIsOpen(false);
@@ -49,6 +59,9 @@ function ProfileDropdown({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1 pr-3 transition hover:border-gold/30 hover:bg-white/10"
+        aria-label="Open profile menu"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
       >
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-aurora to-gold text-sm font-bold text-slate-950">
           {initials}
@@ -59,7 +72,7 @@ function ProfileDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-white/10 bg-[rgba(12,12,12,0.95)] p-2 shadow-2xl backdrop-blur-xl">
+        <div role="menu" aria-label="Profile menu" className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-white/10 bg-white p-2 shadow-2xl backdrop-blur-xl">
           <div className="mb-2 border-b border-white/10 px-3 pb-3 pt-2">
             <p className="truncate text-sm font-semibold text-white">
               {userName || "User"}
@@ -70,6 +83,16 @@ function ProfileDropdown({
           <div className="flex flex-col gap-1">
             <button
               type="button"
+              role="menuitem"
+              onClick={() => handleLink("/projects")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+            >
+              <FolderOpen className="h-4 w-4" />
+              My Projects
+            </button>
+            <button
+              type="button"
+              role="menuitem"
               onClick={() => handleLink("/dashboard")}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
             >
@@ -78,6 +101,7 @@ function ProfileDropdown({
             </button>
             <button
               type="button"
+              role="menuitem"
               onClick={() => handleLink("/reset-password")}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
             >
@@ -86,6 +110,7 @@ function ProfileDropdown({
             </button>
             <button
               type="button"
+              role="menuitem"
               onClick={() => handleLink("/dashboard?tab=settings")}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
             >
@@ -95,6 +120,7 @@ function ProfileDropdown({
             <div className="my-1 border-t border-white/10" />
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setIsOpen(false);
                 onLogout();
@@ -216,7 +242,7 @@ export function Navbar() {
 
       {menuOpen ? (
         <div className="border-t border-white/10 px-4 pb-4 md:hidden">
-          <nav className="mx-auto mt-4 grid max-w-7xl gap-2">
+          <nav aria-label="Primary navigation" className="mx-auto mt-4 grid max-w-7xl gap-2">
             {navLinks.map((item) => (
               <Link
                 key={item.href}
@@ -270,6 +296,14 @@ export function Navbar() {
                 </div>
 
                 <div className="grid gap-1">
+                  <Link
+                    href="/projects"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    My Projects
+                  </Link>
                   <Link
                     href="/dashboard"
                     onClick={() => setMenuOpen(false)}

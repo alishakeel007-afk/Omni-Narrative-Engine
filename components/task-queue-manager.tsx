@@ -31,6 +31,7 @@ export function TaskQueueManager() {
           saveVideoStudioFlow({
             ...currentFlow,
             music: {
+              provider: primaryScene?.backgroundMusicProvider || currentFlow.music.provider,
               message: "Background music is ready.",
               mood: primaryScene?.mood ?? currentFlow.tones.join(", "),
               status: "ready",
@@ -47,6 +48,7 @@ export function TaskQueueManager() {
             script: result,
             voiceResult: result,
             music: {
+              provider: primaryScene?.backgroundMusicProvider || currentFlow.music.provider,
               message: "Background music is ready.",
               mood: primaryScene?.mood ?? currentFlow.tones.join(", "),
               status: "ready",

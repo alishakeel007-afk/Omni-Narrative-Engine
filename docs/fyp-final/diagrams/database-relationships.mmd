@@ -1,0 +1,15 @@
+erDiagram
+  StoryProject ||--o{ StoryDraft : has
+  StoryDraft ||--o{ Scene : contains
+  StoryDraft ||--o{ Character : contains
+  StoryDraft ||--o{ MediaAsset : owns
+  StoryDraft ||--o{ StoryMemory : stores
+  StoryDraft ||--o{ StoryMemoryEmbedding : indexes
+  StoryDraft ||--o{ VideoGenerationJob : tracks
+  Scene ||--o{ Dialogue : has
+  Scene ||--o{ Choice : has
+  Scene ||--o{ MediaAsset : uses
+  Scene ||--o{ StoryMemory : sources
+  Character ||--o{ Dialogue : speaks
+  Character ||--o{ MediaAsset : uses
+  StoryMemory ||--o{ StoryMemoryEmbedding : represented_by

@@ -66,6 +66,7 @@ export async function updateSession(request: NextRequest) {
     "/audio-generation",
     "/video-preview",
     "/video",
+    '/projects',
   ];
 
   const pathname = request.nextUrl.pathname;

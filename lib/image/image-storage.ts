@@ -12,15 +12,15 @@ export async function uploadImageToStorage(params: {
   contentType: string;
   projectId?: string;
   sceneId: string;
-}): Promise<string> {
+}): Promise<{ url: string; storagePath: string }> {
   const path = `${params.projectId || "default"}/${params.sceneId}-${Date.now()}.png`;
 
-  const { publicUrl } = await uploadToSupabaseStorage({
+  const { publicUrl, storagePath } = await uploadToSupabaseStorage({
     bucket: process.env.SUPABASE_IMAGE_BUCKET || "generated-images",
     path,
     body: params.imageBuffer,
     contentType: params.contentType,
   });
 
-  return publicUrl;
+  return { url: publicUrl, storagePath };
 }

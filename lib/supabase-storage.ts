@@ -44,6 +44,21 @@ export async function uploadToSupabaseStorage(params: {
   };
 }
 
+/** Deletes a known server-generated object after its database replacement commits. */
+export async function deleteFromSupabaseStorage(params: { bucket: string; path: string; allowNotFound?: boolean }) {
+  const config = requireSupabaseStorageConfig();
+  const response = await fetch(`${config.url}/storage/v1/object/${params.bucket}/${params.path}`, {
+    method: "DELETE",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+    },
+  });
+  if (!response.ok && !(params.allowNotFound && response.status === 404)) {
+    throw new Error(`Supabase Storage delete failed (${response.status}).`);
+  }
+}
+
 export function getSupabasePublicUrl(bucket: string, path: string) {
   const config = requireSupabaseStorageConfig();
   return `${config.url}/storage/v1/object/public/${bucket}/${path}`;

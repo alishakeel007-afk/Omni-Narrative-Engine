@@ -1,0 +1,13 @@
+flowchart LR
+  U[Authenticated user] --> FE[Next.js React screens]
+  FE --> API[Next.js API routes]
+  FE --> Cache[Browser local draft/cache]
+  API --> Auth[Supabase Auth]
+  API --> Prisma[PrismaPg / Prisma]
+  Prisma --> DB[(Supabase PostgreSQL)]
+  API --> Store[Supabase Storage]
+  API --> Groq[Groq primary]
+  API --> Gemini[Gemini fallback]
+  API --> Deepgram[Deepgram English TTS]
+  API --> Eleven[ElevenLabs Urdu TTS]
+  FE --> Preview[Synchronized browser preview]

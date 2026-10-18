@@ -1,4 +1,5 @@
 import { getEnvValue } from "@/lib/env";
+import { fetchGeminiWithRetry, toGeminiRequestError } from "@/lib/gemini-retry";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -30,9 +31,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const model = "text-embedding-004"; // Fallback if needed, but we will use gemini-embedding-001
   const targetModel = "gemini-embedding-001";
 
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${encodeURIComponent(targetModel)}:embedContent`,
-    {
+  const response = await fetchGeminiWithRetry({
+    request: (signal) => fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(targetModel)}:embedContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -45,12 +45,12 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         },
         outputDimensionality: 768,
       }),
-    }
-  );
+      signal,
+    })
+  });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Embedding error (${response.status}): ${errText.slice(0, 300)}`);
+    throw await toGeminiRequestError(response, "embedding generation");
   }
 
   const payload = await response.json();

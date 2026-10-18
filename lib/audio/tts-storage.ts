@@ -13,21 +13,33 @@ function extensionForContentType(contentType: string): string {
   return "mp3";
 }
 
-export async function uploadTtsAudioToStorage(params: {
+export async function uploadTtsAudioAssetToStorage(params: {
   audioBuffer: ArrayBuffer;
   contentType: string;
   projectId?: string;
   dialogueId: string;
-}): Promise<string> {
+}): Promise<{ audioUrl: string; storagePath: string }> {
   const extension = extensionForContentType(params.contentType);
-  const path = `tts/${params.projectId || "default"}/${params.dialogueId}-${Date.now()}.${extension}`;
+  // A generated clip is immutable. A UUID path prevents concurrent character
+  // clips (or a narrator and dialogue) from ever sharing an object key.
+  const path = `tts/${params.projectId || "default"}/${crypto.randomUUID()}.${extension}`;
 
-  const { publicUrl } = await uploadToSupabaseStorage({
+  const { publicUrl, storagePath } = await uploadToSupabaseStorage({
     bucket: process.env.SUPABASE_AUDIO_BUCKET || "generated-audio",
     path,
     body: params.audioBuffer,
     contentType: params.contentType,
   });
 
-  return publicUrl;
+  return { audioUrl: publicUrl, storagePath };
+}
+
+/** Compatibility helper for existing dialogue TTS callers. */
+export async function uploadTtsAudioToStorage(params: {
+  audioBuffer: ArrayBuffer;
+  contentType: string;
+  projectId?: string;
+  dialogueId: string;
+}): Promise<string> {
+  return (await uploadTtsAudioAssetToStorage(params)).audioUrl;
 }

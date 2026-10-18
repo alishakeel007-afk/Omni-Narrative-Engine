@@ -11,11 +11,8 @@ import {
 } from "lucide-react";
 
 export const navLinks: { href: Route; label: string }[] = [
-  { href: "/story/mode", label: "Start" },
-  { href: "/setup", label: "Setup" },
-  { href: "/story/play", label: "Play Story" },
-  { href: "/story/memory", label: "Story Memory Board" },
-  { href: "/video", label: "AI Story Studio" },
+  { href: "/", label: "Home" },
+  { href: "/story/mode", label: "Video Studio" },
   { href: "/dashboard", label: "Dashboard" }
 ];
 
@@ -26,18 +23,18 @@ export const featureCards = [
     icon: Sparkles
   },
   {
-    title: "AI Guided Story Mode",
-    description: "Follow AI-suggested choices step by step.",
+    title: "Scene & Dialogue Control",
+    description: "Review, edit, reorder, and refine every scene before media generation.",
     icon: BookOpenText
   },
   {
-    title: "AI Story Studio",
-    description: "Build full stories with scenes, dialogues, voice, music, and video preview.",
+    title: "Character Voices",
+    description: "Assign consistent voices and generate narration and character dialogue.",
     icon: Wand2
   },
   {
-    title: "Custom Story Path",
-    description: "Write your own actions and control story direction.",
+    title: "Cinematic Visuals",
+    description: "Generate scene artwork that reflects your characters, location, and mood.",
     icon: Compass
   },
   {
@@ -108,54 +105,3 @@ export const characterProfile = {
   imageLabel: "Character portrait placeholder for Lyra Voss"
 };
 
-
-export const sampleScenes = [
-  {
-    sceneNumber: 1,
-    chapter: "Chapter One",
-    title: "The Whispering Gate",
-    text: "The ancient gate trembles as blue light leaks through its broken symbols. Your companion looks at you with fear, waiting for your decision.",
-    mood: "Suspenseful",
-    location: "Ruins of Vel Astra",
-    imageLabel: "Ancient gate wrapped in blue arcane light under midnight fog",
-    imagePrompt: "Cinematic ruined gate, cracked runes, blue magical leaks, mist, dark fantasy, ultra-detailed",
-    audioPrompt: "Whispers, light wind, distant choir, tension rising",
-    options: [
-      "Open the gate carefully",
-      "Step back and inspect the symbols",
-      "Ask your companion what they know"
-    ]
-  },
-  {
-    sceneNumber: 2,
-    chapter: "Chapter One",
-    title: "The Forest of Echoes",
-    text: "Beyond the gate, a silver forest stretches across a moonlit valley. Every tree repeats your footsteps in soft echoes, as if the woods are learning your name.",
-    mood: "Dark",
-    location: "Forest of Echoes",
-    imageLabel: "Silver trees, moonlit valley, soft violet fog and glowing roots",
-    imagePrompt: "Mystical silver forest, moonlight, glowing roots, atmospheric blue-violet haze",
-    audioPrompt: "Layered forest ambience, echoing steps, low mystical hum",
-    options: [
-      "Follow the glowing roots downhill",
-      "Call out to the unseen voice in the trees",
-      "Mark the gate path before moving deeper"
-    ]
-  },
-  {
-    sceneNumber: 3,
-    chapter: "Chapter Two",
-    title: "The Archive Beneath Glass",
-    text: "A buried observatory opens below the valley floor. Star maps float between broken mirrors, and a dormant machine turns toward you as if it has been waiting for centuries.",
-    mood: "Epic",
-    location: "Astral Observatory",
-    imageLabel: "Underground observatory with floating star maps and broken glass light",
-    imagePrompt: "Sci-fantasy underground observatory, floating constellations, fractured mirrors, gold and blue highlights",
-    audioPrompt: "Mechanical awakening, resonant chimes, slow orchestral swell",
-    options: [
-      "Activate the dormant machine",
-      "Search the floating maps for your name",
-      "Ask the companion to keep watch while you investigate"
-    ]
-  }
-];
