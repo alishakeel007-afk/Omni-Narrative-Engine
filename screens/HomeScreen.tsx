@@ -1,93 +1,116 @@
-import Link from "next/link";
-import { FeatureCard } from "@/components/feature-card";
+"use client";
+
+import { ArrowUpRight, Plus } from "lucide-react";
+import { useState } from "react";
 import { HeroSection } from "@/components/hero-section";
-import { featureCards } from "@/lib/mock-data";
+import { CinematicVideo, PublicMotion } from "@/components/public/cinematic-video";
+import { PublicFooter, PublicHeader } from "@/components/public/public-shell";
+import GuestStudioScreen from "@/screens/GuestStudioScreen";
+import type { StudioTab } from "@/types/studio";
+
+const steps: { tab: StudioTab; title: string; text: string }[] = [
+  { tab: "plan", title: "Find your story.", text: "Explore an idea, shape your characters, and find your direction." },
+  { tab: "scenes", title: "Make it a world.", text: "Create images and video. Choose the takes that bring your story to life." },
+  { tab: "assemble", title: "Bring it all together.", text: "Arrange your scenes, add sound, and make the final cut." },
+];
+
+const questions = [
+  ["No idea yet?", "Start with ‘Help me find an idea.’ Explore a few directions and choose one to develop."],
+  ["Can I bring a script or character?", "Yes. In your studio, paste a script or upload character references to build on what you have."],
+  ["Will my characters stay consistent?", "Lock your character references before creating scenes. Appearance checks flag mismatched takes; review each result before using it."],
+  ["Can I edit before downloading?", "Choose takes, reorder and trim clips, then mix dialogue and music. Download your film as a WebM video."],
+];
 
 export default function HomeScreen() {
+  const [activeTab, setActiveTab] = useState<StudioTab>("plan");
   return (
-    <div className="pb-20 relative">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.06),transparent_30%)]" />
-      <HeroSection />
-
-      <section id="features" className="px-2 py-8 sm:px-4 lg:px-6">
-        <div className="mx-auto max-w-[1500px]">
-          <div className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">
-                Core Features
-              </p>
-              <h2 className="mt-3 font-[var(--font-heading)] text-3xl text-white sm:text-4xl">
-                Core Features of Omni-Narrative Engine
-              </h2>
-            </div>
-            <p className="max-w-2xl text-sm leading-7 text-white/90">
-              Everything needed to create interactive, consistent, and multimedia AI stories.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {featureCards.map((feature) => (
-              <FeatureCard key={feature.title} {...feature} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-2 pt-12 sm:px-4 lg:px-6">
-        <div className="mx-auto max-w-[1500px]">
-          <div className="glass-panel rounded-[2rem] p-6 sm:p-8 lg:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
+    <PublicMotion>
+      <div className="public-site">
+        <a className="public-skip" href="#main-story">Skip to content</a>
+        <PublicHeader />
+        <div id="main-story" tabIndex={-1}>
+          <HeroSection />
+          <section id="how-it-works" className="public-workflow public-section">
+            <div className="public-section-heading">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-gold">Why Omni-Narrative Engine Stands Out</p>
-                <h2 className="mt-3 font-[var(--font-heading)] text-3xl text-white sm:text-4xl">
-                  The user is never locked into one path.
-                </h2>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-white/90">
-                  Users can follow AI-guided choices, write their own story direction, or build a complete cinematic story through AI Story Studio. This makes the system flexible for both beginners and creative users.
-                </p>
+                <span className="public-eyebrow">A LITTLE GUIDANCE. A LOT OF POSSIBILITY.</span>
+                <h2>Big ideas.<br />Three simple steps.</h2>
               </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  ["AI Guided Story Mode", "Best for users who want the system to guide the story."],
-                  ["AI Story Studio", "Best for users who want to build a complete story and video-ready script."],
-                  ["Hybrid Flow", "Users can combine AI suggestions with their own custom input."],
-                  ["Story Memory", "The system tracks decisions, characters, and locations for continuity."]
-                ].map(([title, description]) => (
-                  <div
-                    key={title}
-                    className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5"
+              <p>No complicated workflow.<br />Just a conversation that becomes a story.</p>
+            </div>
+            <div className="public-workflow-grid">
+              <div className="public-step-list" aria-label="Story creation steps">
+                {steps.map((step, index) => (
+                  <button
+                    key={step.tab}
+                    type="button"
+                    className={`public-step ${activeTab === step.tab ? "active" : ""}`}
+                    aria-pressed={activeTab === step.tab}
+                    aria-controls="trial-conversation"
+                    onClick={() => setActiveTab(step.tab)}
                   >
-                    <h3 className="text-lg font-semibold text-white">{title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-white/90">{description}</p>
-                  </div>
+                    <span className="public-step-number">0{index + 1}</span>
+                    <div>
+                      <span className="public-step-label">{step.tab}</span>
+                      <h3>{step.title}</h3>
+                      <p>{step.text}</p>
+                    </div>
+                    <ArrowUpRight className="public-step-arrow" size={18} />
+                  </button>
                 ))}
               </div>
+              <GuestStudioScreen embedded activeTab={activeTab} onTabChange={setActiveTab} />
             </div>
-
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/story/mode"
-                className="rounded-full bg-gradient-to-r from-aurora to-gold px-7 py-4 text-center text-sm font-semibold text-slate-950"
-              >
-                Start Guided Story
-              </Link>
-              <Link
-                href="/setup"
-                className="rounded-full border border-white/10 bg-white/5 px-7 py-4 text-center text-sm font-semibold text-white/82"
-              >
-                Open AI Story Studio
-              </Link>
-              <Link
-                href="/story/memory"
-                className="rounded-full border border-gold/20 bg-gold/10 px-7 py-4 text-center text-sm font-semibold text-gold"
-              >
-                View Memory Board
-              </Link>
+          </section>
+          <section id="possibilities" className="public-possibilities public-section">
+            <div className="public-section-heading">
+              <div>
+                <span className="public-eyebrow">MAKE ROOM FOR THE UNEXPECTED.</span>
+                <h2>Where will your story go?</h2>
+              </div>
+              <p>A new world starts with your next idea.</p>
             </div>
-          </div>
+            <div className="public-film-grid">
+              {[
+                { film: "emerald-world" as const, label: "01 / FANTASY", title: "Imagine another world.", prompt: "Help me find a fantasy story idea." },
+                { film: "forest-light" as const, label: "02 / ADVENTURE", title: "Follow your curiosity.", prompt: "Help me find an adventure story idea." },
+              ].map(({ film, label, title, prompt }) => (
+                <article className="public-film-card" key={film}>
+                  <CinematicVideo film={film} />
+                  <div className="public-film-card-shade" />
+                  <div className="public-film-card-copy">
+                    <span>{label}</span>
+                    <h3>{title}</h3>
+                    <button type="button" aria-label={`Explore ${label.includes("FANTASY") ? "fantasy" : "adventure"} ideas`} onClick={() => {
+                      window.dispatchEvent(new CustomEvent("omni:home-prompt", { detail: prompt }));
+                      document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+                    }}><ArrowUpRight size={22} /></button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="public-film-footnote">Generated scenes. Your story could be next.</p>
+          </section>
+          <section id="questions" className="public-faq public-section">
+            <div><span className="public-eyebrow">GOOD TO KNOW.</span><h2>A little clarity.</h2></div>
+            <div className="public-faq-list">
+              {questions.map(([question, answer]) => (
+                <details key={question}><summary>{question}<Plus size={19} /></summary><p>{answer}</p></details>
+              ))}
+            </div>
+          </section>
+          <section className="public-final-cta">
+            <CinematicVideo film="forest-light" />
+            <div className="public-final-shade" />
+            <div>
+              <span className="public-eyebrow light">YOUR NEXT CHAPTER.</span>
+              <h2>A story only <em>you could tell.</em></h2>
+              <a href="#how-it-works" className="public-button public-button-lime">Start your story<ArrowUpRight size={18} /></a>
+            </div>
+          </section>
         </div>
-      </section>
-    </div>
+        <PublicFooter />
+      </div>
+    </PublicMotion>
   );
 }

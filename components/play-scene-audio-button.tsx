@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Square } from "lucide-react";
 
 export function PlaySceneAudioButton({ audioUrls }: { audioUrls: string[] }) {
@@ -6,7 +6,7 @@ export function PlaySceneAudioButton({ audioUrls }: { audioUrls: string[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const validUrls = audioUrls.filter(Boolean);
+  const validUrls = useMemo(() => audioUrls.filter(Boolean), [audioUrls]);
 
   const playSequence = () => {
     if (validUrls.length === 0) return;
@@ -19,6 +19,7 @@ export function PlaySceneAudioButton({ audioUrls }: { audioUrls: string[] }) {
     setCurrentIndex(0);
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
   };
 
@@ -33,6 +34,13 @@ export function PlaySceneAudioButton({ audioUrls }: { audioUrls: string[] }) {
       setCurrentIndex(0);
     }
   }, [isPlaying, currentIndex, validUrls]);
+
+  useEffect(() => () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
 
   const handleEnded = () => {
     setCurrentIndex((prev) => prev + 1);

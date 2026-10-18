@@ -4,20 +4,59 @@
 
 :root {
   color-scheme: light;
+  --font-heading: var(--font-body);
+  --brand-accent: #c1f17b;
+  --brand-accent-rgb: 193 241 123;
+  --brand-ink: #161616;
+  --brand-muted: #6b6b6b;
+  --brand-line: #e6e6e6;
+  --brand-surface: #f7f7f7;
+}
+
+:where(a, button, input, textarea, select, [role="tab"]):focus-visible {
+  outline: 2px solid var(--brand-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html {
   scroll-behavior: smooth;
 }
 
+/* Keep scrolling visible without giving scrollbars visual weight. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7c7c7 transparent;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #999; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@supports selector(::-webkit-scrollbar) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+}
+@media (forced-colors: active) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+}
+
 body {
   @apply min-h-screen bg-midnight text-slate-950 antialiased;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 52%, #f8fafc 100%);
+  background: linear-gradient(180deg, #fafafa 0%, #ffffff 52%, #fafafa 100%);
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
-  color: #111827;
+  background: var(--brand-accent);
+  color: var(--brand-ink);
 }
 
 @layer components {
@@ -27,19 +66,19 @@ body {
 
   .story-grid {
     background-image:
-      linear-gradient(rgba(15,23,42,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(15,23,42,0.035) 1px, transparent 1px);
+      linear-gradient(rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 
   .gold-ring {
     box-shadow:
-      0 0 0 1px rgba(37, 99, 235, 0.14),
-      0 18px 45px rgba(15, 23, 42, 0.08);
+      0 0 0 1px rgba(96, 96, 96, 0.14),
+      0 18px 45px rgba(23, 23, 23, 0.08);
   }
 
   .text-gradient {
-    @apply bg-gradient-to-r from-slate-950 via-slate-900 to-gold bg-clip-text text-transparent;
+    color: var(--brand-ink);
   }
 
   .input {
@@ -76,7 +115,7 @@ body [class*="bg-velvet"],
 body [class*="from-slate-950"],
 body [class*="via-slate-900"],
 body [class*="to-slate-950"] {
-  background: #f8fafc !important;
+  background: #fafafa !important;
   background-image: none !important;
 }
 
@@ -91,14 +130,14 @@ body [class*="text-white"],
 body [class*="text-slate-100"],
 body [class*="text-slate-200"],
 body [class*="text-slate-300"] {
-  color: #111827 !important;
+  color: #181818 !important;
 }
 
 body [class*="text-white/"],
 body [class*="text-slate-400"],
 body [class*="text-slate-500"],
 body [class*="text-starlight"] {
-  color: #475569 !important;
+  color: #535353 !important;
 }
 
 body [class*="border-white/"],
@@ -108,7 +147,7 @@ body [class*="border-blue-"],
 body [class*="border-purple-"],
 body [class*="border-violet-"],
 body [class*="border-gold"] {
-  border-color: #e2e8f0 !important;
+  border-color: #e7e7e7 !important;
 }
 
 body [class*="bg-white/"],
@@ -125,7 +164,7 @@ body [class*="text-blue-"],
 body [class*="text-purple-"],
 body [class*="text-violet-"],
 body [class*="text-gold"] {
-  color: #2563eb !important;
+  color: #606060 !important;
 }
 
 body button[class*="bg-gradient"],
@@ -136,9 +175,9 @@ body button[class*="bg-blue"],
 body a[class*="bg-blue"],
 body button[class*="bg-gold"],
 body a[class*="bg-gold"] {
-  background: #2563eb !important;
+  background: #606060 !important;
   background-image: none !important;
-  border-color: rgba(37, 99, 235, 0.55) !important;
+  border-color: rgba(96, 96, 96, 0.55) !important;
   color: #ffffff !important;
 }
 
@@ -150,18 +189,44 @@ body button[class*="bg-blue"]:hover,
 body a[class*="bg-blue"]:hover,
 body button[class*="bg-gold"]:hover,
 body a[class*="bg-gold"]:hover {
-  background: #1d4ed8 !important;
+  background: #4e4e4e !important;
 }
 
 body button[class*="red-"],
 body a[class*="red-"] {
-  background: #fee2e2 !important;
-  border-color: #fca5a5 !important;
-  color: #991b1b !important;
+  background: #e8e8e8 !important;
+  border-color: #b7b7b7 !important;
+  color: #363636 !important;
 }
 
 body button[class*="red-"]:hover,
 body a[class*="red-"]:hover {
-  background: #fecaca !important;
-  color: #7f1d1d !important;
+  background: #d5d5d5 !important;
+  color: #323232 !important;
 }
+
+/* Shared theme for older utility-based screens as well as the new studio. */
+body :is(button, a)[class*="bg-gradient"],
+body :is(button, a)[class*="bg-cyan"],
+body :is(button, a)[class*="bg-blue"],
+body :is(button, a)[class*="bg-gold"],
+body :is(button, a)[class*="bg-green"],
+body :is(button, a)[class*="bg-emerald"],
+body :is(button, a)[class*="bg-teal"],
+body :is(button, a)[class*="bg-lime"],
+body :is(button, a)[class*="bg-gradient"]:hover,
+body :is(button, a)[class*="bg-gold"]:hover,
+body :is(button, a)[class*="bg-blue"]:hover,
+body :is(button, a)[class*="bg-cyan"]:hover {
+  background: var(--brand-accent) !important;
+  color: var(--brand-ink) !important;
+  border-color: var(--brand-accent) !important;
+}
+body [class*="text-green-"], body [class*="text-emerald-"],
+body [class*="text-teal-"], body [class*="text-lime-"],
+body [class*="text-cyan-"], body [class*="text-blue-"],
+body [class*="text-purple-"], body [class*="text-violet-"], body [class*="text-gold"] {
+  color: var(--brand-ink) !important;
+}
+input, textarea { caret-color: var(--brand-ink); }
+input[type="range"], input[type="checkbox"], progress { accent-color: var(--brand-accent); }

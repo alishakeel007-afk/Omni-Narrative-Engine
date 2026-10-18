@@ -2,14 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Loader2,
-  Mic2,
-  RefreshCcw,
-  Sparkles
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Mic2, RefreshCcw, Clapperboard } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import {
   VIDEO_DRAFT_STORAGE_KEY,
@@ -30,7 +23,9 @@ export default function VideoVoiceScreen() {
 
     try {
       const response = await fetch("/api/video/tts", {
-        body: JSON.stringify({ script }),
+        // Legacy video drafts are browser-local. Request transient audio so
+        // this compatibility screen cannot create unassociated Storage media.
+        body: JSON.stringify({ script, transient: true, language: "en", scriptLanguage: "en" }),
         headers: {
           "Content-Type": "application/json"
         },
@@ -124,7 +119,7 @@ export default function VideoVoiceScreen() {
           {!visibleResult ? (
             <div className="glass-panel flex min-h-[28rem] items-center justify-center rounded-[2rem] p-8 text-center">
               <div>
-                <Sparkles className="mx-auto h-10 w-10 text-gold" />
+                <Clapperboard className="mx-auto h-10 w-10 text-gold" />
                 <h2 className="mt-5 text-2xl font-semibold text-white">No confirmed film sequence found</h2>
                 <p className="mt-3 text-sm text-white/90">
                   Generate and confirm a script in Video Studio before creating voices.

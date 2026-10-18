@@ -1,4 +1,6 @@
-import type { MovieScene, VideoGenerationResponse } from "@/types/video";
+import type { MovieScene, VideoGenerationResponse, VideoLanguage } from "@/types/video";
+import type { MusicCategory } from "@/lib/audio/music-policy";
+import { isDialogueEmotion, type DialogueEmotion } from "@/lib/audio/emotion-informed-delivery";
 
 export const VIDEO_DRAFT_STORAGE_KEY = "omni-narrative-engine-video-draft";
 export const VIDEO_VOICE_RESULT_STORAGE_KEY = "omni-narrative-engine-video-voice-result";
@@ -10,34 +12,60 @@ export type VideoStudioStage =
   | "storyReview"
   | "scenes"
   | "voice"
+  | "images"
   | "music"
   | "preview";
 
 export type VideoStudioStatus = "idle" | "generating" | "ready" | "error";
 
+export type VideoStudioImageState = {
+  message: string;
+  provider: string;
+  status: VideoStudioStatus;
+};
+
 export type VideoStudioMusicState = {
   message: string;
   mood: string;
+  provider: string;
   status: VideoStudioStatus;
   title: string;
   trackUrl: string;
+};
+
+export type PersistedMusicDecision = {
+  outcome: "silence" | "music";
+  category?: MusicCategory;
+  reason: string;
 };
 
 export type VideoStudioFlowState = {
   acceptedStory: string;
   generatedStory: string;
   genres: string[];
+  images: VideoStudioImageState;
+  language: VideoLanguage;
   music: VideoStudioMusicState;
+  musicDecisions: Record<string, PersistedMusicDecision>;
+  /** Persisted in StoryDraft.videoStudioState to keep derived line emotion across reloads. */
+  dialogueEmotions?: Record<string, DialogueEmotion>;
   roughIdea: string;
   sceneCount: number;
   scenesNeedRegeneration: boolean;
   script: VideoGenerationResponse | null;
+  /** Language used to generate the current script; separate from setup selection. */
+  scriptLanguage?: VideoLanguage;
   stage: VideoStudioStage;
+  /** Last non-preview stage, used to return safely from the Stage 8 route. */
+  returnStage?: VideoStudioStage;
   tones: string[];
   updatedAt: string;
   videoOutdated: boolean;
   voiceNeedsRegeneration: boolean;
   voiceResult: VideoGenerationResponse | null;
+  /** Database-backed persistence (Postgres is the source of truth once set; localStorage is a cache) */
+  projectId?: string;
+  draftId?: string;
 };
 
 export const DEFAULT_VIDEO_GENRES = [
@@ -68,9 +96,16 @@ export const VIDEO_STAGE_LABELS: Array<{ id: VideoStudioStage; label: string }> 
   { id: "storyReview", label: "Story Review" },
   { id: "scenes", label: "Scenes & Dialogues" },
   { id: "voice", label: "Voice Audio" },
+  { id: "images", label: "Visual Generation" },
   { id: "music", label: "Background Music" },
   { id: "preview", label: "Video Preview" }
 ];
+
+/** The Guided workflow is linear; navigation must never skip authored stages. */
+export function previousVideoStudioStage(stage: VideoStudioStage): VideoStudioStage | undefined {
+  const index = VIDEO_STAGE_LABELS.findIndex((item) => item.id === stage);
+  return index > 0 ? VIDEO_STAGE_LABELS[index - 1]?.id : undefined;
+}
 
 function toStringArray(value: unknown, fallback: string[]) {
   if (Array.isArray(value)) {
@@ -106,6 +141,27 @@ function toStage(value: unknown): VideoStudioStage {
 
 function toStatus(value: unknown): VideoStudioStatus {
   return value === "generating" || value === "ready" || value === "error" ? value : "idle";
+}
+
+function toVideoLanguage(value: unknown): VideoLanguage {
+  return value === "ur" ? "ur" : "en";
+}
+
+function toMusicDecisions(value: unknown): Record<string, PersistedMusicDecision> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const categories = new Set<MusicCategory>(["ambient", "suspense", "emotional", "action", "hopeful"]);
+  return Object.fromEntries(Object.entries(value).flatMap(([sceneNumber, decision]) => {
+    if (!decision || typeof decision !== "object") return [];
+    const source = decision as Partial<PersistedMusicDecision>;
+    if ((source.outcome !== "silence" && source.outcome !== "music") || typeof source.reason !== "string") return [];
+    if (source.outcome === "music" && (!source.category || !categories.has(source.category))) return [];
+    return [[sceneNumber, { outcome: source.outcome, category: source.category, reason: source.reason }]];
+  }));
+}
+
+function toDialogueEmotions(value: unknown): Record<string, DialogueEmotion> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, emotion]) => isDialogueEmotion(emotion)));
 }
 
 function normalizeScene(scene: MovieScene, index: number): MovieScene {
@@ -165,23 +221,36 @@ export function createDefaultVideoStudioFlow(): VideoStudioFlowState {
     acceptedStory: "",
     generatedStory: "",
     genres: [DEFAULT_VIDEO_GENRES[0]],
+    images: {
+      message: "Visual images have not been generated yet.",
+      provider: "",
+      status: "idle"
+    },
+    language: "en",
     music: {
       message: "Background music has not been generated yet.",
       mood: "",
+      provider: "",
       status: "idle",
       title: "",
       trackUrl: ""
     },
+    musicDecisions: {},
+    dialogueEmotions: {},
     roughIdea: DEFAULT_VIDEO_SCENARIO,
     sceneCount: 0,
     scenesNeedRegeneration: false,
     script: null,
+    scriptLanguage: undefined,
     stage: "setup",
+    returnStage: undefined,
     tones: [DEFAULT_VIDEO_TONES[0]],
     updatedAt: new Date().toISOString(),
     videoOutdated: false,
     voiceNeedsRegeneration: false,
-    voiceResult: null
+    voiceResult: null,
+    projectId: undefined,
+    draftId: undefined
   };
 }
 
@@ -202,23 +271,36 @@ export function normalizeVideoStudioFlow(value: unknown): VideoStudioFlowState {
     acceptedStory: toCleanString(source.acceptedStory, source.generatedStory || ""),
     generatedStory: toCleanString(source.generatedStory, ""),
     genres: toStringArray(source.genres, fallback.genres),
+    images: {
+      message: toCleanString(source.images?.message, fallback.images.message),
+      provider: toCleanString(source.images?.provider, ""),
+      status: toStatus(source.images?.status)
+    },
+    language: toVideoLanguage(source.language),
     music: {
       message: toCleanString(source.music?.message, fallback.music.message),
       mood: toCleanString(source.music?.mood, ""),
+      provider: toCleanString(source.music?.provider, ""),
       status: toStatus(source.music?.status),
       title: toCleanString(source.music?.title, ""),
       trackUrl: toCleanString(source.music?.trackUrl, "")
     },
+    musicDecisions: toMusicDecisions(source.musicDecisions),
+    dialogueEmotions: toDialogueEmotions(source.dialogueEmotions),
     roughIdea: toCleanString(source.roughIdea, fallback.roughIdea),
     sceneCount,
     scenesNeedRegeneration: Boolean(source.scenesNeedRegeneration),
     script,
+    scriptLanguage: script ? toVideoLanguage(source.scriptLanguage ?? source.language) : undefined,
     stage: toStage(source.stage),
+    returnStage: source.returnStage && source.returnStage !== "preview" ? toStage(source.returnStage) : undefined,
     tones: toStringArray(source.tones, fallback.tones),
     updatedAt: toCleanString(source.updatedAt, fallback.updatedAt),
     videoOutdated: Boolean(source.videoOutdated),
     voiceNeedsRegeneration: Boolean(source.voiceNeedsRegeneration),
-    voiceResult
+    voiceResult,
+    projectId: toCleanString(source.projectId, "") || undefined,
+    draftId: toCleanString(source.draftId, "") || undefined
   };
 }
 

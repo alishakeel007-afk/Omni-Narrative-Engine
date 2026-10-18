@@ -9,6 +9,10 @@ export type CreateStoryCharacter = {
 };
 
 export type CreateStoryDialogue = {
+  audioUrl?: string;
+  audioFingerprint?: string;
+  audioStoragePath?: string;
+  audioOutdated?: boolean;
   characterId: string;
   characterName: string;
   id: string;
@@ -27,6 +31,19 @@ export type CreateStoryScene = {
   storyDescription: string;
   suggestions: string[];
   title: string;
+  generatedImageUrl?: string;
+  generatedImagePrompt?: string;
+  generatedImageStatus?: CreateStoryGenerationStatus;
+  generatedImageError?: string;
+  visualDirection?: import("@/lib/image/scene-visual-context").SceneVisualDirection;
+  narrationAudioUrl?: string;
+  narrationAudioFingerprint?: string;
+  narrationAudioStoragePath?: string;
+  narrationAudioOutdated?: boolean;
+  backgroundMusicUrl?: string;
+  backgroundMusicStatus?: CreateStoryGenerationStatus | "silent";
+  backgroundMusicProvider?: string;
+  backgroundMusicPrompt?: string;
 };
 
 export type CreateStoryAudioState = {
@@ -43,6 +60,10 @@ export type CreateStoryVideoState = {
 };
 
 export type CreateStoryDraft = {
+  projectId?: string;
+  draftId?: string;
+  clientImportId?: string;
+  language?: "en" | "ur";
   audio: CreateStoryAudioState;
   characters: CreateStoryCharacter[];
   genres: string[];

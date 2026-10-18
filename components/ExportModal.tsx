@@ -107,7 +107,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl rounded-xl bg-[#14061a] p-6 shadow-xl">
+      <div className="relative w-full max-w-2xl rounded-xl bg-[#0a0a0a] p-6 shadow-xl">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-lg font-[var(--font-heading)] text-white">Export & End Story</h3>
