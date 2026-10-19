@@ -325,6 +325,12 @@ export type StudioState = {
   directionMode?: "omni" | "director";
   /** The last "Let Omni do it" run, so a retried request is not applied twice. */
   autoDirected?: { requestId: string; at: string; filled: number };
+  /**
+   * The one-time "Generate all N scenes now?" question after "Let Omni do it".
+   * Request ids are fixed when it is offered, so answering Yes twice (a
+   * refresh, a double click) can never queue a second paid render.
+   */
+  generateAllOffer?: { id: string; createdAt: string; requestIds: Record<string, string> };
   /** Replaced/deleted scenes retain their immutable media and IDs. */
   archivedScenes?: StudioScene[];
   scriptUndo?: { kind?: "rebuild" | "sceneList" | "character"; scenes: StudioScene[]; characters: StudioCharacter[]; title: string; premise: string; world: string };

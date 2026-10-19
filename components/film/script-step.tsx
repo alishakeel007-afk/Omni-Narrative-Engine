@@ -31,6 +31,11 @@ type Props = {
   onUpload: (form: FormData) => Promise<string | null>;
   onAction: (body: Record<string, unknown>) => Promise<boolean>;
   onContinue: () => void;
+  /** "Let Omni do it": fills empty scene details, then opens Generate. */
+  onAutoDirect: () => Promise<boolean>;
+  /** "I'll direct": the writer walks the scene pages themselves. */
+  onDirect: () => Promise<boolean>;
+  directing: boolean;
 };
 
 /** The clip length a scene will actually be generated at. */
@@ -51,8 +56,23 @@ export function ScriptStep({
   onUpload,
   onAction,
   onContinue,
+  onAutoDirect,
+  onDirect,
+  directing,
 }: Props) {
+  const mode = state.directionMode;
   const pages: DecisionPage[] = [
+    { id: "who-directs", title: "Who decides the details?", description: "Location, lighting, camera, background people, expressions, wardrobe and sound for every scene. Let Omni fill them in from your story, or set each one yourself. Anything you have already written is always kept.",
+      content: <div className="grid gap-3 sm:grid-cols-2">
+        <button type="button" className={`decision-choice ${mode === "omni" ? "active" : ""}`} aria-pressed={mode === "omni"} disabled={directing || !state.scenes.length} onClick={() => void onAutoDirect()}>
+          <strong>{directing ? "Omni is directing your scenes…" : "Let Omni do it"}</strong>
+          <span>Omni fills every empty detail, then takes you to Generate. You can still review and change anything here.</span>
+        </button>
+        <button type="button" className={`decision-choice ${mode === "director" ? "active" : ""}`} aria-pressed={mode === "director"} disabled={directing} onClick={() => void onDirect()}>
+          <strong>I&apos;ll direct</strong>
+          <span>Go through each scene step by step. Ask Omni on any field when you want a suggestion.</span>
+        </button>
+      </div> },
     { id: "order", title: "Arrange your scenes", description: "Start with the story order. We’ll review each character and scene next.", content: <>
       <ol className="story-scene-list">{state.scenes.map((scene, index) => <li key={scene.id}>
         <span className="story-scene-index">{index + 1}</span><span className="min-w-0 flex-1"><strong>{scene.title}</strong><small>{(scene.visualAction ?? scene.description).slice(0, 110)}</small></span>

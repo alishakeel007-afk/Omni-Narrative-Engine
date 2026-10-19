@@ -77,6 +77,7 @@ const directionSchema = z.object({
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("detectCast") }),
   z.object({ action: z.literal("autoDirect"), requestId: z.string().uuid() }),
+  z.object({ action: z.literal("answerGenerateAll"), offerId: z.string().uuid() }),
   z.object({ action: z.literal("createCharacter"), name: z.string().trim().min(1).max(100), appearance: z.string().max(5000).default("") }),
   z.object({ action: z.literal("removeCharacter"), characterId: z.string().max(100) }),
   z.object({ action: z.literal("generatePortrait"), characterId: z.string().max(100), requestId: z.string().uuid() }),
@@ -293,7 +294,6 @@ const actionSchema = z.discriminatedUnion("action", [
         visualStyle: z.string().max(4000).optional(),
         sourceScript: z.string().max(24000).optional(),
         creativeBrief: creativeBriefSchema.optional(),
-        // Default clip length for the project. Resolved through
         directionMode: z.enum(["omni", "director"]).optional(),
         // null clears a count so Omni decides it again.
         storyPlan: z
@@ -303,6 +303,7 @@ const actionSchema = z.discriminatedUnion("action", [
           })
           .strict()
           .optional(),
+        // Default clip length for the project. Resolved through
         // lib/film/duration.ts, which clamps it to this deployment's cap.
         clipSeconds: z.number().positive().max(60).optional(),
       })
@@ -613,7 +614,6 @@ export async function POST(req: Request, context: Context) {
       if (state.undoTimeline) state.timeline = state.undoTimeline;
       delete state.undoTimeline;
       delete state.undoEdits;
-    } else if (body.action === "createCharacter") {
     } else if (body.action === "autoDirect") {
       if (!state.scenes.length) throw new StudioError("Build the script first, then Omni can fill in the scene details.");
       if (state.autoDirected?.requestId === body.requestId) {
@@ -629,11 +629,19 @@ export async function POST(req: Request, context: Context) {
           const filled = fillSceneDirection(state, reply);
           state.directionMode = "omni";
           state.autoDirected = { requestId: body.requestId, at: new Date().toISOString(), filled };
+          // Asked once on the Generate step. Ids are fixed now so a repeated
+          // Yes resolves to the same durable jobs instead of new paid ones.
+          state.generateAllOffer = { id: randomUUID(), createdAt: new Date().toISOString(),
+            requestIds: Object.fromEntries(state.scenes.map((item) => [item.id, randomUUID()])) };
           notices.push(filled
             ? `Omni filled in ${filled} scene detail${filled === 1 ? "" : "s"}. Anything you had already written was kept.`
             : "Every scene detail was already filled in, so nothing changed.");
         }
       }
+    } else if (body.action === "answerGenerateAll") {
+      // Yes submits through the jobs route first; either answer then closes
+      // the question for good. A stale offer id changes nothing.
+      if (state.generateAllOffer?.id === body.offerId) delete state.generateAllOffer;
     } else if (body.action === "detectCast") {
       if ((state.sourceScript ?? "").trim().length < 40) throw new StudioError("Paste your script first, then Omni can find its characters.");
       const found = await detectScriptCast(state.sourceScript as string);
@@ -653,6 +661,7 @@ export async function POST(req: Request, context: Context) {
       if (state.storyPlan?.characterCount !== undefined && state.storyPlan.characterCount < state.characters.length)
         state.storyPlan.characterCount = state.characters.length;
       notices.push(added.length ? `Found ${added.join(", ")} in your script. Check how each one looks, or add a photo.` : "No new characters were found in your script.");
+    } else if (body.action === "createCharacter") {
       if (state.characters.length >= 12) throw new StudioError("A story supports up to 12 characters.");
       if (state.characters.some(item => item.name.toLowerCase() === body.name.toLowerCase())) throw new StudioError("Choose a unique character name.");
       state.characters.push({ id: randomUUID(), name: body.name, appearance: body.appearance, locked: false, origin: "user" });
@@ -718,9 +727,9 @@ export async function POST(req: Request, context: Context) {
         name: body.name,
         appearance: body.appearance,
         locked: body.locked,
-        ...(body.motivation !== undefined ? { motivation: body.motivation } : {}),
         // Saved by the writer, so a rebuild keeps this character and its look.
         origin: "user",
+        ...(body.motivation !== undefined ? { motivation: body.motivation } : {}),
         ...(body.relationships !== undefined ? { relationships: body.relationships } : {}),
       });
     } else if (body.action === "scene") {
@@ -961,6 +970,8 @@ export async function POST(req: Request, context: Context) {
       // Shared with the landing page's preview, so a visitor sees the same
       // structure the signed-in product builds.
       notices.push(...applyFilmScript(state, script));
+      // The offer named the old scenes; a rebuilt script must be directed again.
+      delete state.generateAllOffer;
         } else if (body.action === "assist") {
       const scene = body.sceneId
         ? state.scenes.find((item) => item.id === body.sceneId)
@@ -1197,16 +1208,6 @@ export async function POST(req: Request, context: Context) {
       const { storyPlan, ...rest } = patch;
       Object.assign(state, rest);
       if (brief) state.creativeBrief = brief;
-    }
-    const appended =
-      body.action === "chat"
-        ? state.messages.filter(
-            (message) =>
-              !loaded.state.messages.some(
-                (existing) => existing.id === message.id,
-              ),
-          )
-        : [];
       if (storyPlan) {
         const plan = { ...state.storyPlan };
         for (const key of ["sceneCount", "characterCount"] as const) {
@@ -1218,6 +1219,16 @@ export async function POST(req: Request, context: Context) {
           throw new StudioError(`You already have ${state.characters.length} characters. Remove one before lowering the count.`);
         state.storyPlan = plan;
       }
+    }
+    const appended =
+      body.action === "chat"
+        ? state.messages.filter(
+            (message) =>
+              !loaded.state.messages.some(
+                (existing) => existing.id === message.id,
+              ),
+          )
+        : [];
     if (appended.length) {
       // A scene job may finish while a Plan reply is being written. Merge the
       // new messages into the latest revision rather than losing either result.

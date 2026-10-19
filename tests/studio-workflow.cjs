@@ -172,11 +172,30 @@ class StudioError extends Error {
   assert.equal(directedBody.state.directionMode, "omni");
   assert.equal(directedBody.state.autoDirected.filled, 1);
   assert.match(directedBody.notices[0], /filled in 1 scene detail\. Anything you had already written was kept/);
+  // The one-time Generate-all question, with a fixed request id per scene.
+  const offer = directedBody.state.generateAllOffer;
+  assert.ok(offer && /^[0-9a-f-]{36}$/.test(offer.id), "Let Omni do it offers Generate all");
+  assert.deepEqual(Object.keys(offer.requestIds), ["s1"]);
+  assert.match(offer.requestIds.s1, /^[0-9a-f-]{36}$/);
   // A retried request is not applied again, even if the writer cleared a field.
   saved = { ...saved, scenes: [{ ...saved.scenes[0], direction: { location: "Mine" } }] };
   directedBody = await (await post({ action: "autoDirect", requestId: runId })).json();
   assert.deepEqual(directedBody.state.scenes[0].direction, { location: "Mine" }, "The same request id is a no-op");
   assert.match(directedBody.notices[0], /already filled/);
+  assert.deepEqual(directedBody.state.generateAllOffer, offer, "A repeated request keeps the same offer and request ids");
+  // A stale answer changes nothing; the real one closes the question for good.
+  state = (await (await post({ action: "answerGenerateAll", offerId: "00000000-0000-4000-8000-000000000000" })).json()).state;
+  assert.deepEqual(state.generateAllOffer, offer);
+  assert.equal((await post({ action: "answerGenerateAll", offerId: "nope" })).status, 400);
+  state = (await (await post({ action: "answerGenerateAll", offerId: offer.id })).json()).state;
+  assert.equal(state.generateAllOffer, undefined, "Answering closes the offer");
+  state = (await (await post({ action: "answerGenerateAll", offerId: offer.id })).json()).state;
+  assert.equal(state.generateAllOffer, undefined, "Answering twice is harmless");
+  // A rebuilt script has new scenes, so an unanswered offer is dropped.
+  saved = { ...saved, generateAllOffer: offer };
+  scriptReply = { title: "Rebuilt", premise: "p", world: "", characters: [], scenes: [{ title: "New", visualAction: "Something new happens.", characters: [], dialogues: [] }] };
+  state = (await (await post({ action: "script" })).json()).state;
+  assert.equal(state.generateAllOffer, undefined, "A rebuild drops the old offer");
   state = (await (await workflow({ directionMode: "director" })).json()).state;
   assert.equal(state.directionMode, "director");
   assert.equal((await workflow({ directionMode: "auto" })).status, 400);

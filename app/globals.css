@@ -142,6 +142,16 @@ html {
 .decision-back { border: 1px solid var(--line); }
 .decision-next { background: var(--accent); font-weight: 600; }
 .decision-back:disabled, .decision-next:disabled { opacity: .4; cursor: default; }
+/* A large either/or answer, such as "Let Omni do it" versus "I'll direct". */
+.decision-choice { display: grid; gap: 6px; text-align: left; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: white; transition: border-color .15s; }
+.decision-choice strong { font-size: 15px; font-weight: 600; }
+.decision-choice span { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.decision-choice.active { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
+.decision-choice:not(:disabled):hover { border-color: var(--ink); }
+.decision-choice:disabled { opacity: .5; cursor: default; }
+.decision-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The one-time "Generate all N scenes now?" question on Step 3. */
+.generate-offer { border: 1px solid var(--ink); border-radius: 16px; padding: 18px; background: white; box-shadow: inset 4px 0 0 var(--accent); }
 .field-assist { margin-top: 14px; }
 .field-assist-trigger { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; font-weight: 500; padding: 8px 0; }
 .omni-assist-mark { width: 16px; height: 16px; object-fit: contain; }

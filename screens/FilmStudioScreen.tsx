@@ -68,6 +68,9 @@ export default function FilmStudioScreen() {
 
   // Serialize blur-saves and clicks so a navigation or build cannot overtake an edit.
   const writes = useRef<Promise<unknown>>(Promise.resolve());
+  // The last project the server returned, for decisions made right after a
+  // write, before React has re-rendered with it.
+  const saved = useRef<StudioState | null>(null);
   const act = useCallback((body: Record<string, unknown>): Promise<boolean> => {
     const run = async () => {
       if (!id) return false;
@@ -79,6 +82,7 @@ export default function FilmStudioScreen() {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "That change could not be saved.");
         setState(result.state);
+        saved.current = result.state;
         if (result.capability) setCapability(result.capability);
         setNotices(result.notices ?? []); setSaveState("saved");
         if (savedTimer.current) clearTimeout(savedTimer.current);
@@ -128,14 +132,6 @@ export default function FilmStudioScreen() {
     [id],
   );
 
-  const [building, setBuilding] = useState(false);
-  const buildScript = useCallback(async () => {
-    setBuilding(true);
-    const ok = await act({ action: "script" });
-    setBuilding(false);
-    if (ok) setState((current) => (current ? { ...current, step: "script" } : current));
-  }, [act]);
-
   const goToStep = useCallback(
     async (step: FilmStep) => {
       if (!state || step === state.step) return;
@@ -146,6 +142,35 @@ export default function FilmStudioScreen() {
     },
     [state, save],
   );
+
+  // "Let Omni do it". The id is kept until the server confirms, so a retry
+  // after a timeout is recognised as the same request.
+  const directRequest = useRef<string | null>(null);
+  const [directing, setDirecting] = useState(false);
+  const autoDirect = useCallback(async () => {
+    setDirecting(true);
+    directRequest.current ??= crypto.randomUUID();
+    const ok = await act({ action: "autoDirect", requestId: directRequest.current });
+    setDirecting(false);
+    if (!ok) return false;
+    directRequest.current = null;
+    setState((current) => (current ? { ...current, step: "generate" } : current));
+    await save({ step: "generate" });
+    return true;
+  }, [act, save]);
+
+  const [building, setBuilding] = useState(false);
+  const buildScript = useCallback(async () => {
+    setBuilding(true);
+    const ok = await act({ action: "script" });
+    if (ok) setState((current) => (current ? { ...current, step: "script" } : current));
+    // An idea is guided end to end: Omni fills the scene details and the
+    // writer lands on Generate. A pasted script stops at Step 2 so its
+    // writer can choose who decides the details. If directing fails, the
+    // writer is left on Step 2 with the error and can retry from there.
+    if (ok && !saved.current?.sourceScript?.trim()) await autoDirect();
+    setBuilding(false);
+  }, [act, autoDirect]);
 
   if (!state) {
     return (
@@ -287,6 +312,9 @@ export default function FilmStudioScreen() {
                 onUpload={upload}
                 onAction={act}
                 onContinue={() => void goToStep("generate")}
+                directing={directing}
+                onAutoDirect={autoDirect}
+                onDirect={() => save({ directionMode: "director" })}
               />
             ) : current === "generate" ? (
               <GenerateStep

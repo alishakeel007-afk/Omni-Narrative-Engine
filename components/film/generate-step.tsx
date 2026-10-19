@@ -70,6 +70,12 @@ export function GenerateStep({
   const [advice, setAdvice] = useState("");
   const alive = useRef(true);
   const pendingRequests = useRef(new Map<string, string>());
+  // Focus lands on the question, never on "Yes": a key press carried over
+  // from the previous screen must not start paid renders.
+  const offerHeading = useRef<HTMLParagraphElement>(null);
+  const offerId = state.generateAllOffer?.id;
+  useEffect(() => { if (offerId) offerHeading.current?.focus(); }, [offerId]);
+
 
   useEffect(() => {
     alive.current = true;
@@ -105,14 +111,16 @@ export function GenerateStep({
   }, [refresh, film.working]);
 
   const submit = useCallback(
-    async (scenes: SceneGeneration[], kind: "image" | "video" = "video") => {
-      if (!scenes.length) return;
+    async (scenes: SceneGeneration[], kind: "image" | "video" = "video", fixedIds?: Record<string, string>) => {
+      if (!scenes.length) return true;
       setBusy("submit");
       setError("");
       try {
         for (const item of scenes) {
           const key = `${kind}:${item.scene.id}`;
-          const requestId = pendingRequests.current.get(key) ?? crypto.randomUUID();
+          // A fixed id (the Generate-all offer) makes a repeated submit land
+          // on the same durable job instead of paying for a new one.
+          const requestId = fixedIds?.[item.scene.id] ?? pendingRequests.current.get(key) ?? crypto.randomUUID();
           pendingRequests.current.set(key, requestId);
           const response = await fetch(`/api/studio/${projectId}/jobs`, {
             method: "POST",
@@ -132,8 +140,10 @@ export function GenerateStep({
           if (!response.ok) throw new Error(body.error || `${item.scene.title} could not be queued.`);
           pendingRequests.current.delete(key);
         }
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "That generation could not be queued.");
+        return false;
       } finally {
         setBusy("");
         void refresh();
@@ -165,6 +175,31 @@ export function GenerateStep({
   );
 
   const urdu = (state.language ?? "en") === "ur";
+  // Asked once after "Let Omni do it". Only scenes that are ready now and
+  // were part of the offer are counted, so the number is what will queue.
+  const offer = state.generateAllOffer;
+  const offered = offer && !urdu ? film.scenes.filter((item) => ["pending", "stale"].includes(item.status) && offer.requestIds[item.scene.id]) : [];
+  const answerOffer = async (yes: boolean) => {
+    if (!offer) return;
+    // Submit first: if this fails or the page closes, the question stays,
+    // and answering Yes again reuses the same request ids.
+    if (yes && !(await submit(offered, "video", offer.requestIds))) return;
+    setBusy("offer");
+    try {
+      const response = await fetch(`/api/studio/${projectId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "answerGenerateAll", offerId: offer.id }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Your answer could not be saved.");
+      onState(body.state);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your answer could not be saved.");
+    } finally {
+      setBusy("");
+    }
+  };
+
 
   if (!state.scenes.length) {
     return (
@@ -176,6 +211,23 @@ export function GenerateStep({
 
   return (
     <div className="space-y-6">
+      {offered.length ? (
+        <section role="alertdialog" aria-labelledby="generate-all-title" aria-describedby="generate-all-body" className="generate-offer">
+          <p id="generate-all-title" tabIndex={-1} ref={offerHeading} className="text-base font-semibold text-[var(--ink)] outline-none">
+            Generate all {offered.length} ready scene{offered.length === 1 ? "" : "s"} now?
+          </p>
+          <p id="generate-all-body" className="mt-1 text-sm leading-6 text-[var(--muted)]">
+            Omni has filled in your scene details. This queues {offered.length} scene video{offered.length === 1 ? "" : "s"}. A scene with characters makes a reference frame first, then its video. Rendering continues if you close this page.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" className="decision-next" disabled={Boolean(busy)} onClick={() => void answerOffer(true)}>
+              {busy === "submit" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
+              Yes, generate {offered.length}
+            </button>
+            <button type="button" className="decision-back" disabled={Boolean(busy)} onClick={() => void answerOffer(false)}>Not now</button>
+          </div>
+        </section>
+      ) : null}
       {urdu ? (
         <p
           role="status"
