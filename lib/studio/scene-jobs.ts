@@ -237,11 +237,11 @@ export async function enqueueSceneJob(
     (cast.length !== scene.characterIds.length ||
       cast.some(
         (character) =>
-          !character.locked || !characterReferences(character).length,
+          character.locked && !characterReferences(character).length,
       ))
   )
     throw new StudioError(
-      "Add reference views and lock every scene character before generating a take.",
+      "A locked character is missing its approved reference image. Add one or unlock that character to generate from its written description.",
     );
   if (kind === "video" && input.direct === true && cast.length)
     throw new StudioError(

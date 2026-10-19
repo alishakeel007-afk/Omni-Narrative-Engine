@@ -63,7 +63,14 @@ export function boundImagePrompt(request: {
 }
 export function sceneIdentity(state: StudioState, scene: StudioScene) {
   return state.characters
-    .filter((item) => scene.characterIds.includes(item.id))
+    // A locked reference is an explicit continuity promise. Characters that
+    // only have a written description are still included in the generation
+    // prompt, but cannot be visually checked against an image they do not have.
+    .filter((item) =>
+      scene.characterIds.includes(item.id) &&
+      item.locked &&
+      characterReferences(item).length,
+    )
     .map(identityProfile);
 }
 export function continuityProblem(
@@ -78,17 +85,7 @@ export function continuityProblem(
   )
     return "This take uses an older scene or story revision. Create a new take from the current requirements.";
   const identities = sceneIdentity(state, scene);
-  if (!scene.characterIds.length) return;
-  if (identities.length !== scene.characterIds.length)
-    return "A scene character is missing. Update the cast first.";
-  if (
-    state.characters.some(
-      (item) =>
-        scene.characterIds.includes(item.id) &&
-        (!item.locked || !characterReferences(item).length),
-    )
-  )
-    return "Review and lock a reference for every character first.";
+  if (!identities.length) return;
   if (
     !take.identity ||
     JSON.stringify(take.identity.map((item) => item.key)) !==

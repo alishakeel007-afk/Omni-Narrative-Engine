@@ -123,7 +123,6 @@ html {
    * it arrives at the next phase instead of showing a line through the number. */
 .story-progress-track { z-index: 0; height: 5px; margin: 0; position: absolute; top: 36px; left: calc(12.5% + 18px); right: calc(12.5% + 18px); background: #e7e7e7; border-radius: 4px; }
 .story-progress-fill { position: relative; height: 100%; display: block; background: var(--accent); border-radius: inherit; transition: width .45s cubic-bezier(.2,.75,.2,1); }
-.story-progress-fill:not([style*="width: 0%"])::after { content: ""; position: absolute; right: -1px; top: 50%; width: 10px; height: 10px; background: var(--accent); clip-path: polygon(100% 50%, 0 0, 0 100%); transform: translateY(-50%); }
 @media (prefers-reduced-motion: reduce) { .story-stage-number::before, .guest-step-number::before, .story-progress-fill { transition: none; } }
 .story-progress-caption { margin: 14px 0 0; display: flex; justify-content: space-between; gap: 18px; font-size: 11px; color: var(--muted); }
 .story-progress-caption > :last-child { flex-shrink: 0; }

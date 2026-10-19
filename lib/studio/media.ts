@@ -169,17 +169,20 @@ export async function startMedia(
   if (
     cast.some(
       (character) =>
-        !character.locked || !characterReferences(character).length,
+        character.locked && !characterReferences(character).length,
     )
   )
     throw new StudioError(
-      "Add reference views and lock every scene character before generating. You can create a concept portrait in Plan first.",
+      "A locked character is missing its approved reference image. Add one or unlock that character to generate from its written description.",
     );
-  if (kind === "video" && direct && cast.length)
+  const anchoredCast = cast.filter(
+    (character) => character.locked && characterReferences(character).length,
+  );
+  if (kind === "video" && direct && anchoredCast.length)
     throw new StudioError(
-      "Character scenes require a checked reference image. Text-only video cannot preserve character references.",
+      "A scene with locked character references needs a checked scene image first.",
     );
-  const identity = cast.map(character => ({ ...identityProfile(character),
+  const identity = anchoredCast.map(character => ({ ...identityProfile(character),
     ...(scene.direction?.wardrobe?.[character.id] ? { sceneWardrobe: scene.direction.wardrobe[character.id] } : {}) }));
   let result;
   if (kind === "image") {
@@ -206,15 +209,19 @@ export async function startMedia(
     const image = scene.takes.find(
       (take) => take.id === scene.selectedImageId && take.status === "complete",
     );
-    const lockedReferences = cast.filter(
-      (character) => character.locked && character.referenceId,
-    );
+    const lockedReferences = anchoredCast;
     if (nativeVideoEnabled()) {
       if (!direct && cast.length && !image?.url) throw new StudioError("Choose a checked scene image first.");
       if (image && !direct) {
         if (!image.url) throw new StudioError("The selected scene image is unavailable.");
         const problem = continuityProblem(state, scene, image);
-        if (problem) throw new StudioError(problem);
+        // An unavailable or uncertain visual check should not discard a
+        // legitimate render request. Keep a confirmed mismatch blocked, but
+        // allow the video to proceed and require review before selection/export.
+        const reviewPending = ["pending", "review", "error"].includes(
+          image.continuity?.status || "",
+        );
+        if (problem && !reviewPending) throw new StudioError(problem);
         if (image.continuityKey ? image.continuityKey !== continuityKey : image.prompt !== basePrompt || lockedReferences.length > 0)
           throw new StudioError("The selected image uses an older scene or character profile. Generate a new scene image first.");
       }
@@ -258,7 +265,10 @@ export async function startMedia(
     }
     if (!direct && image) {
       const problem = continuityProblem(state, scene, image);
-      if (problem) throw new StudioError(problem);
+      const reviewPending = ["pending", "review", "error"].includes(
+        image.continuity?.status || "",
+      );
+      if (problem && !reviewPending) throw new StudioError(problem);
       if (
         image.continuityKey
           ? image.continuityKey !== continuityKey

@@ -325,6 +325,8 @@ export default function FilmStudioScreen() {
                 onAssemble={() => act({ action: "assemble" })}
                 onSelect={(sceneId, takeId) => act({ action: "select", sceneId, takeId })}
                 onReview={(sceneId, takeId) => act({ action: "reviewTake", sceneId, takeId })}
+                onGoToStep={(step) => void goToStep(step)}
+                onLockAll={() => act({ action: "lockCharacters" })}
               />
             ) : (
               <EditStep

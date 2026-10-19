@@ -73,14 +73,14 @@ function scriptProgress(state: StudioState) {
   const cast = new Set(state.scenes.flatMap((scene) => scene.characterIds));
   const named = state.characters.filter((character) => cast.has(character.id));
   const ready = named.filter(
-    (character) => character.locked && characterReferences(character).length,
+    (character) => !character.locked || characterReferences(character).length,
   );
 
   if (described < state.scenes.length)
     remaining.push(`Describe the visual action in ${state.scenes.length - described} scene(s)`);
   if (named.length && ready.length < named.length)
     remaining.push(
-      `Add a reference view and lock ${named
+      `Add a reference view for locked character ${named
         .filter((character) => !ready.includes(character))
         .map((character) => character.name)
         .join(", ")}`,

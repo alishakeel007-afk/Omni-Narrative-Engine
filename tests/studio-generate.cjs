@@ -100,17 +100,17 @@ function scene(overrides = {}) {
   // --- status ------------------------------------------------------------
   assert.equal(statusOf(project()), "pending", "A locked cast with no take is ready to generate");
 
-  // An unlocked or unreferenced character blocks it, and names who.
-  let blocked = sceneGeneration(
+  // A written character is enough for a first take. A reference becomes an
+  // optional continuity anchor only once the writer locks it.
+  let unreferenced = sceneGeneration(
     project({ characters: [character({ locked: false })] }),
     project({ characters: [character({ locked: false })] }).scenes[0],
     0,
     [],
   );
-  assert.equal(blocked.status, "blocked");
-  assert.match(blocked.problem, /Ayesha needs a reference view and a lock/);
+  assert.equal(unreferenced.status, "pending");
 
-  blocked = sceneGeneration(project({ characters: [] }), project({ characters: [] }).scenes[0], 0, []);
+  let blocked = sceneGeneration(project({ characters: [] }), project({ characters: [] }).scenes[0], 0, []);
   assert.equal(blocked.status, "blocked");
   assert.match(blocked.problem, /no longer exists/);
 

@@ -113,6 +113,37 @@ function modelJson(text: string) {
     );
   }
 }
+/**
+ * Seconds until a rate-limited provider will accept requests again, when it
+ * says: Groq sends a Retry-After header, Gemini a RetryInfo detail.
+ */
+async function retryAfterSeconds(response: Response): Promise<number | undefined> {
+  const header = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(header) && header > 0) return Math.ceil(header);
+  try {
+    const body = await response.clone().json();
+    const details: { "@type"?: string; retryDelay?: string }[] = body?.error?.details ?? [];
+    const delay = details.find((item) => item["@type"]?.endsWith("RetryInfo"))?.retryDelay;
+    const seconds = delay ? Number.parseFloat(delay) : NaN;
+    return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One message for "every provider is rate-limited", so it reads the same everywhere. */
+export function rateLimitError(seconds?: number) {
+  const when = seconds === undefined
+    ? "Try again in a minute."
+    : seconds > 3600
+      ? "The daily limit may be used up; try again later today."
+      : seconds > 90
+        ? `Try again in about ${Math.ceil(seconds / 60)} minutes.`
+        : `Try again in about ${Math.max(5, seconds)} seconds.`;
+  const error = new StudioError(`Omni is rate-limited by its AI provider right now. Nothing was changed. ${when}`, 429);
+  return Object.assign(error, { retryAfter: seconds });
+}
+
 export async function askModel(
   prompt: string,
   image?:
@@ -169,21 +200,21 @@ export async function askModel(
         );
       return modelJson(text);
     }
+    if (response.status === 429) throw rateLimitError(await retryAfterSeconds(response));
     throw new StudioError(
-      response.status === 429 ? "Omni has reached the provider’s rate limit. Please try again shortly."
-      : response.status === 401 || response.status === 403 ? "Omni could not authenticate. Check the server’s Gemini API key."
+      response.status === 401 || response.status === 403 ? "Omni could not authenticate. Check the server’s Gemini API key."
       : response.status === 404 ? "The configured Gemini model is unavailable. Check GEMINI_MODEL on the server."
-      : `Omni is temporarily unavailable (${response.status}). Please try again.`, response.status === 429 ? 429 : 502);
+      : `Omni is temporarily unavailable (${response.status}). Please try again.`, 502);
     } catch (cause) {
       primaryError = cause instanceof StudioError ? cause : new StudioError("Omni could not reach its provider. Please try again.", 502);
-      if (image) throw primaryError;
-      // Text-only help can use the configured fallback even after a network
-      // timeout, empty reply or malformed JSON. Never send visual analysis to it.
+      // Groq's vision-capable models are a valid fallback for both guided
+      // writing and continuity checks. A quota limit at the primary provider
+      // must not strand a completed reference image and its dependent video.
     }
   }
   const groq = getEnvValue(["GROQ_API_KEY", "GROQ_FALLBACK_API"]);
   if (!groq && primaryError) throw primaryError;
-  if (!groq || image)
+  if (!groq)
     throw new StudioError(
       image
         ? "Configure GEMINI_API_KEY to analyse character images."
@@ -199,16 +230,36 @@ export async function askModel(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: getEnvValue(["GROQ_MODEL"]) || "llama-3.3-70b-versatile",
+        model: image
+          ? getEnvValue(["GROQ_VISION_MODEL"]) || "meta-llama/llama-4-scout-17b-16e-instruct"
+          : getEnvValue(["GROQ_MODEL"]) || "llama-3.3-70b-versatile",
         response_format: { type: "json_object" },
-        messages: [{ role: "user", content: prompt }],
+        messages: [{
+          role: "user",
+          content: image
+            ? [
+                { type: "text", text: prompt },
+                ...(Array.isArray(image) ? image : [image]).map((item) => ({
+                  type: "image_url",
+                  image_url: { url: `data:${item.mimeType};base64,${item.data}` },
+                })),
+              ]
+            : prompt,
+        }],
       }),
       signal: AbortSignal.timeout(90000),
     },
   );
+  if (response.status === 429) {
+    // Both providers are limited: report the sooner of the two waits.
+    const waits = [await retryAfterSeconds(response),
+      primaryError?.status === 429 ? (primaryError as StudioError & { retryAfter?: number }).retryAfter : undefined]
+      .filter((value): value is number => value !== undefined);
+    throw rateLimitError(waits.length ? Math.min(...waits) : undefined);
+  }
   if (!response.ok)
     throw new StudioError(
-      `The director is unavailable (${response.status}). Please try again.`,
+      `Omni's backup AI provider is unavailable (${response.status}). Nothing was changed. Please try again.`,
       502,
     );
   return modelJson(

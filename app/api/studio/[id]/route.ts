@@ -80,6 +80,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("answerGenerateAll"), offerId: z.string().uuid() }),
   z.object({ action: z.literal("createCharacter"), name: z.string().trim().min(1).max(100), appearance: z.string().max(5000).default("") }),
   z.object({ action: z.literal("removeCharacter"), characterId: z.string().max(100) }),
+  z.object({ action: z.literal("lockCharacters") }),
   z.object({ action: z.literal("generatePortrait"), characterId: z.string().max(100), requestId: z.string().uuid() }),
   z.object({ action: z.literal("sceneList"), operation: z.enum(["add", "remove", "move", "undo"]),
     sceneId: z.string().max(100).optional(), toIndex: z.number().int().min(0).max(23).optional() }),
@@ -732,6 +733,15 @@ export async function POST(req: Request, context: Context) {
         ...(body.motivation !== undefined ? { motivation: body.motivation } : {}),
         ...(body.relationships !== undefined ? { relationships: body.relationships } : {}),
       });
+    } else if (body.action === "lockCharacters") {
+      const referenced = state.characters.filter((character) => characterReferences(character).length);
+      const missing = state.characters.filter((character) => !characterReferences(character).length);
+      if (!referenced.length)
+        throw new StudioError("Add and approve at least one character reference before locking settings.");
+      for (const character of referenced) character.locked = true;
+      notices.push(`Locked ${referenced.length} character ${referenced.length === 1 ? "appearance" : "appearances"} with their current reference images.`);
+      if (missing.length)
+        notices.push(`${missing.map((character) => character.name).join(", ")} will generate from their written descriptions until you add a reference image.`);
     } else if (body.action === "scene") {
       if (
         body.characterIds.some(

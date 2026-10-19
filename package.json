@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/run-studio.cjs dev",
+    "dev:web": "next dev",
     "build": "node scripts/studio-worker.cjs --build && next build",
     "start": "next start",
     "dev:with-worker": "node scripts/run-studio.cjs dev",

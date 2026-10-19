@@ -97,13 +97,30 @@ async function testConsistency() {
   character.references.push({ id: "new-view", label: "Right profile" });
   assert.match(identity.filmContinuityProblem(state), /changed/);
   character.references.pop();
+  // Locking is optional. An unlocked character generates from their written
+  // description and is never visually checked, so they never block a take.
   character.locked = false;
-  assert.match(identity.filmContinuityProblem(state), /lock/);
+  take.continuity.status = "failed";
+  assert.equal(identity.filmContinuityProblem(state), undefined, "An unlocked character never blocks, even after a failed check");
+  take.continuity.status = "passed";
   character.locked = true;
+  // A description-only castmate does not block the locked one's passed take,
+  // and is not part of the identity the take is compared against.
+  const writtenOnly = { id: "samir", name: "Samir", appearance: "Curly hair, cricket jersey.", locked: false };
+  state.characters.push(writtenOnly);
+  scene.characterIds.push("samir");
+  assert.deepEqual(identity.sceneIdentity(state, scene).map((item) => item.name), ["Elara"]);
+  assert.equal(identity.filmContinuityProblem(state), undefined, "A character without a locked reference never blocks");
+  take.continuity.status = "failed";
+  assert.match(identity.filmContinuityProblem(state), /drift/, "The locked character is still checked");
+  take.continuity.status = "passed";
+  scene.characterIds.pop();
+  state.characters.pop();
+  // A cast id with no character is a Step 2 repair, not an appearance gate.
   const unknown = { ...scene, characterIds: ["missing"] };
-  assert.match(identity.continuityProblem(state, unknown, take), /missing/);
+  assert.equal(identity.continuityProblem(state, unknown, take), undefined);
   console.log(
-    "PASS: multiple reference views, fair cast conditioning, unlocked/stale/failed/uncertain take rejection and film export gate.",
+    "PASS: multiple reference views, fair cast conditioning, stale/failed/uncertain take rejection for locked characters, unlocked characters never blocking, and the film export gate.",
   );
 
   let verdict = "match";

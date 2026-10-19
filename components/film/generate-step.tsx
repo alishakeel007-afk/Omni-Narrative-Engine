@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Check,
   Film,
+  Lock,
   Loader2,
   Play,
   RefreshCw,
@@ -33,6 +34,8 @@ type Props = {
   onAssemble: () => Promise<boolean>;
   onSelect: (sceneId: string, takeId: string) => Promise<boolean>;
   onReview: (sceneId: string, takeId: string) => Promise<boolean>;
+  onGoToStep: (step: "setup" | "script") => void;
+  onLockAll: () => Promise<boolean>;
 };
 
 const PHASE_LABEL: Record<string, string> = {
@@ -63,6 +66,8 @@ export function GenerateStep({
   onAssemble,
   onSelect,
   onReview,
+  onGoToStep,
+  onLockAll,
 }: Props) {
   const [jobs, setJobs] = useState<SceneJob[]>([]);
   const [error, setError] = useState("");
@@ -75,7 +80,6 @@ export function GenerateStep({
   const offerHeading = useRef<HTMLParagraphElement>(null);
   const offerId = state.generateAllOffer?.id;
   useEffect(() => { if (offerId) offerHeading.current?.focus(); }, [offerId]);
-
 
   useEffect(() => {
     alive.current = true;
@@ -116,7 +120,7 @@ export function GenerateStep({
       setBusy("submit");
       setError("");
       try {
-        for (const item of scenes) {
+        await Promise.all(scenes.map(async (item) => {
           const key = `${kind}:${item.scene.id}`;
           // A fixed id (the Generate-all offer) makes a repeated submit land
           // on the same durable job instead of paying for a new one.
@@ -139,7 +143,7 @@ export function GenerateStep({
           const body = await response.json();
           if (!response.ok) throw new Error(body.error || `${item.scene.title} could not be queued.`);
           pendingRequests.current.delete(key);
-        }
+        }));
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "That generation could not be queued.");
@@ -175,6 +179,9 @@ export function GenerateStep({
   );
 
   const urdu = (state.language ?? "en") === "ur";
+  const unlocked = state.characters.filter((character) => !character.locked && character.references?.length);
+  const missingReference = state.characters.filter((character) => !character.references?.length);
+  const queueable = film.scenes.filter((item) => ["pending", "stale"].includes(item.status));
   // Asked once after "Let Omni do it". Only scenes that are ready now and
   // were part of the offer are counted, so the number is what will queue.
   const offer = state.generateAllOffer;
@@ -199,7 +206,6 @@ export function GenerateStep({
       setBusy("");
     }
   };
-
 
   if (!state.scenes.length) {
     return (
@@ -228,6 +234,26 @@ export function GenerateStep({
           </div>
         </section>
       ) : null}
+      <section className="rounded-xl border border-[var(--line)] p-4">
+        <p className="text-sm font-medium text-[var(--ink)]">Need to change the story first?</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+          Return to any earlier step without losing your scenes. Every scene with a character needs an approved reference and a locked appearance before it can render.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="guest-pill" disabled={Boolean(busy)} onClick={() => onGoToStep("setup")}>Edit setup</button>
+          <button type="button" className="guest-pill" disabled={Boolean(busy)} onClick={() => onGoToStep("script")}>Edit script &amp; characters</button>
+          {unlocked.length ? <button type="button" className="guest-pill" disabled={Boolean(busy)} onClick={async () => {
+            setBusy("lock"); setError("");
+            const ok = await onLockAll();
+            if (!ok) setError("Those current settings could not be locked. Check that every character has a reference image.");
+            setBusy("");
+          }}><Lock className="h-3.5 w-3.5" aria-hidden /> Lock all current references</button> : null}
+          {queueable.length ? <button type="button" className="guest-pill" disabled={Boolean(busy) || urdu} onClick={() => void submit(queueable)}>
+            <Play className="h-3.5 w-3.5" aria-hidden /> Generate all ready scenes ({queueable.length})
+          </button> : null}
+        </div>
+        {missingReference.length ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{missingReference.map((character) => character.name).join(", ")} will generate from their written descriptions. Add a reference later when you want their look held across scenes.</p> : null}
+      </section>
       {urdu ? (
         <p
           role="status"

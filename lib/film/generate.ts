@@ -71,12 +71,12 @@ function castProblem(state: StudioState, scene: StudioScene) {
   if (cast.length !== scene.characterIds.length)
     return "A character in this scene no longer exists. Fix the cast in Script & Characters.";
   const unready = cast.filter(
-    (character) => !character.locked || !characterReferences(character).length,
+    (character) => character.locked && !characterReferences(character).length,
   );
   if (unready.length)
     return `${unready
       .map((character) => character.name)
-      .join(", ")} ${unready.length > 1 ? "need" : "needs"} a reference view and a lock before this scene can be generated.`;
+      .join(", ")} ${unready.length > 1 ? "need" : "needs"} an approved reference before this scene can be generated.`;
   return null;
 }
 
