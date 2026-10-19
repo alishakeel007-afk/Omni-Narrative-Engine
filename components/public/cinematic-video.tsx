@@ -2,11 +2,24 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
+import { showreelClip } from "@/lib/film/showreel";
 
-const MotionContext = createContext({ paused: true, toggle: () => {} });
+/**
+ * Background video for the public pages.
+ *
+ * Autoplay only works when the element is muted, inline and marked autoplay
+ * BEFORE the browser decides — not by calling `play()` later — so those are set
+ * on the element itself. Motion starts on unless the visitor asked for less
+ * (`prefers-reduced-motion`) or is saving data; a blocked autoplay or a missing
+ * file leaves the flat surface showing rather than a broken frame.
+ */
+const MotionContext = createContext({ paused: true, canLoad: false, toggle: () => {} });
 
 export function PublicMotion({ children }: { children: React.ReactNode }) {
+  // Resolve motion/data preferences before mounting media. With no restriction
+  // or saved pause, playback starts automatically after hydration.
   const [paused, setPaused] = useState(true);
+  const [canLoad, setCanLoad] = useState(false);
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const connection = (
@@ -18,9 +31,9 @@ export function PublicMotion({ children }: { children: React.ReactNode }) {
     } catch {
       /* Optional preference. */
     }
-    setPaused(
-      saved === "paused" || preference.matches || !!connection?.saveData,
-    );
+    const stop = saved === "paused" || (saved !== "playing" && (preference.matches || !!connection?.saveData));
+    setPaused(stop);
+    setCanLoad(!stop);
     const reduce = () => {
       if (preference.matches) setPaused(true);
     };
@@ -30,17 +43,15 @@ export function PublicMotion({ children }: { children: React.ReactNode }) {
   const toggle = () =>
     setPaused((current) => {
       try {
-        localStorage.setItem(
-          "omni-public-motion",
-          current ? "playing" : "paused",
-        );
+        localStorage.setItem("omni-public-motion", current ? "playing" : "paused");
       } catch {
         /* Optional preference. */
       }
+      if (current) setCanLoad(true);
       return !current;
     });
   return (
-    <MotionContext.Provider value={{ paused, toggle }}>
+    <MotionContext.Provider value={{ paused, canLoad, toggle }}>
       {children}
     </MotionContext.Provider>
   );
@@ -50,6 +61,7 @@ export function MotionToggle({ compact = false }: { compact?: boolean }) {
   const { paused, toggle } = useContext(MotionContext);
   return (
     <button
+      type="button"
       className={`public-motion-toggle ${compact ? "compact" : ""}`}
       onClick={toggle}
       aria-label={paused ? "Play background videos" : "Pause background videos"}
@@ -67,71 +79,74 @@ export function CinematicVideo({
   priority = false,
   className = "",
 }: {
-  film?: "emerald-world" | "forest-light";
+  film?: string;
   priority?: boolean;
   className?: string;
 }) {
-  const { paused } = useContext(MotionContext);
+  const { paused, canLoad } = useContext(MotionContext);
   const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const [visible, setVisible] = useState(false);
+  const clip = showreelClip(film);
+  // Only mounted once it has been near the viewport, so a page with four of
+  // these does not fetch four videos at once.
+  const [near, setNear] = useState(priority);
+  const [visible, setVisible] = useState(priority);
   const [ready, setReady] = useState(false);
-  const [source, setSource] = useState("");
+  const [failed, setFailed] = useState(false);
+
   useEffect(() => {
+    const element = container.current;
+    if (!element) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
-      { threshold: 0.05 },
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+        if (entry.isIntersecting) setNear(true);
+      },
+      { threshold: 0.05, rootMargin: "200px" },
     );
-    if (container.current) observer.observe(container.current);
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  // Playback follows what the visitor can see and what they asked for. A
+  // rejected play() is expected on some browsers and must not throw.
   useEffect(() => {
     const element = video.current;
     if (!element) return;
     const update = () => {
-      if (paused || !visible || document.hidden) {
-        element.pause();
-        return;
-      }
-      if (!source) {
-        const large =
-          window.matchMedia("(min-width: 2000px)").matches &&
-          (navigator.hardwareConcurrency || 2) >= 8;
-        setSource(`/films/${film}-${large ? "4k" : "web"}.mp4`);
-      } else
-        void element.play().catch(() => {
-          /* The poster stays visible if autoplay is blocked. */
-        });
+      if (paused || !visible || document.hidden) element.pause();
+      else void element.play().catch(() => undefined);
     };
     update();
     document.addEventListener("visibilitychange", update);
     return () => document.removeEventListener("visibilitychange", update);
-  }, [paused, visible, source, film]);
+  }, [paused, visible, near]);
+
   return (
-    <div
-      ref={container}
-      className={`public-cinema ${className}`}
-      aria-hidden="true"
-    >
-      <img
-        src={`/films/${film}-poster.jpg`}
-        alt=""
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : "auto"}
-        className="public-cinema-poster"
-      />
-      <video
-        ref={video}
-        src={source || undefined}
-        muted
-        loop
-        playsInline
-        preload="none"
-        poster={`/films/${film}-poster.jpg`}
-        onCanPlay={() => setReady(true)}
-        onError={() => setReady(false)}
-        className={ready ? "ready" : ""}
-      />
+    <div ref={container} className={`public-cinema ${className}`} aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={clip.poster} alt="" className="public-cinema-poster" loading={priority ? "eager" : "lazy"} />
+      {near && canLoad && !failed ? (
+        <video
+          ref={video}
+          src={clip.src}
+          poster={clip.poster}
+          autoPlay={!paused}
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          // `metadata` is enough to show a first frame; the rest streams.
+          preload={priority ? "auto" : "metadata"}
+          onLoadedData={() => setReady(true)}
+          onError={() => {
+            // A missing or unplayable file degrades to the flat surface.
+            setReady(false);
+            setFailed(true);
+          }}
+          className={ready ? "ready" : ""}
+        />
+      ) : null}
     </div>
   );
 }

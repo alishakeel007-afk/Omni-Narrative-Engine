@@ -1,5 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { EMPTY_STUDIO, type StudioState } from "@/types/studio";
+import { EMPTY_STUDIO, normalizeStudioState, type StudioState } from "@/types/studio";
+import { sceneRequirements } from "./identity";
+import { markStaleClips } from "@/lib/film/edit";
+
+function refreshFreshness(state: StudioState) {
+  for (const scene of state.scenes) {
+    const requirements = sceneRequirements(state, scene);
+    for (const take of scene.takes) {
+      if (take.sourceRequirements) take.stale = take.sourceRequirements !== requirements;
+    }
+  }
+  if (state.clips?.length) state.clips = markStaleClips(state, state.clips);
+  return state;
+}
 
 export class StudioError extends Error {
   constructor(
@@ -14,13 +27,15 @@ export async function loadStudio(userId: string, projectId: string) {
     where: { id: projectId, userId },
   });
   if (!project) throw new StudioError("Project not found.", 404);
-  return { project, state: project.state as unknown as StudioState };
+  // Normalizing on load keeps every caller on one shape, so a v1 project opens
+  // without each route having to know about the older layout.
+  return { project, state: refreshFreshness(normalizeStudioState(project.state)) };
 }
 export async function saveStudio(
   loaded: Awaited<ReturnType<typeof loadStudio>>,
   state: StudioState,
 ) {
-  const next = { ...state, revision: loaded.state.revision + 1 };
+  const next = refreshFreshness({ ...state, revision: loaded.state.revision + 1 });
   const changed = await prisma.filmWorkspace.updateMany({
     where: {
       id: loaded.project.id,

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { DEFAULT_AUTH_REDIRECT, getSafeRedirectPath } from "@/lib/auth-redirect";
 import ScreenLayout from "@/screens/ScreenLayout";
+import { StudioEntryNotice } from "@/components/public/studio-entry-notice";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -77,8 +78,8 @@ export default function SignupScreen() {
 
     try {
       setIsSubmitting(true);
-      await signup(fullName.trim(), email.trim(), password);
-      router.push(nextPath as Route);
+      const result = await signup(fullName.trim(), email.trim(), password);
+      router.push((result.needsVerification ? `/verify-email?next=${encodeURIComponent(nextPath)}` : nextPath) as Route);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create account.");
     } finally {
@@ -94,20 +95,21 @@ export default function SignupScreen() {
       maxWidth="max-w-lg"
     >
       <div className="glass-panel rounded-[2rem] p-8">
-          <p className="text-xs uppercase tracking-[0.32em] text-starlight/80">Signup</p>
-          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-white">
+          <p className="text-xs uppercase tracking-[0.32em] text-[var(--muted)]">Signup</p>
+          <h1 className="mt-3 font-[var(--font-heading)] text-4xl text-[var(--ink)]">
             Create Your Account
           </h1>
-          <p className="mt-4 text-sm leading-7 text-white/90">
+          <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
             Register with email and password to save your story progress and access the protected Omni-Narrative Engine experience.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <StudioEntryNotice nextPath={nextPath} />
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Field label="Full Name">
               <input
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-gold/30"
+                className="w-full rounded-[1.2rem] border border-[var(--line)] bg-black/20 px-4 py-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--line)]"
                 placeholder="Your full name"
               />
             </Field>
@@ -117,7 +119,7 @@ export default function SignupScreen() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-gold/30"
+                className="w-full rounded-[1.2rem] border border-[var(--line)] bg-black/20 px-4 py-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--line)]"
                 placeholder="you@example.com"
               />
             </Field>
@@ -140,8 +142,8 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
-              <p className="font-semibold text-white">Password Rules</p>
+            <div className="rounded-[1.2rem] border border-[var(--line)] bg-transparent px-4 py-3 text-sm text-[var(--muted)]">
+              <p className="font-semibold text-[var(--ink)]">Password Rules</p>
               <ul className="mt-3 space-y-2">
                 {[
                   ["At least 8 characters", passwordRules.hasMinimumLength],
@@ -150,7 +152,7 @@ export default function SignupScreen() {
                   ["At least 1 number", passwordRules.hasNumber],
                   ["At least 1 special character", passwordRules.hasSpecialCharacter]
                 ].map(([label, passed]) => (
-                  <li key={String(label)} className={passed ? "text-starlight" : "text-white/85"}>
+                  <li key={String(label)} className={passed ? "text-[var(--ink)]" : "text-[var(--ink)]/85"}>
                     {passed ? "Passed:" : "Required:"} {label}
                   </li>
                 ))}
@@ -158,7 +160,7 @@ export default function SignupScreen() {
             </div>
 
             {error ? (
-              <div className="rounded-[1.2rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              <div className="rounded-[1.2rem] border border-[var(--line)] bg-transparent px-4 py-3 text-sm font-medium text-[var(--ink)]">
                 {error}
               </div>
             ) : null}
@@ -166,15 +168,15 @@ export default function SignupScreen() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-4 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-55"
+              className="w-full rounded-full bg-[var(--accent)] px-6 py-4 text-sm font-semibold text-[var(--ink)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {isSubmitting ? "Creating account..." : "Sign Up"}
             </button>
           </form>
 
-          <div className="mt-6 text-sm text-white/90">
+          <div className="mt-6 text-sm text-[var(--muted)]">
             Already have an account?{' '}
-            <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route} className="text-starlight transition hover:text-gold">
+            <Link href={`/auth?next=${encodeURIComponent(nextPath)}` as Route} className="text-[var(--ink)] transition hover:text-[var(--ink)]">
               Login here
             </Link>
           </div>
@@ -192,7 +194,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-3 block text-sm font-semibold text-white">{label}</span>
+      <span className="mb-3 block text-sm font-semibold text-[var(--ink)]">{label}</span>
       {children}
     </label>
   );
@@ -215,12 +217,12 @@ function PasswordInput({
         type={showPassword ? "text" : "password"}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[1.2rem] border border-white/10 bg-black/20 px-4 py-3 pr-12 text-sm text-white outline-none focus:border-gold/30"
+        className="w-full rounded-[1.2rem] border border-[var(--line)] bg-black/20 px-4 py-3 pr-12 text-sm text-[var(--ink)] outline-none focus:border-[var(--line)]"
       />
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/85"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ink)]/85"
         aria-label="Toggle password visibility"
       >
         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

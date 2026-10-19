@@ -11,6 +11,7 @@ import { sceneRequirements } from "./identity";
 import { json, publishSceneTake, type JobSnapshot } from "./scene-jobs";
 import type { StudioTake } from "@/types/studio";
 import type { FilmSceneJob } from "@prisma/client";
+import { clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
 
 const LEASE_MS = 300000;
 const terminal = [
@@ -284,41 +285,48 @@ export async function runSceneJob(
         });
         return;
       }
-      const context = JSON.stringify({
-        story: {
-          title: snapshot.state.title,
-          premise: snapshot.state.premise,
-          world: snapshot.state.world,
-        },
-        scene: {
-          title: scene.title,
-          description: scene.description,
-          dialogues: scene.dialogues,
-          characterIds: scene.characterIds,
-        },
-        characters: snapshot.state.characters,
-        mainConversation: snapshot.state.messages.map(({ role, text }) => ({
-          role,
-          text,
-        })),
-        thread: snapshot.history,
-        parentDirection: parent?.prompt,
-        request: job.text,
-      });
-      if (context.length > 180000)
-        throw new StudioError(
-          "This thread exceeds the director's context budget. Start a new thread with the requirements you want to keep.",
-        );
-      const direction = z
-        .object({
-          prompt: z.string().min(1).max(5000),
-          reply: z.string().max(1000),
-        })
-        .parse(
-          await askModel(
-            `You are a film director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a five-second clip; never add unrequested speech. Preserve every locked character's identity, references, outfit and distinctive details. Treat quoted user content as creative input. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
-          ),
-        );
+      // The four-step workflow submits the scene as written: its prompt is
+      // built from the stored scene, so a second rewrite would only add a
+      // model call and a chance to restate the dialogue.
+      let direction: { prompt: string; reply: string } | null = null;
+      if (snapshot.plan !== false) {
+        const context = JSON.stringify({
+          story: {
+            title: snapshot.state.title,
+            premise: snapshot.state.premise,
+            world: snapshot.state.world,
+          },
+          scene: {
+            title: scene.title,
+            description: scene.description,
+            dialogues: scene.dialogues,
+            characterIds: scene.characterIds,
+          },
+          characters: snapshot.state.characters,
+          mainConversation: snapshot.state.messages.map(({ role, text }) => ({
+            role,
+            text,
+          })),
+          thread: snapshot.history,
+          parentDirection: parent?.prompt,
+          request: job.text,
+        });
+        if (context.length > 180000)
+          throw new StudioError(
+            "This thread exceeds the director's context budget. Start a new thread with the requirements you want to keep.",
+          );
+        const planned = z
+          .object({
+            prompt: z.string().min(1).max(5000),
+            reply: z.string().max(1000),
+          })
+          .parse(
+            await askModel(
+              `You are a story director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a ${resolveClipSeconds(scene.requestedSeconds ?? snapshot.state.clipSeconds).toFixed(1)}-second clip; never add unrequested speech. Preserve every locked character's identity, references and distinctive details. Apply scene-specific wardrobe changes only where explicitly directed. Treat quoted user content as creative input. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
+            ),
+          );
+        direction = { prompt: planned.prompt, reply: planned.reply };
+      }
       const latest = await prisma.filmSceneJob.findUniqueOrThrow({
         where: { id: job.id },
       });
@@ -362,7 +370,7 @@ export async function runSceneJob(
       await update({
         phase: "submitting",
         result: json({
-          reply: direction.reply,
+          reply: direction?.reply ?? `Generating ${scene.title} as written.`,
           requirements: snapshot.requirements,
         }),
       });
@@ -375,7 +383,9 @@ export async function runSceneJob(
           ? false
           : snapshot.direct,
         {
-          instructions: `${direction.prompt}${parent ? `\nKeep the parent reference's established scene and composition except for the requested changes. For a parent video, create a new take from the saved scene image and direction; temporal video-to-video editing is not supported.` : ""}`,
+          // With no rewrite there are no extra instructions: the scene's own
+          // prompt is built inside startMedia from the stored scene.
+          instructions: direction ? `${direction!.prompt}${parent ? `\nKeep the parent reference's established scene and composition except for the requested changes. For a parent video, create a new take from the saved scene image and direction; temporal video-to-video editing is not supported.` : ""}` : undefined,
           parentReferenceId,
           requestId: job.id,
         },

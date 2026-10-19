@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSafeRedirectPath } from '@/lib/auth-redirect'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -35,31 +36,48 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const protectedRoutes = [
-    '/dashboard',
-    '/setup',
-    '/story',
-    '/audio-generation',
-    '/video-preview',
-    '/video'
-  ];
+  // The only authenticated surfaces: the project list and the four-step film
+  // workflow. The story-engine routes that used to be here are gone.
+  const protectedRoutes = ['/dashboard', '/film', '/story', '/account'];
 
   const pathname = request.nextUrl.pathname;
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
 
-  if (isProtectedRoute && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth'
-    url.searchParams.set('next', pathname)
-    return NextResponse.redirect(url)
+  // getUser() above may have refreshed the session onto supabaseResponse. A
+  // redirect that does not carry those cookies forward throws the refreshed
+  // tokens away, which is what logs users out at random.
+  const redirectKeepingSession = (url: URL) => {
+    const response = NextResponse.redirect(url)
+    for (const cookie of supabaseResponse.cookies.getAll()) {
+      response.cookies.set(cookie.name, cookie.value, cookie)
+    }
+    return response
   }
 
-  const isAuthRoute = pathname === '/auth' || pathname === '/signup' || pathname === '/forgot-password' || pathname === '/reset-password';
-  
-  if (isAuthRoute && user) {
+  if (isProtectedRoute && !user) {
+    // Keep the query string: it carries things like the pending studio entry
+    // id, which the visitor would otherwise lose by signing in.
+    const target = `${pathname}${request.nextUrl.search}`
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+    url.pathname = '/auth'
+    url.search = ''
+    url.searchParams.set('next', target)
+    return redirectKeepingSession(url)
+  }
+
+  const isAuthRoute = pathname === '/auth' || pathname === '/signup' || pathname === '/forgot-password';
+
+  if (isAuthRoute && user) {
+    // Honour where the visitor was heading before being asked to sign in.
+    // getSafeRedirectPath rejects off-site and auth-looping targets.
+    const target = getSafeRedirectPath(request.nextUrl.searchParams.get('next'))
+    const url = request.nextUrl.clone()
+    url.search = ''
+    const resolved = new URL(target, url)
+    url.pathname = resolved.pathname
+    url.search = resolved.search
+    url.hash = resolved.hash
+    return redirectKeepingSession(url)
   }
 
   return supabaseResponse

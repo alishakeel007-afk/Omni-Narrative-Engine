@@ -2,7 +2,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { createStudio, loadStudio, saveStudio, StudioError } from "./store";
 import { directorReply } from "./ai";
-import type { StudioState, StudioTab } from "@/types/studio";
+import type { FilmAssist, FilmLanguage, StudioState, StudioTab } from "@/types/studio";
+import { applyFilmScript, generateFilmScript } from "@/lib/film/ai";
+import { generationLockMs } from "@/lib/film/duration";
 
 export const GUEST_COOKIE = "omni-guest-studio";
 export const GUEST_LIMIT = 3;
@@ -67,7 +69,7 @@ export async function guestTurn(
     throw new StudioError("Continue with an account to keep creating.", 403);
   if (
     state.operation &&
-    Date.now() - Date.parse(state.operation.startedAt) < 240000
+    Date.now() - Date.parse(state.operation.startedAt) < generationLockMs()
   )
     throw new StudioError(
       "Your director is still replying. Please wait a moment.",
@@ -173,7 +175,7 @@ export async function claimGuest(
   }
   if (
     loaded.state.operation &&
-    Date.now() - Date.parse(loaded.state.operation.startedAt) < 240000
+    Date.now() - Date.parse(loaded.state.operation.startedAt) < generationLockMs()
   )
     throw new StudioError(
       "Wait for your director's reply before continuing.",
@@ -199,4 +201,114 @@ export async function claimGuest(
   if (!changed.count)
     throw new StudioError("This conversation changed. Please try again.", 409);
   return { id, state: (await loadStudio(userId, id)).state };
+}
+
+/**
+ * A real Step 2 draft for a visitor who has not signed up yet.
+ *
+ * The demo used to be a chat window, which no longer resembles the product.
+ * This runs the SAME script generator the four-step workflow uses, so the
+ * scenes and characters a visitor sees are genuinely what they would get —
+ * nothing is mocked up. It costs one model call, counted against the same
+ * three-turn guest allowance as before, and never touches the GPU.
+ */
+export async function guestPreview(
+  cookie: string | undefined,
+  input: {
+    idea: string;
+    assist: FilmAssist;
+    language: FilmLanguage;
+    visualStyle?: string;
+    clipSeconds?: number;
+    sourceScript?: string;
+    requestId: string;
+  },
+) {
+  let loaded = await loadGuest(cookie);
+  let newCookie: string | undefined;
+  if (!loaded) {
+    const token = randomBytes(32).toString("hex");
+    const project = await createStudio(`guest:${token}`);
+    newCookie = `${project.id}:${token}`;
+    loaded = await loadStudio(`guest:${token}`, project.id);
+  }
+  const state = structuredClone(loaded.state);
+  // A replayed request returns the saved draft and spends no turn.
+  if (state.messages.some((message) => message.requestId === input.requestId))
+    return { ...guestView(loaded.project.id, state), cookie: newCookie };
+  if (guestView(loaded.project.id, state).remaining === 0)
+    throw new StudioError(
+      "That is the end of the preview. Create an account to keep going — your idea comes with you.",
+      403,
+    );
+  if (
+    state.operation &&
+    Date.now() - Date.parse(state.operation.startedAt) < generationLockMs()
+  )
+    throw new StudioError("Your director is still drafting. Please wait a moment.", 409);
+
+  state.operation = { id: input.requestId, startedAt: new Date().toISOString() };
+  const reserved = await saveStudio(loaded, state);
+  loaded = { ...loaded, state: reserved };
+  try {
+    const draft = structuredClone(reserved);
+    draft.premise = input.idea;
+    draft.assist = input.assist;
+    draft.language = input.language;
+    if (input.clipSeconds !== undefined) draft.clipSeconds = input.clipSeconds;
+    if (input.visualStyle) {
+      draft.visualStyle = input.visualStyle;
+      draft.world = input.visualStyle;
+    }
+    // Two scenes is enough to show the shape without a long wait.
+    const script = await generateFilmScript({
+      state: draft,
+      idea: input.idea,
+      sourceScript: input.sourceScript,
+      sceneCount: 2,
+    });
+    const next = structuredClone(reserved);
+    applyFilmScript(next, script);
+    next.premise = input.idea;
+    next.assist = input.assist;
+    next.language = input.language;
+    if (input.sourceScript !== undefined) next.sourceScript = input.sourceScript;
+    if (input.clipSeconds !== undefined) next.clipSeconds = input.clipSeconds;
+    if (input.visualStyle) {
+      next.visualStyle = input.visualStyle;
+      next.world = input.visualStyle;
+    }
+    next.step = "script";
+    // Recorded as a turn so the allowance is shared with any other guest use.
+    next.messages.push({
+      id: randomUUID(),
+      role: "user",
+      text: input.idea,
+      tab: "plan",
+      requestId: input.requestId,
+      createdAt: new Date().toISOString(),
+    });
+    delete next.operation;
+    return {
+      ...guestView(loaded.project.id, await saveStudio(loaded, next)),
+      cookie: newCookie,
+    };
+  } catch (error) {
+    // Release the reservation; a failed draft does not spend a turn.
+    const current = await loadStudio(loaded.project.userId, loaded.project.id);
+    if (current.state.operation?.id === input.requestId) {
+      const recovered = structuredClone(current.state);
+      delete recovered.operation;
+      await saveStudio(current, recovered);
+    }
+    if (newCookie) {
+      const failure = new StudioError(
+        error instanceof Error ? error.message : "Your director couldn't draft that.",
+        error instanceof StudioError ? error.status : 503,
+      );
+      Object.assign(failure, { guestCookie: newCookie });
+      throw failure;
+    }
+    throw error;
+  }
 }

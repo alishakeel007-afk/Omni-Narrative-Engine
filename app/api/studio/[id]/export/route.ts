@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadStudio, saveStudio, StudioError } from "@/lib/studio/store";
 import { uploadToSupabaseStorage } from "@/lib/supabase-storage";
 import { filmContinuityProblem } from "@/lib/studio/identity";
+import { generationLockMs } from "@/lib/film/duration";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -21,7 +22,8 @@ export async function POST(
     if (problem) throw new StudioError(problem);
     if (
       loaded.state.operation &&
-      Date.now() - Date.parse(loaded.state.operation.startedAt) < 240000
+      Date.now() - Date.parse(loaded.state.operation.startedAt) <
+        generationLockMs(loaded.state.clipSeconds)
     )
       throw new StudioError(
         "Wait for the current generation submission before saving an export.",
@@ -60,7 +62,8 @@ export async function POST(
       if (changedProblem) throw new StudioError(changedProblem);
       if (
         loaded.state.operation &&
-        Date.now() - Date.parse(loaded.state.operation.startedAt) < 240000
+        Date.now() - Date.parse(loaded.state.operation.startedAt) <
+        generationLockMs(loaded.state.clipSeconds)
       )
         throw new StudioError(
           "Generation is being submitted. Retry saving the export in a moment.",

@@ -19,6 +19,9 @@ const schema = z.discriminatedUnion("action", [
     parentJobId: z.string().optional(),
     kind: z.enum(["chat", "image", "video"]).optional(),
     direct: z.boolean().optional(),
+    // false submits the scene as written, skipping the director's rewrite.
+    // The four-step workflow builds its own prompt from the stored scene.
+    plan: z.boolean().optional(),
   }),
   z.object({ action: z.enum(["cancel", "retry"]), jobId: z.string().uuid() }),
 ]);

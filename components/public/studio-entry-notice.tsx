@@ -1,47 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readStudioEntry, studioEntryFromPath } from "@/lib/studio/entry";
+import { FILM_LANGUAGES } from "@/lib/film/language";
+import { readStudioEntry, studioEntryFromPath, type StudioEntry } from "@/lib/studio/entry";
 
+/**
+ * Confirms, on the sign-in and sign-up pages, that the visitor's work survives.
+ *
+ * The idea never leaves their browser until the account exists, so this reads it
+ * from local storage using the opaque id in `?next=`. It reassures them that
+ * signing in is not going to lose what they just did — including the setup
+ * choices, which are applied to the film they land on.
+ */
 export function StudioEntryNotice({ nextPath }: { nextPath: string }) {
-  const [message, setMessage] = useState("");
-  const [reply, setReply] = useState("");
+  const [entry, setEntry] = useState<StudioEntry | null>(null);
   useEffect(() => {
-    let active = true;
-    const entry = readStudioEntry(studioEntryFromPath(nextPath));
-    setMessage(entry?.text || "");
-    setReply("");
-    if (entry?.guestProjectId)
-      void fetch("/api/studio/guest", { cache: "no-store" })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((data) => {
-          if (active && data?.id === entry.guestProjectId)
-            setReply(
-              [...data.state.messages]
-                .reverse()
-                .find(
-                  (message: { role: string; text: string }) =>
-                    message.role === "assistant",
-                )?.text || "",
-            );
-        })
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
+    setEntry(readStudioEntry(studioEntryFromPath(nextPath)));
   }, [nextPath]);
-  if (!message) return null;
+  if (!entry?.text) return null;
+  const language = FILM_LANGUAGES.find((item) => item.id === entry.setup?.language);
+  const details = [
+    entry.setup?.assist ? `${entry.setup.assist === "guided" ? "Guided" : "Custom"} mode` : null,
+    language?.label,
+    entry.setup?.clipSeconds ? `${entry.setup.clipSeconds}s clips` : null,
+    entry.setup?.visualStyle,
+  ].filter(Boolean) as string[];
   return (
     <aside className="public-entry-notice" aria-label="Your saved story idea">
-      <strong>Your idea is coming with you.</strong>
-      <p>{message.length > 180 ? `${message.slice(0, 180)}…` : message}</p>
-      {reply && (
-        <details className="public-entry-reply" open>
-          <summary>Your director's latest reply</summary>
-          <p>{reply}</p>
-        </details>
-      )}
-      <span>Sign up or log in. Your director will take it from here.</span>
+      <strong>Your story is coming with you.</strong>
+      <p>{entry.text.length > 180 ? `${entry.text.slice(0, 180)}…` : entry.text}</p>
+      {details.length ? <small>{details.join(" · ")}</small> : null}
     </aside>
   );
 }

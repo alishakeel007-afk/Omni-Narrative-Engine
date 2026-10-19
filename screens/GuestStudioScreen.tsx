@@ -12,13 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicBrand } from "@/components/public/public-shell";
 import { AssemblyPreview } from "@/components/public/assembly-preview";
 import { EMPTY_STUDIO, type StudioState, type StudioTab } from "@/types/studio";
-import {
-  readStudioEntry,
-  removeStudioEntry,
-  saveStudioEntry,
-  studioEntryPath,
-  STUDIO_ENTRY_LIMIT,
-} from "@/lib/studio/entry";
+import { STUDIO_ENTRY_LIMIT, STUDIO_ENTRY_ROUTE, readStudioEntry, removeStudioEntry, saveStudioEntry, studioEntryPath } from "@/lib/studio/entry";
 
 type Trial = {
   id: string | null;
@@ -107,7 +101,7 @@ export default function GuestStudioScreen({
     target = "signup",
     pendingText?: string,
   ) {
-    let next = "/studio";
+    let next = STUDIO_ENTRY_ROUTE;
     try {
       const latest = [...value.state.messages]
         .reverse()
@@ -132,7 +126,7 @@ export default function GuestStudioScreen({
   ) {
     if (!value.trim() || busyRef.current || !ready || loading) return;
     if (currentUser && !embedded) {
-      router.replace("/studio");
+      router.replace(STUDIO_ENTRY_ROUTE as Route);
       return;
     }
     if (!currentUser && !trial.remaining) {
@@ -223,7 +217,7 @@ export default function GuestStudioScreen({
     }
     if (currentUser) {
       const start = new URLSearchParams(window.location.search).get("start");
-      router.replace((start ? studioEntryPath(start) : "/studio") as Route);
+      router.replace((start ? studioEntryPath(start) : STUDIO_ENTRY_ROUTE) as Route);
       return;
     }
     if (initialized.current) return;
@@ -285,7 +279,7 @@ export default function GuestStudioScreen({
     <div className={`film-studio public-trial${embedded ? " public-inline-studio" : ""}`}>
       <header className="studio-top">
         {!embedded && <PublicBrand />}
-        <nav className="studio-tabs" role="tablist" aria-label="Film workspace">
+        <nav className="studio-tabs" role="tablist" aria-label="Story workspace">
           {tabs.map((value, index) => (
             <button
               key={value}
@@ -507,7 +501,7 @@ export default function GuestStudioScreen({
               </div>
             </form>
             <p className="studio-composer-note">
-              {currentUser ? <a href={privateProject.current ? `/studio?project=${privateProject.current}` : "/studio"}>Open your full studio <ArrowUpRight size={12} /></a> : <>Three messages to explore. {embedded && trial.state.messages.length ? <button type="button" className="public-inline-continue" disabled={busy} onClick={() => continueToAccount()}>Keep creating</button> : "Sign in to keep creating."}</>}
+              {currentUser ? <a href={privateProject.current ? `/film/${privateProject.current}` : STUDIO_ENTRY_ROUTE}>Open your stories <ArrowUpRight size={12} /></a> : <>Three messages to explore. {embedded && trial.state.messages.length ? <button type="button" className="public-inline-continue" disabled={busy} onClick={() => continueToAccount()}>Keep creating</button> : "Sign in to keep creating."}</>}
             </p>
           </div>}
         </main>

@@ -1,4 +1,4 @@
-import type { MovieCharacterVoice } from "@/types/video";
+import type { MovieCharacterVoice } from "@/types/audio";
 import { getEnvValue } from "@/lib/env";
 import { formatElevenLabsEmotionInformedText, type DialogueEmotion } from "@/lib/audio/emotion-informed-delivery";
 

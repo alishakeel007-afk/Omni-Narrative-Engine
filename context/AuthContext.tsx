@@ -8,11 +8,13 @@ import {
   useState
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeRedirectPath } from "@/lib/auth-redirect";
 
 export type AuthUser = {
   id: string;
   name: string;
   email: string;
+  needsVerification?: boolean;
 };
 
 type AuthContextValue = {
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getSafeRedirectPath(new URLSearchParams(window.location.search).get("next")))}`,
         data: {
           full_name: name,
         }
@@ -87,8 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: data.user.email || email
     };
     
-    setCurrentUser(authUser);
-    return authUser;
+    if (data.session) setCurrentUser(authUser);
+    return { ...authUser, needsVerification: !data.session };
   };
 
   const login = async (email: string, password: string) => {
@@ -116,9 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const forgotPassword = async (email: string) => {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const appUrl = window.location.origin;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${appUrl}/reset-password`,
+      redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
     });
     if (error) throw error;
   };

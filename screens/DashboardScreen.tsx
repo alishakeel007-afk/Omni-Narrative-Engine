@@ -1,369 +1,277 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { DashboardCard } from "@/components/dashboard-card";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
+import { Film, Loader2, Plus, Trash2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
-import ScreenLayout from "@/screens/ScreenLayout";
-import { useStory } from "@/context/StoryContext";
-import { countCustomChoices } from "@/lib/story-engine";
-import {
-  CREATE_STORY_STORAGE_KEY,
-  createDefaultDraft,
-  loadCreateStoryDraft
-} from "@/lib/create-story-storage";
-import {
-  DEFAULT_VIDEO_SCENARIO,
-  VIDEO_DRAFT_STORAGE_KEY,
-  VIDEO_STUDIO_FLOW_STORAGE_KEY,
-  VIDEO_VOICE_RESULT_STORAGE_KEY,
-  loadVideoStudioFlow
-} from "@/lib/video-storage";
-import {
-  STORY_COMPLETED_STORAGE_KEY,
-  STORY_PROGRESS_STORAGE_KEY
-} from "@/lib/story-storage";
-
-type ResumeTarget = {
-  canDelete: boolean;
-  description: string;
-  href: string;
-  label: string;
-  source: "active-story" | "custom-story" | "saved-setup" | "video-studio";
-  title: string;
-};
-
-type DatabaseDraft = {
-  id: string;
-  isActive: boolean;
-  status: string;
-  title: string;
-  updatedAt: string;
-  versionNumber: number;
-};
-
-type DatabaseProject = {
-  id: string;
-  title: string;
-  drafts: DatabaseDraft[];
-};
+import { readStudioEntry, removeStudioEntry, linkStudioEntry } from "@/lib/studio/entry";
+import type { StudioProject } from "@/types/studio";
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { saveSetupOnly, setup, state, updateSetup } = useStory();
-  const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
-  const [databaseProjects, setDatabaseProjects] = useState<DatabaseProject[]>([]);
-  const currentScene = state.currentScene.sceneNumber;
-  const hasProgress = state.memoryTimeline.length > 0 || state.currentScene.sceneNumber > 1;
-  const customChoiceCount = countCustomChoices(state);
-  const recentSessionLabel = state.lastSavedAt
-    ? new Date(state.lastSavedAt).toLocaleString()
-    : "No saved session yet";
-  const dynamicStats = [
-    { label: "Saved Stories", value: "1 Active Story" },
-    { label: "Favorite Genres", value: setup.genre },
-    {
-      label: "Recent Sessions",
-      value: state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleDateString() : "New Run"
-    },
-    { label: "Total Scenes Generated", value: String(currentScene) },
-    { label: "Total Custom Choices Made", value: String(customChoiceCount) }
-  ];
-  const startCreateStory = () => {
-    updateSetup({ mode: "custom" });
-    saveSetupOnly({ mode: "custom" });
-    router.push("/setup");
-  };
-  const fallbackResumeTarget = useMemo<ResumeTarget>(() => ({
-    canDelete: hasProgress,
-    description: hasProgress
-      ? `Resume Scene ${currentScene} with ${setup.characterName}'s latest decisions still tracked in memory.`
-      : `Open the first scene for ${setup.characterName} and begin the saved ${setup.mode} setup.`,
-    href: hasProgress ? "/story/play" : "/setup",
-    label: hasProgress ? "Continue Last Story" : "Saved Setup",
-    source: hasProgress ? "active-story" : "saved-setup",
-    title: setup.storyTitle
-  }), [currentScene, hasProgress, setup]);
+  const search = useSearchParams();
+  const [projects, setProjects] = useState<StudioProject[] | null>(null);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [handoff, setHandoff] = useState(false);
+  const claimed = useRef(false);
 
+  /**
+   * The landing demo's handoff.
+   *
+   * A visitor types an idea before signing in; the text stays in their own
+   * browser under an opaque entry id, which arrives here as `?start=`. It
+   * becomes a real project and they land on its Setup step with the idea
+   * already in place. If anything fails they simply see their project list,
+   * because the idea is still recoverable from the guest cookie server-side.
+   */
   useEffect(() => {
-    const customRaw = window.localStorage.getItem(CREATE_STORY_STORAGE_KEY);
-
-    if (customRaw) {
-      const draft = loadCreateStoryDraft();
-      const defaultDraft = createDefaultDraft();
-      const hasCustomWork =
-        draft.scenes.length > 0 ||
-        draft.storyTitle !== defaultDraft.storyTitle ||
-        draft.audio.voiceStatus !== "idle" ||
-        draft.audio.backgroundMusicStatus !== "idle" ||
-        draft.video.status !== "idle";
-
-      if (hasCustomWork) {
-        setResumeTarget({
-          canDelete: true,
-          description:
-            draft.video.status === "ready"
-              ? `Open the custom video preview for ${draft.scenes.length} scene${draft.scenes.length === 1 ? "" : "s"}.`
-              : `Resume the custom scene builder with ${draft.scenes.length || 1} scene${draft.scenes.length === 1 ? "" : "s"} saved.`,
-          href: draft.video.status === "ready" ? "/video-preview?mode=custom" : "/story-builder",
-          label: "Continue AI Story Studio",
-          source: "custom-story",
-          title: draft.storyTitle
-        });
-        return;
-      }
-    }
-
-    const videoRaw = window.localStorage.getItem(VIDEO_STUDIO_FLOW_STORAGE_KEY);
-
-    if (videoRaw) {
-      const flow = loadVideoStudioFlow();
-      const hasVideoWork =
-        Boolean(flow.script) ||
-        Boolean(flow.generatedStory) ||
-        Boolean(flow.acceptedStory) ||
-        Boolean(flow.voiceResult) ||
-        flow.stage !== "setup" ||
-        flow.roughIdea !== DEFAULT_VIDEO_SCENARIO ||
-        flow.music.status !== "idle";
-
-      if (hasVideoWork) {
-        setResumeTarget({
-          canDelete: true,
-          description: flow.script
-            ? `Resume Guided Video Studio at ${flow.stage} with ${flow.script.scenes.length} generated scene${flow.script.scenes.length === 1 ? "" : "s"}.`
-            : "Resume the Guided Video Studio setup where you left off.",
-          href: flow.stage === "preview" ? "/video-preview?mode=guided" : "/video",
-          label: "Continue Guided Video Studio",
-          source: "video-studio",
-          title: flow.script?.title || "Guided Video Studio Draft"
-        });
-        return;
-      }
-    }
-
-    setResumeTarget(fallbackResumeTarget);
-  }, [fallbackResumeTarget]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadDatabaseProjects() {
+    const start = search?.get("start");
+    if (!start || claimed.current) return;
+    claimed.current = true;
+    const entry = readStudioEntry(start);
+    setHandoff(true);
+    void (async () => {
       try {
-        const response = await fetch("/api/story/projects");
-        if (!response.ok) return;
-        const data = await response.json() as { projects?: DatabaseProject[] };
-        if (!cancelled) {
-          setDatabaseProjects(data.projects ?? []);
+        if (!entry) throw new Error("This saved idea is no longer available in this browser. Return to the landing page to start again.");
+        // A guest trial is claimed first, so the conversation it already holds
+        // is not abandoned in favour of an empty project.
+        const trial = entry.guestProjectId ? await fetch("/api/studio/guest/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(entry?.guestProjectId ? { id: entry.guestProjectId } : {}),
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null) : null;
+        let id: string | undefined = entry?.projectId ?? trial?.id ?? undefined;
+        if (!id) {
+          const created = await fetch("/api/studio", { method: "POST" });
+          const body = await created.json();
+          if (!created.ok) throw new Error(body.error || "Your story could not be created.");
+          id = body.id as string;
         }
-      } catch {
-        if (!cancelled) {
-          setDatabaseProjects([]);
+        linkStudioEntry(start, id);
+        // Every choice they made before signing up is applied, not just the
+        // idea text, so the film opens as they left it on the landing page.
+        const patch: Record<string, unknown> = { step: trial?.state?.scenes?.length ? "script" : "setup" };
+        if (entry?.text?.trim()) patch.premise = entry.text.trim();
+        if (entry?.setup?.assist) patch.assist = entry.setup.assist;
+        if (entry?.setup?.language) patch.language = entry.setup.language;
+        if (entry?.setup?.visualStyle) patch.visualStyle = entry.setup.visualStyle;
+        if (entry?.setup?.clipSeconds) patch.clipSeconds = entry.setup.clipSeconds;
+        if (entry?.setup?.sourceScript) patch.sourceScript = entry.setup.sourceScript;
+        if (Object.keys(patch).length > 1) {
+          const saved = await fetch(`/api/studio/${id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "workflow", patch }),
+          });
+          if (!saved.ok) throw new Error("Your setup could not be saved. Your idea is still in this browser.");
         }
+        removeStudioEntry(start);
+        router.replace(`/story/${id}` as Route);
+      } catch (cause) {
+        // Fall back to the list rather than stranding them on a spinner.
+        setHandoff(false);
+        setError(cause instanceof Error ? cause.message : "Your story could not be opened. Your idea is still saved in this browser.");
+        router.replace("/dashboard" as Route);
       }
-    }
+    })();
+  }, [search, router]);
 
-    loadDatabaseProjects();
-
+  useEffect(() => {
+    let active = true;
+    setLoadFailed(false);
+    (async () => {
+      try {
+        const response = await fetch("/api/studio", { cache: "no-store" });
+        const body = await response.json();
+        if (!active) return;
+        if (!response.ok) throw new Error(body.error || "Your projects could not be loaded.");
+        setProjects(body.projects);
+      } catch (cause) {
+        if (!active) return;
+        setError(cause instanceof Error ? cause.message : "Your projects could not be loaded.");
+        setLoadFailed(true);
+        setProjects([]);
+      }
+    })();
     return () => {
-      cancelled = true;
+      active = false;
     };
+  }, [attempt]);
+
+  const create = useCallback(async () => {
+    setCreating(true);
+    setError("");
+    try {
+      const response = await fetch("/api/studio", { method: "POST" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "The project could not be created.");
+      router.push(`/story/${body.id}` as Route);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The project could not be created.");
+      setCreating(false);
+    }
+  }, [router]);
+
+  const newStarted = useRef(false);
+  useEffect(() => {
+    if (search?.get("new") === "1" && !newStarted.current) {
+      newStarted.current = true;
+      void create();
+    }
+  }, [search, create]);
+
+  const remove = useCallback(async (project: StudioProject) => {
+    if (!window.confirm(`Delete "${project.title}"? This cannot be undone.`)) return;
+    setDeleting(project.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/studio/${project.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "The project could not be deleted.");
+      }
+      setProjects((current) => (current || []).filter((item) => item.id !== project.id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The project could not be deleted.");
+    } finally {
+      setDeleting(null);
+    }
   }, []);
 
-  const activeResumeTarget = resumeTarget ?? fallbackResumeTarget;
-
-  const deleteSavedStory = () => {
-    if (!activeResumeTarget.canDelete) return;
-
-    const confirmed = window.confirm(
-      `Delete "${activeResumeTarget.title}"? This removes the saved story from this browser.`
+  if (handoff)
+    return (
+      <ProtectedRoute>
+        <main className="mx-auto max-w-2xl px-6 py-24 text-center">
+          <p className="flex items-center justify-center gap-2 text-sm text-[var(--muted)]">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Setting up your story…
+          </p>
+        </main>
+      </ProtectedRoute>
     );
-
-    if (!confirmed) return;
-
-    if (activeResumeTarget.source === "custom-story") {
-      window.localStorage.removeItem(CREATE_STORY_STORAGE_KEY);
-    }
-
-    if (activeResumeTarget.source === "video-studio") {
-      window.localStorage.removeItem(VIDEO_STUDIO_FLOW_STORAGE_KEY);
-      window.localStorage.removeItem(VIDEO_DRAFT_STORAGE_KEY);
-      window.localStorage.removeItem(VIDEO_VOICE_RESULT_STORAGE_KEY);
-    }
-
-    if (activeResumeTarget.source === "active-story") {
-      window.localStorage.removeItem(STORY_PROGRESS_STORAGE_KEY);
-      window.localStorage.removeItem(STORY_COMPLETED_STORAGE_KEY);
-    }
-
-    window.location.reload();
-  };
-
-  const createNewDraftVersion = async (storyProjectId: string) => {
-    const response = await fetch("/api/story/drafts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storyProjectId })
-    });
-
-    if (!response.ok) return;
-
-    const projectsResponse = await fetch("/api/story/projects");
-    if (!projectsResponse.ok) return;
-    const data = await projectsResponse.json() as { projects?: DatabaseProject[] };
-    setDatabaseProjects(data.projects ?? []);
-  };
 
   return (
     <ProtectedRoute>
-      <ScreenLayout eyebrow="User Dashboard" title="Narrative Command Center" description="Quick access to saved progress, genre preferences, and usage analytics for the AI story experience." maxWidth="max-w-7xl">
-          <div className="mb-6 flex flex-col items-center justify-between gap-4 rounded-[1.5rem] border border-gold/20 bg-gold/5 p-6 sm:flex-row">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Ready for your next adventure?</h2>
-              <p className="mt-1 text-sm text-white/70">Start a new guided or custom story.</p>
-            </div>
-            <Link
-              href="/story/mode?fresh=1"
-              className="rounded-full bg-gradient-to-r from-aurora via-starlight to-gold px-6 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
-            >
-              Start New Story
-            </Link>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-[var(--ink)]">
+              Your stories
+            </h1>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">
+              Open a story to pick up where you left off.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={create}
+            disabled={creating}
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:opacity-90 disabled:opacity-60"
+          >
+            {creating ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Plus className="h-4 w-4" aria-hidden />
+            )}
+            {creating ? "Creating story…" : "New story"}
+          </button>
+        </header>
 
-          <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Link
-              href={activeResumeTarget.href}
-              className="glass-panel gold-ring rounded-[1.75rem] p-6 transition hover:-translate-y-1"
-            >
-              <p className="text-xs uppercase tracking-[0.28em] text-gold">{activeResumeTarget.label}</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
-              <p className="mt-3 text-sm leading-7 text-white/90">{activeResumeTarget.description}</p>
-            </Link>
-
-            <Link
-              href="/story/mode?fresh=1"
-              className="glass-panel rounded-[1.75rem] p-6 transition hover:-translate-y-1"
-            >
-              <p className="text-xs uppercase tracking-[0.28em] text-starlight/78">Start New Story</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">Create Fresh Setup</h2>
-              <p className="mt-3 text-sm leading-7 text-white/90">
-                Pick a genre, define a protagonist, and choose guided or custom story mode.
-              </p>
-            </Link>
-
+        {error ? (
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-medium text-[var(--ink)]"
+          >
+            {error}{" "}
             <button
               type="button"
-              onClick={startCreateStory}
-              className="glass-panel rounded-[1.75rem] p-6 text-left transition hover:-translate-y-1"
+              onClick={() => setAttempt((value) => value + 1)}
+              className="underline underline-offset-2"
             >
-              <p className="text-xs uppercase tracking-[0.28em] text-gold">Create Your Own Story</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">Custom Scene Builder</h2>
-              <p className="mt-3 text-sm leading-7 text-white/90">
-                Write scenes and character dialogue yourself, then generate voices, music, and a preview placeholder.
-              </p>
+              Try again
             </button>
+          </p>
+        ) : null}
 
-            <Link
-              href="/video"
-              className="glass-panel rounded-[1.75rem] p-6 transition hover:-translate-y-1"
+        {projects === null ? (
+          <p className="mt-10 flex items-center gap-2 text-sm text-[var(--muted)]">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Loading your projects…
+          </p>
+        ) : loadFailed ? (
+          <p className="mt-6 text-sm text-[var(--muted)]">Your stories could not be loaded. Retry the connection to see your saved projects.</p>
+        ) : projects.length === 0 ? (
+          <div className="mt-10 rounded-2xl border border-dashed border-[var(--line)] px-6 py-16 text-center">
+            <Film className="mx-auto h-7 w-7 text-[var(--ink)]" aria-hidden />
+            <h2 className="mt-4 text-lg font-semibold text-[var(--ink)]">
+              No stories yet
+            </h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--muted)]">
+              Start with an idea or paste a script you already have, and work
+              through setup, script, generation and editing.
+            </p>
+            <button
+              type="button"
+              onClick={create}
+              disabled={creating}
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:opacity-90 disabled:opacity-60"
             >
-              <p className="text-xs uppercase tracking-[0.28em] text-gold">Video Studio</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">Build Movie Scenes</h2>
-              <p className="mt-3 text-sm leading-7 text-white/90">
-                Turn one scenario into scene-by-scene script, dialogue, prompts, and voice audio.
-              </p>
-            </Link>
-
-            <div className="glass-panel rounded-[1.75rem] p-6">
-              <div className="flex items-start justify-between gap-3">
-                <Link href={activeResumeTarget.href} className="min-w-0 flex-1">
-                  <p className="text-xs uppercase tracking-[0.28em] text-white/75">Saved Stories</p>
-                  <h2 className="mt-4 text-2xl font-semibold text-white">{activeResumeTarget.title}</h2>
-                  <p className="mt-3 text-sm leading-7 text-white/90">{activeResumeTarget.description}</p>
-                </Link>
-                {activeResumeTarget.canDelete ? (
-                  <button
-                    type="button"
-                    onClick={deleteSavedStory}
-                    className="shrink-0 rounded-full border border-red-400/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/15"
-                  >
-                    Delete
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="glass-panel rounded-[1.75rem] p-6">
-              <p className="text-xs uppercase tracking-[0.28em] text-white/75">Recent Sessions</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white">
-                {hasProgress ? `Scene ${currentScene}` : "Waiting to Begin"}
-              </h2>
-              <p className="mt-3 text-sm leading-7 text-white/90">{recentSessionLabel}</p>
-            </div>
+              <Plus className="h-4 w-4" aria-hidden />
+              Create your first story
+            </button>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {dynamicStats.map((item, index) => (
-              <DashboardCard key={item.label} title={item.label} value={item.value} accent={index === 0 ? "gold" : "blue"} />
+        ) : (
+          <ul className="mt-8 divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)]">
+            {projects.map((project) => (
+              <li key={project.id} className="flex items-center gap-4 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/story/${project.id}` as Route)}
+                  className="flex-1 text-left"
+                >
+                  <span className="block text-sm font-semibold text-[var(--ink)]">
+                    {project.title}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                    Edited {formatWhen(project.updatedAt)}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(project)}
+                  disabled={deleting === project.id}
+                  aria-label={`Delete ${project.title}`}
+                  className="rounded-full border border-[var(--line)] p-2 text-[var(--ink)] transition hover:bg-black/[0.04] disabled:opacity-60"
+                >
+                  {deleting === project.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  )}
+                </button>
+              </li>
             ))}
-          </div>
-
-          <section className="mt-8 glass-panel rounded-[1.75rem] p-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-white/75">Saved Story Versions</p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">Story Versions</h2>
-                <p className="mt-2 text-sm leading-7 text-white/90">
-                  Save different versions of the same story, so you can edit freely without losing earlier work.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4">
-              {databaseProjects.length > 0 ? (
-                databaseProjects.map((project) => (
-                  <div key={project.id} className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{project.title}</h3>
-                        <p className="mt-1 text-sm text-white/85">
-                          {project.drafts.length} saved version{project.drafts.length === 1 ? "" : "s"} of this story.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => createNewDraftVersion(project.id)}
-                        className="rounded-full border border-gold/25 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/15"
-                      >
-                        Save as New Version
-                      </button>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {project.drafts.map((draft) => (
-                        <span
-                          key={draft.id}
-                          className={`rounded-full border px-3 py-1 text-xs ${
-                            draft.isActive
-                              ? "border-gold/30 bg-gold/10 text-gold"
-                              : "border-white/10 bg-white/5 text-white/90"
-                          }`}
-                        >
-                          Version {draft.versionNumber} {draft.isActive ? "Current" : draft.status.toLowerCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-[1.25rem] border border-white/10 bg-black/25 p-4 text-sm leading-7 text-white/90">
-                  No saved story versions yet. When you save or edit a story, its versions will appear here.
-                </div>
-              )}
-            </div>
-          </section>
-    </ScreenLayout>
+          </ul>
+        )}
+      </main>
     </ProtectedRoute>
   );
+}
+
+function formatWhen(value: string) {
+  const when = new Date(value);
+  if (Number.isNaN(when.getTime())) return "recently";
+  const minutes = Math.round((Date.now() - when.getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return when.toLocaleDateString();
 }

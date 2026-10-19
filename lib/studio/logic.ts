@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { precedingSceneContext, sceneDirectionText } from "@/lib/film/prompt";
 import { imageBackend } from "./image-backend";
 import type {
   StudioChoice,
@@ -229,6 +230,8 @@ export function scenePrompt(state: StudioState, sceneId: string) {
       .update(
         JSON.stringify({
           description: scene.description,
+          direction: scene.direction,
+          continuityContext: precedingSceneContext(state, scene),
           world: state.world,
           cast: cast.map((character) => ({
             ...identityProfile(character),
@@ -237,6 +240,6 @@ export function scenePrompt(state: StudioState, sceneId: string) {
         }),
       )
       .digest("hex"),
-    prompt: `${scene.description}\nWorld and visual style: ${state.world}\nCharacter continuity: ${cast.map((character) => `${character.name}: ${character.appearance}`).join("\n")}\nEach character's reference views describe the same appearance. Preserve facial proportions, hairline, hair texture, visible markings, silhouette and approved outfit across views. Do not blend features between characters. Keep movement natural and restrained; no face morphing, age changes, hairstyle changes or outfit substitutions. Compose the requested scene with appropriate framing and setting. No text overlays or subtitles.`,
+    prompt: `${scene.description}\n${precedingSceneContext(state, scene)}\n${sceneDirectionText(state, scene)}\nWorld and visual style: ${state.world}\nCharacter continuity: ${cast.map((character) => `${character.name}: ${character.appearance}`).join("\n")}\nEach character's reference views describe the same appearance. Preserve facial proportions, hairline, hair texture, visible markings, silhouette and approved outfit across views unless this scene explicitly specifies a wardrobe change. Scene wardrobe overrides clothing only, never facial identity. Do not blend features between characters. Keep movement natural and restrained; no face morphing, age changes, hairstyle changes or outfit substitutions. Compose the requested scene with appropriate framing and setting. No text overlays or subtitles.`,
   };
 }

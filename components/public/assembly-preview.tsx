@@ -44,7 +44,7 @@ export function AssemblyPreview() {
       <div className="public-assembly-track"><span>Dialogue</span><i aria-hidden="true" /></div>
       <div className="public-assembly-track"><span>Music</span><i aria-hidden="true" /></div>
       <p>Arrange scenes. Trim clips. Mix sound. Export.</p>
-      <small>Example footage. Edit your own film in your studio.</small>
+      <small>Example footage. Edit your own story in your studio.</small>
     </section>
   );
 }

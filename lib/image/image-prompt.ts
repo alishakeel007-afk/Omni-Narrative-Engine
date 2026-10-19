@@ -83,7 +83,7 @@ export function buildImagePrompt(request: ImageGenerationRequest): string {
     continuity.length > 0 ? `Character continuity only: ${continuity.map((fact) => fact.replace(/[.]+$/, "")).join("; ")}.` : "",
     artStyle ? `Keep the established project art direction: ${artStyle}.` : "",
     request.mood ? `Lighting and atmosphere: ${compact(request.mood, 120)}.` : "Cinematic lighting appropriate to the stated scene.",
-    "Focused composition, clear character blocking, physically plausible props, film still."
+    "Focused composition, clear character blocking, physically plausible props, story still."
   ].filter(Boolean);
 
   return truncatePrompt(parts);

@@ -346,8 +346,8 @@ export const SceneQueue = forwardRef<SceneQueueHandle, Props>(
                     {take.kind === "video"
                       ? scene.selectedVideoId === take.id &&
                         props.state.timeline.includes(scene.id)
-                        ? "In your film"
-                        : "Add to film"
+                        ? "In your story"
+                        : "Add to story"
                       : scene.selectedImageId === take.id
                         ? "Image selected"
                         : "Use this image"}

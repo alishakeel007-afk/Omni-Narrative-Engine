@@ -3,13 +3,11 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { loadStudio, saveStudio, StudioError } from "@/lib/studio/store";
-import { filmContinuityProblem } from "@/lib/studio/identity";
+import { sceneSetContinuityProblem } from "@/lib/studio/identity";
+import { exportProblem, markStaleClips, renderClips } from "@/lib/film/edit";
+import { exportSignature } from "@/lib/film/export-state";
 import { ltxRequest, exportSourceUrl, saveLtxArtifact } from "@/lib/studio/ltx";
-import {
-  sceneEdit,
-  type StudioState,
-  type StudioRenderJob,
-} from "@/types/studio";
+import type { StudioState, StudioRenderJob } from "@/types/studio";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -111,37 +109,18 @@ export async function POST(req: Request, context: Context) {
     );
     if (existing)
       return NextResponse.json({ job: existing, state: loaded.state });
-    const problem = filmContinuityProblem(loaded.state);
-    if (problem) throw new StudioError(problem);
-    if (!loaded.state.timeline.length || loaded.state.timeline.length > 12)
-      throw new StudioError("Choose 1–12 scenes to export.");
-    const clips = loaded.state.timeline.map((id) => {
-      const scene = loaded.state.scenes.find((item) => item.id === id)!;
-      const take = scene.takes.find(
-        (item) => item.id === scene.selectedVideoId,
-      );
-      if (!take?.url || take.status !== "complete")
-        throw new StudioError("A selected clip is unavailable.");
-      const edit = sceneEdit(loaded.state, id);
-      return {
-        url: take.url,
-        start: edit.start,
-        end: edit.end,
-        volume: edit.videoVolume,
-        fade_in: edit.fadeIn || 0,
-        fade_out: edit.fadeOut || 0,
-        texts: edit.texts || [],
-        voices: take.nativeAudio
-          ? []
-          : scene.dialogues.flatMap((line) =>
-              line.audioUrl ? [line.audioUrl] : [],
-            ),
-        music: !take.nativeAudio && scene.musicUrl ? scene.musicUrl : null,
-        voice_delay: edit.voiceDelay,
-        voice_volume: edit.voiceVolume,
-        music_volume: edit.musicVolume,
-      };
-    });
+    // The timeline is a list of clip INSTANCES, so one scene can appear
+    // several times after a split and each instance exports its own range.
+    const timeline = markStaleClips(loaded.state, loaded.state.clips ?? []);
+    // Refused while any clip points at an older video: exporting something the
+    // user cannot see in the editor is worse than making them relink first.
+    const stale = exportProblem(loaded.state, timeline);
+    if (stale) throw new StudioError(stale);
+    const appearance = sceneSetContinuityProblem(loaded.state, [
+      ...new Set(timeline.map((clip) => clip.sceneId)),
+    ]);
+    if (appearance) throw new StudioError(appearance);
+    const clips = renderClips(loaded.state, timeline);
     const snapshotKey = createHash("sha256")
       .update(JSON.stringify(clips))
       .digest("hex");
@@ -151,6 +130,7 @@ export async function POST(req: Request, context: Context) {
       requestId,
       status: "submitting",
       snapshotKey,
+      sourceSignature: exportSignature(loaded.state),
       snapshot: { clips },
       createdAt: new Date().toISOString(),
     };
@@ -217,7 +197,7 @@ export async function GET(req: Request, context: Context) {
     let item: NonNullable<StudioState["exports"]>[number] | undefined;
     if (status === "complete") {
       if (!result.has_audio)
-        throw new StudioError("The exported film has no audio track.", 502);
+        throw new StudioError("The exported story has no audio track.", 502);
       const saved = await saveLtxArtifact(
         loaded.project.id,
         `exports/${job.id}`,
@@ -228,6 +208,7 @@ export async function GET(req: Request, context: Context) {
         id: job.id,
         url: saved.publicUrl,
         name: `${loaded.state.title}.mp4`,
+        sourceSignature: job.sourceSignature,
         createdAt: new Date().toISOString(),
       };
     }

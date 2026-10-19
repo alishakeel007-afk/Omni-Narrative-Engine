@@ -88,7 +88,55 @@ class StudioError extends Error {
     ),
     "https://demo.supabase.co/storage/v1/object/sign/generated-videos/clip.mp4?token=temporary",
   );
-  const { EMPTY_STUDIO, sceneEdit } = loadTs("types/studio.ts");
+
+  // Audio-conditioned generation stays off until the worker is deployed with
+  // its audio weights, so an unconfigured deployment cannot be billed for it.
+  assert.equal(ltx.audioVideoEnabled(), false);
+  await assert.rejects(
+    () =>
+      ltx.startLtxAudioVideo({
+        prompt: "Ayesha speaks to camera.",
+        audioUrl:
+          "https://demo.supabase.co/storage/v1/object/public/generated-audio/line.mp3",
+        identity: [],
+        continuityKey: "one",
+        requestId: randomUUID(),
+      }),
+    /STUDIO_LTX_AUDIO_PIPELINE/,
+  );
+  env.STUDIO_LTX_AUDIO_PIPELINE = "a2vid";
+  assert.ok(ltx.audioVideoEnabled());
+  const spokenRequestId = randomUUID();
+  const spoken = await ltx.startLtxAudioVideo({
+    prompt: "Ayesha speaks one line to camera.",
+    audioUrl:
+      "https://demo.supabase.co/storage/v1/object/public/generated-audio/line.mp3",
+    imageUrl:
+      "https://demo.supabase.co/storage/v1/object/public/generated-images/portrait.png",
+    identity: [],
+    continuityKey: "one",
+    requestId: spokenRequestId,
+  });
+  assert.equal(spoken.provider, "modal-ltx");
+  assert.equal(spoken.nativeAudio, true);
+  const spokenBody = JSON.parse(
+    calls.filter((call) => call.url.endsWith("/jobs")).at(-1).options.body,
+  );
+  // The worker reads the speech from a signed URL, never a public one.
+  assert.match(spokenBody.audio_url, /\/object\/sign\/.*token=temporary$/);
+  // Length comes from the measured speech, so no frame count is sent.
+  assert.equal("num_frames" in spokenBody, false);
+  assert.equal(spokenBody.request_id, spokenRequestId);
+  assert.equal(
+    spokenBody.image_base64,
+    Buffer.from("image-bytes").toString("base64"),
+  );
+  // Audio-conditioned requests must never reach the unconfigured backend.
+  env.STUDIO_VIDEO_BACKEND = "magic-hour";
+  assert.equal(ltx.audioVideoEnabled(), false);
+  env.STUDIO_VIDEO_BACKEND = "modal-ltx";
+  delete env.STUDIO_LTX_AUDIO_PIPELINE;
+  const { EMPTY_STUDIO, normalizeStudioState, sceneEdit } = loadTs("types/studio.ts");
   let state = structuredClone(EMPTY_STUDIO);
   state.title = "Validation film";
   state.scenes = [
@@ -104,17 +152,30 @@ class StudioError extends Error {
           audioUrl: "https://unused.example/old-voice",
         },
       ],
-      takes: [{ ...take, id: "take" }],
+      // A measured duration, as polling records on a real take: the export
+      // range comes from the file, never from the requested length.
+      takes: [{ ...take, id: "take", status: "complete", duration: 5, url: "https://demo.supabase.co/storage/v1/object/public/generated-videos/take.mp4" }],
       selectedVideoId: "take",
     },
   ];
   state.timeline = ["s"];
+  // v1 stored a trim per scene. Export reads clip INSTANCES now, and
+  // `loadStudio` always normalizes, so this mirrors what production hands the
+  // route: the legacy trim has to survive into the exported range.
+  // The shape a native clip actually gets saved with: its own soundtrack at
+  // full level and no separate voice or music track.
+  state.edits = { s: { start: 1, end: 4, videoVolume: 1, voiceVolume: 0, musicVolume: 0, voiceDelay: 0 } };
+  state = normalizeStudioState(state);
+  assert.equal(state.clips.length, 1, "A v1 timeline becomes one clip instance");
+  assert.equal(state.clips[0].sourceIn, 1);
+  assert.equal(state.clips[0].sourceOut, 4);
   assert.equal(sceneEdit(state, "s").videoVolume, 1);
   assert.equal(sceneEdit(state, "s").voiceVolume, 0);
   let nativeInput;
   const media = loadTs("lib/studio/media.ts", {
     "./ltx": {
       nativeVideoEnabled: () => true,
+      audioVideoEnabled: () => false,
       startLtxVideo: async (input) => {
         nativeInput = input;
         return input;
@@ -226,6 +287,9 @@ class StudioError extends Error {
   );
   const job = state.renderJobs[0];
   assert.equal(requests.get(job.requestId).clips[0].volume, 1);
+  // The legacy per-scene trim reaches the exporter through the clip instance.
+  assert.equal(requests.get(job.requestId).clips[0].start, 1);
+  assert.equal(requests.get(job.requestId).clips[0].end, 4);
   assert.equal(
     requests.get(job.requestId).clips[0].voices.length,
     0,
@@ -254,7 +318,8 @@ class StudioError extends Error {
   assert.equal((await post(retryId)).status, 502);
   const retryJob = state.renderJobs.find((item) => item.requestId === retryId);
   assert.equal(retryJob.status, "submitting");
-  state.edits.s = { ...sceneEdit(state, "s"), videoVolume: 0.1 };
+  // Changing the clip AFTER reservation must not reach the reserved snapshot.
+  state.clips = [{ ...state.clips[0], clipVolume: 0.1 }];
   state.revision++;
   assert.equal(
     (

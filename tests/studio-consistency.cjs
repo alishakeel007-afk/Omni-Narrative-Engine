@@ -13,11 +13,14 @@ const png = Buffer.from(
 
 async function testConsistency() {
   const { EMPTY_STUDIO } = loadTs("types/studio.ts");
-  let imageConfig = { STUDIO_MAGIC_HOUR_IMAGE_MODEL: "qwen-edit" };
+  let imageConfig = { STUDIO_IMAGE_BACKEND: "magic-hour", STUDIO_MAGIC_HOUR_IMAGE_MODEL: "qwen-edit" };
   const configuredBackend = loadTs("lib/studio/image-backend.ts", {
     "@/lib/env": { getEnvValue: (names) => imageConfig[names[0]] || "" },
   });
   assert.equal(configuredBackend.imageBackend().referenceLimit, 3);
+  imageConfig.STUDIO_IMAGE_BACKEND = "cloudflare";
+  assert.equal(configuredBackend.imageBackend().referenceLimit, 4);
+  assert.equal(configuredBackend.imageBackend().cloudflare, true);
   imageConfig.STUDIO_IMAGE_BACKEND = "qwen";
   assert.equal(configuredBackend.imageBackend().referenceLimit, 6);
   const identity = loadTs("lib/studio/identity.ts");
@@ -297,6 +300,8 @@ async function testConsistency() {
     "next/server": next,
     "@/lib/supabase/server": auth,
     "@/lib/studio/store": store,
+    // Only DELETE queries the database; these assertions never reach it.
+    "@/lib/prisma": {},
     "@/lib/studio/ai": {},
     "@/lib/audio/music-service": {},
     "@/lib/studio/media": {

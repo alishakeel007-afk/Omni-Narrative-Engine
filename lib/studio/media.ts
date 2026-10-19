@@ -16,8 +16,13 @@ import {
   identityProfile,
 } from "./identity";
 import { startQwenImage } from "./qwen";
+import { startCloudflareImage } from "./cloudflare";
 import { imageBackend } from "./image-backend";
-import { nativeVideoEnabled, startLtxVideo } from "./ltx";
+import { audioVideoEnabled, nativeVideoEnabled, startLtxVideo } from "./ltx";
+import { generationBlockedReason } from "@/lib/film/language";
+import { clipLengthProblem, clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
+import { buildFilmPrompt } from "@/lib/film/prompt";
+import { clipProblem } from "@/lib/film/shots";
 
 export async function magicHour(path: string, body?: object) {
   const key = getEnvValue(["MAGIC_HOUR_API_KEY"]);
@@ -73,6 +78,7 @@ export async function startChatImage(
   name = "Director image",
 ): Promise<StudioTake> {
   const backend = imageBackend();
+  if (backend.cloudflare) return startCloudflareImage(draftId, request);
   if (backend.selfHosted && request.referenceIds.length)
     return startQwenImage(draftId, request);
   const ids = [...new Set(request.referenceIds)];
@@ -129,6 +135,14 @@ export async function startMedia(
   direct: boolean,
   options: { instructions?: string; parentReferenceId?: string; requestId?: string } = {},
 ): Promise<StudioTake> {
+  if (kind === "video") {
+    const unavailable = generationBlockedReason(state.language);
+    if (unavailable) throw new StudioError(unavailable, 503);
+    const lengthProblem = clipLengthProblem(state.scenes.find(item => item.id === sceneId)?.requestedSeconds ?? state.clipSeconds);
+    if (lengthProblem) throw new StudioError(lengthProblem);
+    if (!nativeVideoEnabled() && (state.scenes.find(item => item.id === sceneId)?.requestedSeconds ?? state.clipSeconds ?? 5) > 5.05)
+      throw new StudioError("Longer clips require the validated Modal worker. This video backend supports only 5s.");
+  }
   const {
     scene,
     cast,
@@ -165,7 +179,8 @@ export async function startMedia(
     throw new StudioError(
       "Character scenes require a checked reference image. Text-only video cannot preserve character references.",
     );
-  const identity = cast.map(identityProfile);
+  const identity = cast.map(character => ({ ...identityProfile(character),
+    ...(scene.direction?.wardrobe?.[character.id] ? { sceneWardrobe: scene.direction.wardrobe[character.id] } : {}) }));
   let result;
   if (kind === "image") {
     return {
@@ -203,8 +218,43 @@ export async function startMedia(
         if (image.continuityKey ? image.continuityKey !== continuityKey : image.prompt !== basePrompt || lockedReferences.length > 0)
           throw new StudioError("The selected image uses an older scene or character profile. Generate a new scene image first.");
       }
-      const dialogue = scene.dialogues.map((line) => `${line.character} says exactly: ${JSON.stringify(line.text)}`).join("\n");
-      return startLtxVideo({ prompt: `${prompt}\nNative audio direction: Generate synchronized speech, environmental sound effects, and an appropriate quiet background score unless the director explicitly requests otherwise. Keep speech intelligible and music underneath it. Follow all requested voice delivery, music and sound cues. This is one short clip of about five seconds. Do not invent extra dialogue.\n${dialogue || "No spoken dialogue unless explicitly requested in the scene direction."}`, imageUrl: !direct ? image?.url : undefined, identity, continuityKey, requestId: options.requestId });
+      // One source video, however many internal cuts it carries. The prompt is
+      // chronological prose with explicit cut markers, and the length asked for
+      // is whatever this deployment is configured and validated for.
+      const language = state.language ?? "en";
+      // Urdu speech has to be synthesised and sent to the audio-conditioned
+      // pipeline. Submitting Urdu text to the native-audio path would produce a
+      // clip whose speech is not the authored line, so it is refused outright
+      // rather than generated and left for the user to discover.
+      // One wording, from lib/film/language.ts, so the interface, the queue and
+      // this last line of defence all say the same thing.
+      const unavailable = generationBlockedReason(language);
+      if (unavailable) throw new StudioError(unavailable, 503);
+      const seconds = resolveClipSeconds(scene.requestedSeconds ?? state.clipSeconds);
+      const problem = clipProblem({ scene, language, clipSeconds: seconds });
+      if (problem) throw new StudioError(problem);
+      const direction = [
+        corrections
+          ? `Correct these observed defects from the last rejected take while preserving the approved reference views: ${corrections}`
+          : "",
+        options.instructions || "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return startLtxVideo({
+        prompt: buildFilmPrompt({
+          state,
+          scene,
+          language,
+          clipSeconds: seconds,
+          instructions: direction || undefined,
+        }),
+        imageUrl: !direct ? image?.url : undefined,
+        identity,
+        continuityKey,
+        requestId: options.requestId,
+        seconds: scene.requestedSeconds ?? state.clipSeconds ?? 5,
+      });
     }
     if (!direct && image) {
       const problem = continuityProblem(state, scene, image);

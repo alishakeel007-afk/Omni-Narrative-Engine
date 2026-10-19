@@ -10,6 +10,20 @@ out
 dist
 .env
 .env.local
+
+# Local build, worker and diagnostic output. .run-screenshots can hold private
+# local fixtures, so it must never be committed.
+.next-dev
+.run-screenshots
+.scratch-local/
+.claude/
+.studio-worker
+.venv-modal
+.venv-modal.broken
+tsconfig.tsbuildinfo
+__pycache__/
+*.pyc
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

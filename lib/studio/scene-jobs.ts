@@ -7,6 +7,11 @@ import {
   sceneRequirements,
 } from "./identity";
 import type { StudioState, StudioTake } from "@/types/studio";
+import { clipFrames, clipLengthProblem, generationLockMs, VALIDATED_MAX_FRAMES } from "@/lib/film/duration";
+import { generationBlockedReason } from "@/lib/film/language";
+import { clipProblem } from "@/lib/film/shots";
+import { clipSeconds } from "@/lib/film/duration";
+import { ltxRequest, nativeVideoEnabled } from "./ltx";
 
 export const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 export const activeJobs = ["queued", "waiting", "running"];
@@ -19,12 +24,24 @@ export type JobInput = {
   parentJobId?: string;
   kind?: "chat" | "image" | "video";
   direct?: boolean;
+  /**
+   * Whether to run the director's prompt rewrite before submitting.
+   *
+   * The conversational studio needs it: its request is a sentence the user
+   * typed. The four-step workflow does not: the scene already holds the visual
+   * action, the cast, the dialogue and the length, and `buildFilmPrompt` turns
+   * that into the prompt. Rewriting it again would cost a model call per scene
+   * and risk restating the dialogue the structured prompt already carries.
+   */
+  plan?: boolean;
 };
 export type JobSnapshot = {
   state: StudioState;
   requirements: string;
   key: string;
   direct: boolean;
+  /** Absent or true keeps the director rewrite; false submits the scene as written. */
+  plan?: boolean;
   parent?: StudioTake;
   history: { text: string; reply?: string }[];
 };
@@ -188,6 +205,29 @@ export async function enqueueSceneJob(
     parent?.kind ||
     (parentJob?.kind as "image" | "video" | undefined) ||
     requestedKind(input.text);
+  // Refused before a job row exists, so an unavailable language or clip length
+  // never reaches the worker and never shows up as a queued job that will fail.
+  if (kind !== "chat") {
+    const unavailable = generationBlockedReason(loaded.state.language);
+    if (unavailable) throw new StudioError(unavailable, 503);
+    if (kind === "video") {
+      const problem = clipProblem({ scene, language: loaded.state.language ?? "en", clipSeconds: clipSeconds(scene.requestedSeconds ?? loaded.state.clipSeconds) });
+      if (problem) throw new StudioError(problem);
+    }
+    const lengthProblem = clipLengthProblem(
+      scene.requestedSeconds ?? loaded.state.clipSeconds,
+    );
+    if (lengthProblem)
+      throw new StudioError(
+        `${scene.title}: ${lengthProblem} Change the clip length in Setup, or for this scene, before generating.`,
+      );
+    if (kind === "video" && clipFrames(scene.requestedSeconds ?? loaded.state.clipSeconds) > VALIDATED_MAX_FRAMES) {
+      if (!nativeVideoEnabled()) throw new StudioError("Longer clips require the validated Modal worker.");
+      const health = await (await ltxRequest("/health")).json();
+      if (health.frame_rate !== 24 || health.frame_step !== 8 || health.max_video_frames < clipFrames(scene.requestedSeconds ?? loaded.state.clipSeconds))
+        throw new StudioError("The video worker does not support this clip length yet. Keep the request saved and choose an available length before generating.");
+    }
+  }
   const requirements = sceneRequirements(loaded.state, scene);
   const cast = loaded.state.characters.filter((character) =>
     scene.characterIds.includes(character.id),
@@ -275,6 +315,7 @@ export async function enqueueSceneJob(
         requirements,
         key,
         direct: input.direct ?? !scene.selectedImageId,
+        ...(input.plan === false ? { plan: false } : {}),
         parent:
           previous?.take ||
           parent ||
@@ -431,7 +472,8 @@ export async function publishSceneTake(
     const loaded = await loadStudio(userId, workspaceId);
     if (
       loaded.state.operation &&
-      Date.now() - Date.parse(loaded.state.operation.startedAt) < 240000
+      Date.now() - Date.parse(loaded.state.operation.startedAt) <
+        generationLockMs(loaded.state.clipSeconds)
     )
       return false;
     const state = structuredClone(loaded.state);

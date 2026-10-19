@@ -5,16 +5,37 @@
 :root {
   color-scheme: light;
   --font-heading: var(--font-body);
-  --brand-accent: #c1f17b;
+
+  /*
+   * The whole product is three colours: white surfaces, black text, one flat
+   * green for anything that needs emphasis. Grey is only black at low opacity,
+   * used for hairline borders and secondary text, so no fourth hue exists.
+   *
+   * New components must use these tokens and must not use bg-gradient-*,
+   * from-/via-/to-, or a second hue. Status is carried by text and iconography,
+   * never by red/amber/green semantics.
+   */
+  --bg: #ffffff;
+  --ink: #000000;
+  --accent: #c1f17b;
+  --line: rgba(0, 0, 0, 0.12);
+  --muted: rgba(0, 0, 0, 0.55);
+
+  /*
+   * The landing page and the account shell in `public.css` use their own
+   * variable names. These map them onto the three colours above, so that
+   * design keeps working without carrying a palette of its own.
+   */
+  --brand-accent: var(--accent);
   --brand-accent-rgb: 193 241 123;
-  --brand-ink: #161616;
-  --brand-muted: #6b6b6b;
-  --brand-line: #e6e6e6;
-  --brand-surface: #f7f7f7;
+  --brand-ink: var(--ink);
+  --brand-muted: var(--muted);
+  --brand-line: var(--line);
+  --brand-surface: var(--bg);
 }
 
 :where(a, button, input, textarea, select, [role="tab"]):focus-visible {
-  outline: 2px solid var(--brand-ink);
+  outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
 
@@ -41,6 +62,41 @@ html {
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #999; }
+
+/* This overview scrolls away with the page. The four numbered stages share one arrow track. */
+.film-progress { position: static; background: #fff; border-bottom: 1px solid var(--line); }
+.film-progress-inner { max-width: 1152px; margin: auto; padding: 8px 24px; display: flex; gap: 20px; align-items: center; }
+.film-progress-steps { display: flex; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.film-progress-step { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); color: #000; background: #fff; }
+.film-progress-step.current { background: var(--accent); border-color: #000; }
+.film-progress-step.done { border-color: #000; box-shadow: inset 0 0 0 2px var(--accent); }
+.film-progress-step:disabled { opacity: .4; cursor: default; }
+.film-progress-copy { flex: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; font-size: 12px; }
+.film-progress-percent { color: var(--muted); }
+.film-progress-copy progress { grid-column: 1 / -1; width: 100%; height: 4px; appearance: none; border: 0; }
+.film-progress-copy progress::-webkit-progress-bar { background: #eee; border-radius: 4px; }
+.film-progress-copy progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
+.film-progress-copy progress::-moz-progress-bar { background: var(--accent); }
+.film-progress-summary { max-width: 1152px; margin: auto; padding: 0 24px 7px; font-size: 11px; color: var(--muted); }
+.film-disclosure { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 16px; }
+.film-disclosure summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.film-disclosure summary > span { color: var(--muted); font-weight: 400; font-size: 11px; margin-left: 8px; }
+.film-help { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
+.film-decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.film-decision { display: block; min-width: 0; }
+.film-decision label, .film-decision span { display: block; font-size: 12px; font-weight: 500; }
+.film-decision input, .film-decision textarea { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #000; padding: 8px 10px; margin: 5px 0; font-size: 13px; }
+.film-text-button { color: #000; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.film-text-button:disabled { opacity: .4; text-decoration: none; }
+@media (max-width: 640px) {
+  .film-progress-inner { padding-inline: 16px; gap: 12px; }
+  .film-progress-summary { padding-inline: 16px; }
+  .film-progress-steps { gap: 5px; }
+  .film-progress-step { width: 34px; height: 34px; }
+  .film-progress-copy { font-size: 11px; }
+  .film-decision-grid { grid-template-columns: 1fr; }
+  .film-disclosure summary > span { display: block; margin: 3px 0; }
+}
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 @supports selector(::-webkit-scrollbar) {
   * { scrollbar-width: auto; scrollbar-color: auto; }
@@ -49,184 +105,102 @@ html {
   * { scrollbar-width: auto; scrollbar-color: auto; }
 }
 
+.story-progress { position: static; background: #fff; border-bottom: 1px solid var(--line); }
+.story-progress-inner { position: relative; max-width: 896px; padding: 22px 24px 12px; margin: auto; }
+.story-progress-stages { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.story-progress-stage { text-align: center; min-width: 0; }
+.story-progress-stage button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; font-size: 12px; }
+.story-progress-stage button:disabled { opacity: .45; }
+.story-stage-number, .guest-step-number { isolation: isolate; overflow: hidden; position: relative; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: #fff; }
+.story-stage-number { width: 32px; height: 32px; font-weight: 600; }
+.story-stage-number::before, .guest-step-number::before { content: ""; z-index: 0; position: absolute; inset: auto 0 0; height: var(--story-circle-fill, 0%); background: var(--accent); transition: height .45s cubic-bezier(.2,.75,.2,1); }
+.story-stage-number > span, .guest-step-number > span { position: relative; z-index: 1; }
+.story-progress-stage.current .story-stage-number, .story-progress-stage.done .story-stage-number { border-color: var(--ink); }
+.story-stage-name { line-height: 1.5; white-space: nowrap; }
+.story-stage-anchor { display: none; }
+/* The path sits behind the circles at their exact vertical centre. It begins
+   * and ends at circle centres, so the opaque circle masks the arrowhead once
+   * it arrives at the next phase instead of showing a line through the number. */
+.story-progress-track { z-index: 0; height: 5px; margin: 0; position: absolute; top: 36px; left: calc(12.5% + 18px); right: calc(12.5% + 18px); background: #e7e7e7; border-radius: 4px; }
+.story-progress-fill { position: relative; height: 100%; display: block; background: var(--accent); border-radius: inherit; transition: width .45s cubic-bezier(.2,.75,.2,1); }
+.story-progress-fill:not([style*="width: 0%"])::after { content: ""; position: absolute; right: -1px; top: 50%; width: 10px; height: 10px; background: var(--accent); clip-path: polygon(100% 50%, 0 0, 0 100%); transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) { .story-stage-number::before, .guest-step-number::before, .story-progress-fill { transition: none; } }
+.story-progress-caption { margin: 14px 0 0; display: flex; justify-content: space-between; gap: 18px; font-size: 11px; color: var(--muted); }
+.story-progress-caption > :last-child { flex-shrink: 0; }
+.decision-flow { scroll-margin-top: 80px; min-width: 0; }
+.decision-flow-top { display: flex; justify-content: space-between; align-items: center; gap: 14px; color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.decision-jump { min-width: 0; max-width: 60%; }
+.decision-jump select { width: 100%; max-width: 270px; border: 0; color: var(--muted); background: transparent; font-size: 11px; text-overflow: ellipsis; }
+.decision-content { padding-top: 28px; }
+.decision-heading { font-size: clamp(21px, 3vw, 28px); font-weight: 600; letter-spacing: -.035em; line-height: 1.25; }
+.decision-description { color: var(--muted); font-size: 14px; line-height: 1.7; max-width: 620px; margin-top: 10px; }
+.decision-answer { margin-top: 24px; }
+.decision-input { display: block; width: 100%; border: 1px solid var(--line); padding: 13px 15px; border-radius: 12px; background: white; font-size: 14px; line-height: 1.7; resize: vertical; }
+.decision-input:focus { border-color: var(--ink); outline: 2px solid var(--accent); outline-offset: 2px; }
+.decision-actions { display: flex; justify-content: space-between; gap: 16px; align-items: center; border-top: 1px solid var(--line); margin-top: 28px; padding-top: 18px; }
+.decision-back, .decision-next { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 30px; font-size: 13px; }
+.decision-back { border: 1px solid var(--line); }
+.decision-next { background: var(--accent); font-weight: 600; }
+.decision-back:disabled, .decision-next:disabled { opacity: .4; cursor: default; }
+.field-assist { margin-top: 14px; }
+.field-assist-trigger { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; font-weight: 500; padding: 8px 0; }
+.omni-assist-mark { width: 16px; height: 16px; object-fit: contain; }
+.field-assist-body { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 7px; background: #fafafa; }
+.story-review dt { color: var(--muted); font-size: 11px; margin-top: 18px; }
+.story-review dd { font-size: 14px; line-height: 1.7; margin: 4px 0 0; }
+.story-scene-list { list-style: none; padding: 0; display: grid; gap: 10px; }
+.story-scene-list li { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.story-scene-index { font-size: 12px; background: #f4f4f4; border-radius: 50%; display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; }
+.story-scene-list strong { display: block; font-size: 13px; font-weight: 500; }
+.story-scene-list small { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .story-progress-inner { padding: 18px 12px 10px; }
+  .story-progress-track { top: 32px; left: calc(12.5% + 9px); right: calc(12.5% + 9px); }
+  .story-stage-name { font-size: 9px; white-space: normal; min-height: 28px; max-width: 68px; }
+  .story-progress-caption { font-size: 10px; gap: 8px; }
+  .decision-content { padding-top: 22px; }
+  .decision-jump select { max-width: 170px; }
+  .story-scene-list li { flex-wrap: wrap; }
+}
+
 body {
-  @apply min-h-screen bg-midnight text-slate-950 antialiased;
-  background: linear-gradient(180deg, #fafafa 0%, #ffffff 52%, #fafafa 100%);
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--brand-accent);
-  color: var(--brand-ink);
+  background: var(--accent);
+  color: var(--ink);
 }
 
 @layer components {
+  /*
+   * Shared surface for the account screens and the dashboard cards. The old
+   * `.gold-ring`, `.text-gradient`, `.story-grid`, `.input` and `.textarea`
+   * helpers went with the screens that used them.
+   */
   .glass-panel {
-    @apply border border-slate-200 bg-white shadow-card;
-  }
-
-  .story-grid {
-    background-image:
-      linear-gradient(rgba(23, 23, 23, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-
-  .gold-ring {
-    box-shadow:
-      0 0 0 1px rgba(96, 96, 96, 0.14),
-      0 18px 45px rgba(23, 23, 23, 0.08);
-  }
-
-  .text-gradient {
-    color: var(--brand-ink);
-  }
-
-  .input {
-    @apply w-full rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
-  }
-
-  .textarea {
-    @apply w-full resize-y rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-gold/40 focus:ring-2 focus:ring-gold/10;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.08);
   }
 }
 
-@layer utilities {
-  .animate-scene-reveal {
-    animation: sceneReveal 620ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
+/*
+ * Form affordances, which have no Tailwind class of their own. The override
+ * layer that used to live here is gone: off-palette classes are fixed at the
+ * source now, so a new one shows up in review instead of being repainted.
+ */
+input,
+textarea {
+  caret-color: var(--ink);
 }
 
-@keyframes sceneReveal {
-  0% {
-    opacity: 0;
-    transform: translateY(22px) scale(0.985);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+input[type="range"],
+input[type="checkbox"],
+progress {
+  accent-color: var(--accent);
 }
-
-body [class*="min-h-screen"],
-body [class*="bg-midnight"],
-body [class*="bg-abyss"],
-body [class*="bg-velvet"],
-body [class*="from-slate-950"],
-body [class*="via-slate-900"],
-body [class*="to-slate-950"] {
-  background: #fafafa !important;
-  background-image: none !important;
-}
-
-body [class*="bg-black"],
-body [class*="bg-slate-950"],
-body [class*="bg-slate-900"],
-body [class*="bg-slate-800"] {
-  background-color: #ffffff !important;
-}
-
-body [class*="text-white"],
-body [class*="text-slate-100"],
-body [class*="text-slate-200"],
-body [class*="text-slate-300"] {
-  color: #181818 !important;
-}
-
-body [class*="text-white/"],
-body [class*="text-slate-400"],
-body [class*="text-slate-500"],
-body [class*="text-starlight"] {
-  color: #535353 !important;
-}
-
-body [class*="border-white/"],
-body [class*="border-slate-"],
-body [class*="border-cyan-"],
-body [class*="border-blue-"],
-body [class*="border-purple-"],
-body [class*="border-violet-"],
-body [class*="border-gold"] {
-  border-color: #e7e7e7 !important;
-}
-
-body [class*="bg-white/"],
-body [class*="bg-cyan-"],
-body [class*="bg-blue-"],
-body [class*="bg-purple-"],
-body [class*="bg-violet-"],
-body [class*="bg-gold"] {
-  background-color: #ffffff !important;
-}
-
-body [class*="text-cyan-"],
-body [class*="text-blue-"],
-body [class*="text-purple-"],
-body [class*="text-violet-"],
-body [class*="text-gold"] {
-  color: #606060 !important;
-}
-
-body button[class*="bg-gradient"],
-body a[class*="bg-gradient"],
-body button[class*="bg-cyan"],
-body a[class*="bg-cyan"],
-body button[class*="bg-blue"],
-body a[class*="bg-blue"],
-body button[class*="bg-gold"],
-body a[class*="bg-gold"] {
-  background: #606060 !important;
-  background-image: none !important;
-  border-color: rgba(96, 96, 96, 0.55) !important;
-  color: #ffffff !important;
-}
-
-body button[class*="bg-gradient"]:hover,
-body a[class*="bg-gradient"]:hover,
-body button[class*="bg-cyan"]:hover,
-body a[class*="bg-cyan"]:hover,
-body button[class*="bg-blue"]:hover,
-body a[class*="bg-blue"]:hover,
-body button[class*="bg-gold"]:hover,
-body a[class*="bg-gold"]:hover {
-  background: #4e4e4e !important;
-}
-
-body button[class*="red-"],
-body a[class*="red-"] {
-  background: #e8e8e8 !important;
-  border-color: #b7b7b7 !important;
-  color: #363636 !important;
-}
-
-body button[class*="red-"]:hover,
-body a[class*="red-"]:hover {
-  background: #d5d5d5 !important;
-  color: #323232 !important;
-}
-
-/* Shared theme for older utility-based screens as well as the new studio. */
-body :is(button, a)[class*="bg-gradient"],
-body :is(button, a)[class*="bg-cyan"],
-body :is(button, a)[class*="bg-blue"],
-body :is(button, a)[class*="bg-gold"],
-body :is(button, a)[class*="bg-green"],
-body :is(button, a)[class*="bg-emerald"],
-body :is(button, a)[class*="bg-teal"],
-body :is(button, a)[class*="bg-lime"],
-body :is(button, a)[class*="bg-gradient"]:hover,
-body :is(button, a)[class*="bg-gold"]:hover,
-body :is(button, a)[class*="bg-blue"]:hover,
-body :is(button, a)[class*="bg-cyan"]:hover {
-  background: var(--brand-accent) !important;
-  color: var(--brand-ink) !important;
-  border-color: var(--brand-accent) !important;
-}
-body [class*="text-green-"], body [class*="text-emerald-"],
-body [class*="text-teal-"], body [class*="text-lime-"],
-body [class*="text-cyan-"], body [class*="text-blue-"],
-body [class*="text-purple-"], body [class*="text-violet-"], body [class*="text-gold"] {
-  color: var(--brand-ink) !important;
-}
-input, textarea { caret-color: var(--brand-ink); }
-input[type="range"], input[type="checkbox"], progress { accent-color: var(--brand-accent); }

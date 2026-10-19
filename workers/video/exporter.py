@@ -28,6 +28,13 @@ class Overlay(BaseModel):
         return self
 
 
+# Clip count and total length are separate limits. Splitting in the editor and
+# longer clip lengths both multiply clips, so the count is generous; total
+# duration is the limit that actually binds.
+MAX_CLIPS = 24
+MAX_FILM_SECONDS = 180
+
+
 class Clip(BaseModel):
     model_config = ConfigDict(extra="forbid")
     url: str = Field(max_length=8192)
@@ -47,7 +54,7 @@ class Clip(BaseModel):
 class ExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: UUID
-    clips: list[Clip] = Field(min_length=1, max_length=12)
+    clips: list[Clip] = Field(min_length=1, max_length=MAX_CLIPS)
 
 
 def download(url, destination):
@@ -75,9 +82,14 @@ def run(arguments):
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *arguments], check=True, capture_output=True, timeout=300)
 
 
+def filter_path(value):
+    """FFmpeg filter values need escaping even when subprocess avoids a shell."""
+    return Path(value).as_posix().replace(":", r"\:").replace("'", r"'\''")
+
+
 def render(payload, output):
     request = ExportRequest.model_validate(payload)
-    font = os.getenv("LTX_FONT_PATH", "/root/Manrope.ttf")
+    font = filter_path(os.getenv("LTX_FONT_PATH", "/root/Manrope.ttf"))
     total_duration = 0
     with tempfile.TemporaryDirectory(prefix="film-") as temporary:
         directory = Path(temporary)
@@ -92,8 +104,11 @@ def render(payload, output):
                 raise ValueError("A trim range is outside its source clip.")
             duration = min(end, source_duration) - clip.start
             total_duration += duration
-            if total_duration > 180:
-                raise ValueError("This version exports films up to three minutes.")
+            if total_duration > MAX_FILM_SECONDS:
+                raise ValueError(
+                    f"This version exports films up to {MAX_FILM_SECONDS / 60:.0f} minutes, "
+                    f"and the timeline is already {total_duration:.1f}s."
+                )
             arguments = ["-i", str(source)]
             audio_sources = []
             filters = []
@@ -130,11 +145,14 @@ def render(payload, output):
                 text_file = directory / f"text-{index}-{text_index}.txt"
                 text_file.write_text(text.text, encoding="utf-8")
                 text_end = min(text.end or duration, duration)
-                visual += f",drawtext=fontfile='{font}':textfile='{text_file}':expansion=none:fontsize={text.size}:fontcolor={text.color}:x=(w-text_w)*{text.x}:y=(h-text_h)*{text.y}:borderw=2:bordercolor=black:enable='between(t,{text.start},{text_end})'"
+                visual += f",drawtext=fontfile='{font}':textfile='{filter_path(text_file)}':expansion=none:fontsize={text.size}:fontcolor={text.color}:x=(w-text_w)*{text.x}:y=(h-text_h)*{text.y}:borderw=2:bordercolor=black:enable='between(t,{text.start},{text_end})'"
             filters.append(visual + "[vout]")
-            target = directory / f"clip-{index}.mp4"
-            run([*arguments, "-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]", "-t", str(duration), "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", str(target)])
+            # Keep intermediate audio as PCM. Encoding AAC per clip adds an
+            # encoder-delay/padding block at every cut; concatenating those
+            # packets can overlap timestamps and drift from the video.
+            target = directory / f"clip-{index}.mkv"
+            run([*arguments, "-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]", "-t", str(duration), "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", str(target)])
             completed.append(target)
         manifest = directory / "timeline.txt"
         manifest.write_text("\n".join(f"file '{path.as_posix()}'" for path in completed))
-        run(["-f", "concat", "-safe", "0", "-i", str(manifest), "-c", "copy", "-movflags", "+faststart", output])
+        run(["-f", "concat", "-safe", "0", "-i", str(manifest), "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", str(total_duration), "-movflags", "+faststart", output])

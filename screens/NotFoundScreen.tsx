@@ -7,7 +7,7 @@ export default function NotFoundScreen() {
       <div className="text-center">
         <Link
           href="/"
-          className="mt-8 inline-flex rounded-full bg-gradient-to-r from-aurora to-gold px-7 py-4 text-sm font-semibold text-slate-950"
+          className="mt-8 inline-flex rounded-full bg-[var(--accent)] px-7 py-4 text-sm font-semibold text-[var(--ink)]"
         >
           Return Home
         </Link>

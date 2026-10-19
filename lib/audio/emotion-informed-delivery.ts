@@ -1,4 +1,4 @@
-import type { MovieCharacterVoice, MovieDialogueLine, MovieScene } from "@/types/video";
+import type { MovieCharacterVoice, MovieDialogueLine, MovieSceneMood } from "@/types/audio";
 
 /**
  * A compact, provider-neutral description of a line's intended delivery.
@@ -20,7 +20,7 @@ export type EmotionResolution = {
 
 export type EmotionResolutionInput = {
   line: Pick<MovieDialogueLine, "delivery" | "line"> & { voiceProfile: Pick<MovieCharacterVoice, "tone" | "currentEmotionalState">; emotion?: unknown };
-  scene?: Pick<MovieScene, "mood" | "sceneTone">;
+  scene?: MovieSceneMood;
   characterEmotionalState?: string | null;
 };
 

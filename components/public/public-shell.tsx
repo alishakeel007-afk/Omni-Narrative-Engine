@@ -4,18 +4,19 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CinematicVideo, MotionToggle, PublicMotion } from "./cinematic-video";
+import { ACTIVE_ENTRY_KEY, readStudioEntry, studioEntryPath } from "@/lib/studio/entry";
+import type { Route } from "next";
 
 export function PublicBrand() {
   return (
     <Link href="/" className="public-brand" aria-label="OmniNarrative home">
       <span className="public-brand-symbol" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none">
-          <path d="M7 24V8h5l8 12V8h5v16h-5L12 12v12H7Z" fill="currentColor" />
-          <circle cx="23" cy="3" r="2.5" fill="var(--brand-accent)" />
-        </svg>
+        {/* Supplied Omni mark, trimmed to a transparent PNG for light and dark surfaces. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/omni-mark.png" alt="" />
       </span>
       <span>
-        omni<span className="public-brand-light">narrative</span>
+        <span className="public-brand-omni">omni</span><span className="public-brand-light">narrative</span>
         <span className="public-brand-dot">.</span>
       </span>
     </Link>
@@ -29,6 +30,15 @@ const links = [
 
 export function PublicHeader({ account = false }: { account?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [entry, setEntry] = useState<string | null>(null);
+  useEffect(() => {
+    const refresh = () => { try {
+      const id = localStorage.getItem(ACTIVE_ENTRY_KEY);
+      setEntry(readStudioEntry(id) && id ? studioEntryPath(id) : null);
+    } catch { setEntry(null); } };
+    refresh(); window.addEventListener("omni:entry-saved", refresh);
+    return () => window.removeEventListener("omni:entry-saved", refresh);
+  }, []);
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -48,12 +58,12 @@ export function PublicHeader({ account = false }: { account?: boolean }) {
           ))}
         </nav>
         <div className="public-header-actions">
-          <Link className="public-login-link" href="/auth?next=/studio">
+          <Link className="public-login-link" href={(entry ? `/auth?next=${encodeURIComponent(entry)}` : "/auth") as Route}>
             Log in
           </Link>
           <Link
             className="public-button public-button-small"
-            href="/signup?next=/studio"
+            href={(entry ? `/signup?next=${encodeURIComponent(entry)}` : "/signup") as Route}
           >
             {account ? "Start your story" : "Start creating"}
             <ArrowUpRight size={15} />
@@ -85,7 +95,7 @@ export function PublicHeader({ account = false }: { account?: boolean }) {
               <ArrowUpRight size={17} />
             </Link>
           ))}
-          <Link href="/auth?next=/studio" onClick={() => setOpen(false)}>
+          <Link href={(entry ? `/auth?next=${encodeURIComponent(entry)}` : "/auth") as Route} onClick={() => setOpen(false)}>
             Log in
             <ArrowUpRight size={17} />
           </Link>
@@ -111,8 +121,8 @@ export function PublicFooter({ compact = false }: { compact?: boolean }) {
         <div className="public-footer-links">
           <Link href="/#how-it-works">How it works</Link>
           <Link href="/#questions">Questions</Link>
-          <Link href="/auth?next=/studio">
-            Your studio
+          <Link href="/auth">
+            Your stories
             <ArrowUpRight size={13} />
           </Link>
         </div>
@@ -153,14 +163,16 @@ export function PublicAccountShell({
                 Your next story.<br /><em>Starts here.</em>
               </h2>
               <p>
-                Plan. Create. Make it yours.
+                Set up, write, generate, edit. Four steps, one story.
               </p>
               <div className="public-account-steps">
-                <span>01 Plan</span>
+                <span>01 Setup</span>
                 <ArrowRight size={14} />
-                <span>02 Create</span>
+                <span>02 Script</span>
                 <ArrowRight size={14} />
-                <span>03 Assemble</span>
+                <span>03 Generate</span>
+                <ArrowRight size={14} />
+                <span>04 Edit</span>
               </div>
             </div>
             <div className="public-account-film-label">

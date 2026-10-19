@@ -425,7 +425,7 @@ export function FilmAssembly({
       !window.AudioContext
     ) {
       onError(
-        "This browser cannot export a film. Use a recent desktop Chrome or Edge.",
+        "This browser cannot export a story. Use a recent desktop Chrome or Edge.",
       );
       return;
     }
@@ -469,7 +469,7 @@ export function FilmAssembly({
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       throw new Error(
-        "Media took too long to load. Preview the film once, then retry export.",
+        "Media took too long to load. Preview the story once, then retry export.",
       );
     };
     try {
@@ -510,7 +510,7 @@ export function FilmAssembly({
       await video.current.play();
     } catch (cause) {
       onError(
-        cause instanceof Error ? cause.message : "Could not export film.",
+        cause instanceof Error ? cause.message : "Could not export story.",
       );
       stop();
     }
@@ -531,7 +531,7 @@ export function FilmAssembly({
         <h2>Bring your story together.</h2>
         <div className="studio-empty">
           Choose a completed take in Scenes and select{" "}
-          <strong>Add to film</strong>.<br />
+          <strong>Add to story</strong>.<br />
           Your clips will appear here, ready to arrange and mix.
         </div>
         {available.map((item) => (
@@ -603,7 +603,7 @@ export function FilmAssembly({
         className="studio-row"
         style={{ justifyContent: "space-between", marginBottom: 14 }}
       >
-        <h2 style={{ margin: 0 }}>Your film</h2>
+        <h2 style={{ margin: 0 }}>Your story</h2>
         <button
           className="studio-btn primary"
           disabled={disabled || playing || cloudRendering || !!continuityIssue}
@@ -614,7 +614,7 @@ export function FilmAssembly({
             ? "Exporting…"
             : mp4Export
               ? "Export MP4"
-              : "Export film"}
+              : "Export story"}
         </button>
       </div>
       <div className="studio-film-preview">
@@ -686,7 +686,7 @@ export function FilmAssembly({
           disabled={disabled || (!playing && !!continuityIssue)}
         >
           {playing ? <Square /> : <Play />}
-          {playing ? (recording ? "Stop export" : "Stop") : "Preview full film"}
+          {playing ? (recording ? "Stop export" : "Stop") : "Preview full story"}
         </button>
         <span className="studio-muted">
           Scene {index + 1} of {state.timeline.length} · {position.toFixed(1)} /{" "}
@@ -695,7 +695,7 @@ export function FilmAssembly({
       </div>
       {recording && (
         <p className="studio-export-progress" role="status">
-          Rendering your film with audio in real time. Keep this tab open. Scene{" "}
+          Rendering your story with audio in real time. Keep this tab open. Scene{" "}
           {index + 1} of {state.timeline.length}.
         </p>
       )}
@@ -712,7 +712,7 @@ export function FilmAssembly({
             href={download}
             download={`${state.title.replace(/[^a-z0-9_-]/gi, "-")}.${downloadFormat}`}
           >
-            Download edited film (.{downloadFormat})
+            Download edited story (.{downloadFormat})
           </a>
           <p className="studio-muted">
             Includes clip audio, trims and text.{" "}
@@ -761,7 +761,7 @@ export function FilmAssembly({
           ))}
         </details>
       )}
-      <div className="studio-timeline" aria-label="Film timeline">
+      <div className="studio-timeline" aria-label="Story timeline">
         {state.timeline.map((id, at) => (
           <div
             key={id}
@@ -793,7 +793,7 @@ export function FilmAssembly({
               </button>
               <button
                 className="studio-icon"
-                aria-label="Remove clip from film"
+                aria-label="Remove clip from story"
                 disabled={playing || disabled}
                 onClick={() => {
                   setIndex(0);

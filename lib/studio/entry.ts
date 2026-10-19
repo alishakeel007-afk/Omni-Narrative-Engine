@@ -1,13 +1,29 @@
 // Only an opaque ID goes in the URL. The visitor's message stays in this browser
 // until authentication completes, including an email confirmation in a new tab.
-import type { StudioTab } from "@/types/studio";
+import type { FilmAssist, FilmLanguage, StudioTab } from "@/types/studio";
 export const STUDIO_ENTRY_LIMIT = 24000;
 const PREFIX = "omni-studio-entry:";
+export const ACTIVE_ENTRY_KEY = "omni-studio-active-entry";
 const LIFETIME = 24 * 60 * 60 * 1000;
 type EntryStorage = Pick<
   Storage,
   "getItem" | "setItem" | "removeItem" | "key" | "length"
 >;
+/**
+ * The setup choices a visitor made on the landing page.
+ *
+ * Carried through authentication with the idea text, so the film they land on
+ * already reflects every decision they made before signing up rather than
+ * resetting to defaults.
+ */
+export type StudioEntrySetup = {
+  assist?: FilmAssist;
+  language?: FilmLanguage;
+  visualStyle?: string;
+  clipSeconds?: number;
+  sourceScript?: string;
+};
+
 export type StudioEntry = {
   text: string;
   createdAt: number;
@@ -15,7 +31,23 @@ export type StudioEntry = {
   guestProjectId?: string;
   tab?: StudioTab;
   pendingText?: string;
+  setup?: StudioEntrySetup;
 };
+
+/** Validates the stored setup, discarding anything unrecognised. */
+function readSetup(value: unknown): StudioEntrySetup | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const setup: StudioEntrySetup = {};
+  if (raw.assist === "guided" || raw.assist === "custom") setup.assist = raw.assist;
+  if (raw.language === "en" || raw.language === "ur") setup.language = raw.language;
+  if (typeof raw.visualStyle === "string" && raw.visualStyle.trim().length <= 300)
+    setup.visualStyle = raw.visualStyle;
+  if (typeof raw.clipSeconds === "number" && raw.clipSeconds > 0 && raw.clipSeconds <= 60)
+    setup.clipSeconds = raw.clipSeconds;
+  if (typeof raw.sourceScript === "string" && raw.sourceScript.length <= STUDIO_ENTRY_LIMIT) setup.sourceScript = raw.sourceScript;
+  return Object.keys(setup).length ? setup : undefined;
+}
 export function isStudioEntryId(id: string | null): id is string {
   return !!id && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id);
 }
@@ -47,7 +79,7 @@ export function readStudioEntry(
       storage.removeItem(PREFIX + id);
       return null;
     }
-    return entry;
+    return { ...entry, setup: readSetup(entry.setup) };
   } catch {
     return null;
   }
@@ -55,7 +87,7 @@ export function readStudioEntry(
 export function saveStudioEntry(
   text: string,
   storage: EntryStorage = window.localStorage,
-  details: Pick<StudioEntry, "guestProjectId" | "tab" | "pendingText"> = {},
+  details: Pick<StudioEntry, "guestProjectId" | "tab" | "pendingText" | "setup"> = {},
 ) {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length > STUDIO_ENTRY_LIMIT)
@@ -88,17 +120,38 @@ export function linkStudioEntry(
 export function removeStudioEntry(id: string, storage?: EntryStorage) {
   try {
     (storage || window.localStorage).removeItem(PREFIX + id);
+    if ((storage || window.localStorage).getItem(ACTIVE_ENTRY_KEY) === id) (storage || window.localStorage).removeItem(ACTIVE_ENTRY_KEY);
   } catch {
     /* The project already contains the message. */
   }
 }
-export function studioEntryPath(id: string) {
-  return `/studio?start=${encodeURIComponent(id)}`;
+
+/** Updates one local draft instead of accumulating a new entry per keystroke. */
+export function updateStudioEntry(id: string | null, text: string, details: Pick<StudioEntry, "setup" | "guestProjectId">) {
+  const existing = readStudioEntry(id);
+  const nextId = existing && id ? id : saveStudioEntry(text, window.localStorage, details);
+  window.localStorage.setItem(PREFIX + nextId, JSON.stringify({ ...existing, text: text.trim(), createdAt: Date.now(), ...details }));
+  window.localStorage.setItem(ACTIVE_ENTRY_KEY, nextId);
+  window.dispatchEvent(new Event("omni:entry-saved"));
+  return nextId;
 }
+/**
+ * Where a signed-in visitor lands with their trial in hand.
+ *
+ * The id is the ENTRY id, which only this browser can resolve into the text
+ * they typed. The dashboard reads it, turns it into a real project, and sends
+ * them to that film's Setup step.
+ */
+export const STUDIO_ENTRY_ROUTE = "/dashboard";
+
+export function studioEntryPath(id: string) {
+  return `${STUDIO_ENTRY_ROUTE}?start=${encodeURIComponent(id)}`;
+}
+
 export function studioEntryFromPath(path: string) {
   const url = new URL(path, "https://omninarrative.invalid");
   return url.origin === "https://omninarrative.invalid" &&
-    url.pathname === "/studio"
+    url.pathname === STUDIO_ENTRY_ROUTE
     ? url.searchParams.get("start")
     : null;
 }

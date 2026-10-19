@@ -239,6 +239,10 @@
 }
 .public-skip {
   position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  position: fixed;
   z-index: 100;
   top: 10px;
   left: 16px;
@@ -279,6 +283,7 @@
 .public-brand-light {
   font-weight: 500;
 }
+.public-brand-omni { color: var(--brand-accent); }
 .public-brand-dot {
   color: #707070;
 }
@@ -287,9 +292,10 @@
   height: 35px;
   display: flex;
 }
-.public-brand-symbol svg {
+.public-brand-symbol img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .public-desktop-nav {
   display: flex;
@@ -378,7 +384,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: linear-gradient(130deg, #272727, #555555 60%, #2a2a2a);
+  background: #2b2b2b;
 }
 .public-cinema-poster,
 .public-cinema video {
@@ -403,14 +409,7 @@
 .public-hero-shade {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(18, 18, 18, 0.84),
-      rgba(17, 17, 17, 0.63) 30%,
-      rgba(17, 17, 17, 0.12) 67%
-    ),
-    linear-gradient(0deg, rgba(14, 14, 14, 0.6), transparent 30%);
+  background: rgba(17, 17, 17, 0.58);
 }
 .public-hero-copy {
   position: relative;
@@ -505,14 +504,7 @@
   height: 27px;
   border: 1px solid #e2e2e288;
   border-radius: 3px;
-  background: repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 6px,
-      #ffffff99 6px,
-      #ffffff99 8px
-    )
-    left 3px top 4px/2px 17px no-repeat;
+  background: #ffffff55;
 }
 .public-hero-motion {
   position: absolute;
@@ -1051,13 +1043,7 @@
 .public-demo-audio > span {
   height: 9px;
   flex: 1;
-  background: repeating-linear-gradient(
-    90deg,
-    #a0a0a077 0,
-    #a0a0a077 2px,
-    transparent 2px,
-    transparent 5px
-  );
+  background: #a0a0a055;
 }
 .public-demo-audio.music {
   background: #efefef;
@@ -1091,7 +1077,7 @@
 .public-film-card-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, #111111da, transparent 80%);
+  background: rgba(17, 17, 17, 0.42);
 }
 .public-film-genre {
   position: absolute;
@@ -1395,7 +1381,7 @@
 .public-account-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, #141414e6, #17171780 60%, #17171744);
+  background: rgba(20, 20, 20, 0.62);
 }
 .public-account-scene-copy {
   position: relative;
@@ -1676,12 +1662,6 @@
 .public-account-form .glass-panel > p {
   font-size: 12px;
 }
-.public-account-form .glass-panel button[class*="bg-gradient"] {
-  background: #5c5c5c !important;
-  color: #ffffff !important;
-  border-radius: 9px;
-  box-shadow: none;
-}
 .public-account-form .glass-panel a {
   color: #666666 !important;
 }
@@ -1764,9 +1744,7 @@
     letter-spacing: -4px;
   }
   .public-hero-shade {
-    background:
-      linear-gradient(90deg, #171717c9, #17171744),
-      linear-gradient(0deg, #141414ab, transparent 45%);
+    background: rgba(23, 23, 23, 0.55);
   }
   .public-hero-caption {
     bottom: 23px;
@@ -2366,7 +2344,7 @@
 .public-assembly-sequence span { display: block; padding-top: 4px; font-size: 9px; }
 .public-assembly-track { display: flex; align-items: center; gap: 12px; font-size: 10px; }
 .public-assembly-track > span { min-width: 48px; }
-.public-assembly-track > i { flex: 1; height: 13px; border-radius: 3px; background: repeating-linear-gradient(90deg, var(--brand-accent) 0 3px, #f4f4f4 3px 5px); }
+.public-assembly-track > i { flex: 1; height: 13px; border-radius: 3px; background: var(--brand-accent); }
 .public-assembly > p { font-size: 11px; margin-top: 4px; }
 .public-assembly > small { color: var(--brand-muted); font-size: 10px; }
 .public-workflow-grid > .public-inline-studio {
@@ -2379,6 +2357,58 @@
 .public-workflow-grid .studio-welcome h3 { font-size: clamp(23px, 2.3vw, 30px); }
 .public-workflow-grid .studio-scroll { padding-inline: 24px; }
 .public-workflow-grid .studio-composer-wrap { padding-inline: 24px; }
+
+/* Four-step guest workflow shares the project's decisions and accent. */
+.guest-flow { min-width: 0; border: 1px solid var(--brand-line, #ddd); border-radius: 16px; background: #fff; color: #000; }
+.public-header-inner { height: 64px; }
+.public-step p { display: block; font-size: 12px; line-height: 1.7; color: #555; max-width: 270px; }
+.public-entry-notice { padding: 12px; margin-top: 16px; border: 1px solid var(--brand-line, #ddd); border-radius: 10px; font-size: 13px; }
+.public-entry-notice p { margin-top: 6px; font-size: 12px; line-height: 1.6; }
+.public-entry-notice small { display: block; margin-top: 6px; color: #555; }
+.guest-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 16px; margin: 0; list-style: none; border-bottom: 1px solid var(--brand-line, #ddd); }
+.guest-steps li { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; color: #666; }
+.guest-step-number { flex: 0 0 26px; width: 26px; height: 26px; color: #000; border-color: #ddd; }
+.guest-step-title { padding-top: 4px; }
+.guest-steps [aria-current="step"] .guest-step-number { border-color: #000; }
+.guest-progress-overview { padding: 16px; border-bottom: 1px solid var(--brand-line, #ddd); }
+.guest-progress-overview .guest-steps { gap: 0; border: 0; padding: 0; }
+.guest-progress-overview .guest-steps li { display: flex; flex-direction: column; align-items: center; gap: 0; width: 100%; text-align: center; }
+.guest-progress-overview .guest-step-number { flex: none; width: 26px; }
+.guest-progress-overview .guest-step-title { display: block; font-size: 9px; line-height: 1.4; min-height: 30px; max-width: 76px; padding-top: 6px; }
+.guest-progress-overview .story-stage-anchor { margin-top: 4px; }
+.guest-panel { padding: 20px; display: grid; gap: 18px; }
+.guest-field { min-width: 0; }
+.guest-field > label, .guest-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+.guest-field input, .guest-field textarea { width: 100%; border: 1px solid #ddd; border-radius: 9px; padding: 10px 12px; background: #fff; color: #000; font-size: 14px; line-height: 1.6; }
+.guest-field input:focus, .guest-field textarea:focus { outline: 2px solid #c1f17b; outline-offset: 1px; border-color: #000; }
+.guest-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.guest-card { padding: 12px; border: 1px solid #ddd; border-radius: 10px; background: #fff; text-align: left; color: #000; }
+.guest-card strong { display: block; font-size: 13px; }
+.guest-card small { display: block; font-size: 11px; line-height: 1.5; margin-top: 4px; }
+.guest-card.active { border-color: #000; background: #c1f17b; }
+.guest-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.guest-pill { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border: 1px solid #ddd; border-radius: 20px; background: #fff; color: #000; font-size: 12px; line-height: 1.5; }
+.guest-pill.active { background: #c1f17b; border-color: #000; }
+.guest-pill em { font-style: normal; color: #666; padding-left: 3px; }
+.guest-pill:disabled { opacity: .5; cursor: default; }
+.guest-pill:not(:disabled):hover, .guest-card:hover { border-color: #000; }
+.guest-note { display: block; font-size: 12px; color: #555; line-height: 1.6; margin-top: 6px; }
+.guest-error { font-size: 13px; padding: 10px; border: 1px solid #000; border-radius: 8px; }
+.guest-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.guest-actions button:disabled { opacity: .5; cursor: default; }
+.guest-back { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.guest-scenes { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.guest-scenes > li { padding: 12px; border: 1px solid #ddd; border-radius: 10px; }
+.guest-scenes strong, .guest-scenes small { display: block; font-size: 13px; line-height: 1.6; }
+.guest-scenes small { margin-top: 5px; color: #555; }
+.guest-dialogue { font-size: 12px; padding: 10px 0 0; list-style: none; }
+.guest-dialogue em { font-style: normal; font-weight: 600; margin-right: 5px; }
+.guest-next { list-style: none; display: grid; gap: 8px; padding: 0; font-size: 12px; }
+.guest-next li { display: flex; align-items: center; gap: 7px; }
+.guest-spin { animation: guest-spin 1s linear infinite; }
+@keyframes guest-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .guest-spin { animation: none; } }
+@media (max-width: 640px) { .guest-panel { padding: 16px; } .guest-step-title { display: none; } .guest-steps { justify-items: center; } }
 @media (max-width: 820px) {
   .public-workflow-grid > .public-inline-studio { height: 560px; }
 }

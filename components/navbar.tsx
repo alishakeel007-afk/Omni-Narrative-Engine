@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { ChevronDown, FolderOpen, LogOut, Menu, Settings, Clapperboard, User, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Settings, Clapperboard, User, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { navLinks } from "@/lib/mock-data";
+// The four-step workflow is the only authenticated creation journey, so the
+// nav is just the project list plus a way to start one.
+const navLinks: { href: Route; label: string }[] = [
+  { href: "/dashboard" as Route, label: "Stories" },
+  { href: "/dashboard?new=1" as Route, label: "New story" },
+  { href: "/guide" as Route, label: "How it works" },
+  { href: "/account?tab=settings" as Route, label: "Settings" },
+];
 import { PublicBrand } from "@/components/public/public-shell";
 
 function ProfileDropdown({
@@ -58,43 +65,34 @@ function ProfileDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1 pr-3 transition hover:border-gold/30 hover:bg-white/10"
+        className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-transparent p-1 pr-3 transition hover:border-[var(--line)] hover:bg-black/[0.04]"
         aria-label="Open profile menu"
         aria-expanded={isOpen}
         aria-haspopup="menu"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-aurora to-gold text-sm font-bold text-slate-950">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-[var(--ink)]">
           {initials}
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-[var(--muted)] transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
       {isOpen && (
-        <div role="menu" aria-label="Profile menu" className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-white/10 bg-white p-2 shadow-2xl backdrop-blur-xl">
-          <div className="mb-2 border-b border-white/10 px-3 pb-3 pt-2">
-            <p className="truncate text-sm font-semibold text-white">
+        <div role="menu" aria-label="Profile menu" className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-[var(--line)] bg-white p-2 shadow-2xl backdrop-blur-xl">
+          <div className="mb-2 border-b border-[var(--line)] px-3 pb-3 pt-2">
+            <p className="truncate text-sm font-semibold text-[var(--ink)]">
               {userName || "User"}
             </p>
-            <p className="truncate text-xs text-white/90">{userEmail}</p>
+            <p className="truncate text-xs text-[var(--muted)]">{userEmail}</p>
           </div>
 
           <div className="flex flex-col gap-1">
             <button
               type="button"
               role="menuitem"
-              onClick={() => handleLink("/projects")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
-              <FolderOpen className="h-4 w-4" />
-              My Projects
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => handleLink("/dashboard")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+              onClick={() => handleLink("/account?tab=profile")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
             >
               <User className="h-4 w-4" />
               View Profile
@@ -102,8 +100,8 @@ function ProfileDropdown({
             <button
               type="button"
               role="menuitem"
-              onClick={() => handleLink("/reset-password")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+              onClick={() => handleLink("/account?tab=security")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
             >
               <Settings className="h-4 w-4" />
               Change Password
@@ -111,13 +109,13 @@ function ProfileDropdown({
             <button
               type="button"
               role="menuitem"
-              onClick={() => handleLink("/dashboard?tab=settings")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+              onClick={() => handleLink("/account?tab=settings")}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
             >
               <Settings className="h-4 w-4" />
               Settings
             </button>
-            <div className="my-1 border-t border-white/10" />
+            <div className="my-1 border-t border-[var(--line)]" />
             <button
               type="button"
               role="menuitem"
@@ -125,7 +123,7 @@ function ProfileDropdown({
                 setIsOpen(false);
                 onLogout();
               }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:bg-transparent hover:font-medium text-[var(--ink)]"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -164,26 +162,13 @@ export function Navbar() {
   };
 
 
-  const isActive = (href: string) => {
-    if (pathname === href) return true;
-    // Map custom mode pages to the AI Story Studio tab
-    if (
-      href === "/video" &&
-      [
-        "/setup",
-        "/story-builder",
-        "/audio-generation",
-        "/video-preview",
-      ].includes(pathname)
-    ) {
-      return true;
-    }
-    return false;
-  };
+  // A film page belongs to the project list it was opened from.
+  const isActive = (href: string) =>
+    (href.includes("?") ? false : pathname === href || (href === "/dashboard" && (pathname.startsWith("/story/") || pathname.startsWith("/film/"))));
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/92 backdrop-blur-2xl shadow-card">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-white/92 backdrop-blur-2xl shadow-card">
+      <div className="mx-auto flex max-w-7xl items-center justify-between h-14 px-4 sm:px-6 lg:px-8">
         <PublicBrand />
 
         <nav className="hidden items-center gap-3 md:flex">
@@ -194,8 +179,8 @@ export function Navbar() {
                 href={item.href}
                 className={`rounded-full border px-4 py-2 text-sm transition ${
                   isActive(item.href)
-                    ? "border-gold/30 bg-gold/10 text-gold"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-gold/30 hover:text-slate-950"
+                    ? "border-[var(--line)] bg-transparent text-[var(--ink)]"
+                    : "border-[var(--line)] bg-white text-[var(--muted)] hover:border-[var(--line)] hover:text-[var(--ink)]"
                 }`}
               >
                 {item.label}
@@ -207,13 +192,13 @@ export function Navbar() {
             <>
               <Link
                 href="/auth"
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:border-gold/30 hover:text-slate-950"
+                className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--muted)] transition hover:border-[var(--line)] hover:text-[var(--ink)]"
               >
                 Login
               </Link>
               <Link
                 href="/signup"
-                className="rounded-full bg-gradient-to-r from-aurora to-gold px-4 py-2 text-sm font-semibold text-slate-950 transition hover:scale-[1.02]"
+                className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:opacity-90"
               >
                 Sign Up
               </Link>
@@ -232,7 +217,7 @@ export function Navbar() {
         <button
           type="button"
           onClick={() => setMenuOpen((current) => !current)}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-gold/30 md:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--line)] bg-white text-[var(--ink)] transition hover:border-[var(--line)] md:hidden"
           aria-label="Toggle navigation menu"
           aria-expanded={menuOpen}
         >
@@ -241,7 +226,7 @@ export function Navbar() {
       </div>
 
       {menuOpen ? (
-        <div className="border-t border-white/10 px-4 pb-4 md:hidden">
+        <div className="border-t border-[var(--line)] px-4 pb-4 md:hidden">
           <nav aria-label="Primary navigation" className="mx-auto mt-4 grid max-w-7xl gap-2">
             {navLinks.map((item) => (
               <Link
@@ -250,8 +235,8 @@ export function Navbar() {
                 onClick={() => setMenuOpen(false)}
                 className={`rounded-[1.2rem] border px-4 py-3 text-sm transition ${
                   isActive(item.href)
-                    ? "border-gold/30 bg-gold/10 text-gold"
-                    : "border-white/10 bg-white/5 text-white/80 hover:border-starlight/30 hover:bg-white/10 hover:text-white"
+                    ? "border-[var(--line)] bg-transparent text-[var(--ink)]"
+                    : "border-[var(--line)] bg-transparent text-[var(--muted)] hover:border-[var(--line)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
                 }`}
               >
                 {item.label}
@@ -259,18 +244,18 @@ export function Navbar() {
             ))}
 
             {!loading && !currentUser ? (
-              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-4">
+              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
                 <Link
                   href="/auth"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/80 transition hover:border-starlight/30 hover:bg-white/10 hover:text-white"
+                  className="rounded-[1.2rem] border border-[var(--line)] bg-transparent px-4 py-3 text-center text-sm text-[var(--muted)] transition hover:border-[var(--line)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
                 >
                   Login
                 </Link>
                 <Link
                   href="/signup"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-[1.2rem] bg-gradient-to-r from-aurora to-gold px-4 py-3 text-center text-sm font-semibold text-slate-950 transition hover:scale-[1.01]"
+                  className="rounded-[1.2rem] bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-[var(--ink)] transition hover:opacity-90"
                 >
                   Sign Up
                 </Link>
@@ -278,18 +263,18 @@ export function Navbar() {
             ) : null}
 
             {!loading && currentUser ? (
-              <div className="mt-2 rounded-[1.2rem] border border-white/10 bg-white/5 p-4">
-                <div className="mb-4 flex items-center gap-3 border-b border-white/10 pb-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-aurora to-gold text-base font-bold text-slate-950">
+              <div className="mt-2 rounded-[1.2rem] border border-[var(--line)] bg-transparent p-4">
+                <div className="mb-4 flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-base font-bold text-[var(--ink)]">
                     {(currentUser.name || currentUser.email || "?")
                       .charAt(0)
                       .toUpperCase()}
                   </div>
                   <div className="overflow-hidden">
-                    <p className="truncate text-sm font-semibold text-white">
+                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
                       {currentUser.name || "User"}
                     </p>
-                    <p className="truncate text-xs text-white/90">
+                    <p className="truncate text-xs text-[var(--muted)]">
                       {currentUser.email}
                     </p>
                   </div>
@@ -297,42 +282,34 @@ export function Navbar() {
 
                 <div className="grid gap-1">
                   <Link
-                    href="/projects"
+                    href="/account?tab=profile"
                     onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    My Projects
-                  </Link>
-                  <Link
-                    href="/dashboard"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
                   >
                     <User className="h-4 w-4" />
                     View Profile
                   </Link>
                   <Link
-                    href="/reset-password"
+                    href="/account?tab=security"
                     onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
                   >
                     <Settings className="h-4 w-4" />
                     Change Password
                   </Link>
                   <Link
-                    href="/dashboard?tab=settings"
+                    href="/account?tab=settings"
                     onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
                   >
                     <Settings className="h-4 w-4" />
                     Settings
                   </Link>
-                  <div className="my-1 border-t border-white/10" />
+                  <div className="my-1 border-t border-[var(--line)]" />
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-[var(--ink)] transition hover:bg-transparent hover:font-medium text-[var(--ink)]"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout

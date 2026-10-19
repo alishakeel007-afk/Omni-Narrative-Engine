@@ -1,6 +1,46 @@
 # Native LTX-2.5 video and MP4 assembly
 
-OmniNarrative submits text-to-video or image-and-text-to-video jobs to an authenticated Modal CPU API. LTX generates video and a single native soundtrack (speech, music and effects); the MP4 keeps both streams. Audio uploads and voice cloning are not implemented.
+OmniNarrative submits text-to-video, image-and-text-to-video, or audio-conditioned jobs to an authenticated Modal CPU API. LTX generates video and a single native soundtrack (speech, music and effects); the MP4 keeps both streams. Voice cloning is not implemented.
+
+## Audio-conditioned (lip-synced) generation
+
+Supplying `audio_url` routes the job to `A2VidPipelineTwoStage` instead of the distilled pipeline. The supplied speech is frozen conditioning, so the model animates to it rather than regenerating it, and the pipeline derives the clip length from the audio. This is used for Urdu, where dialogue is synthesised with ElevenLabs first and then sent for lip-sync.
+
+**One take carries one speaking turn.** A clip has a single mixed soundtrack and a single lip-synced performance, so a scene with several speakers must be split into separate shots before submission.
+
+This mode is off unless both are true:
+
+- `/models/ltx25/audio-ready` exists, written by `prepare_models(download=True, audio=True)`.
+- The app sets `STUDIO_LTX_AUDIO_PIPELINE="a2vid"` (alongside `STUDIO_VIDEO_BACKEND="modal-ltx"`).
+
+It needs two weight files beyond the distilled set, because both diffusion stages load the base transformer and stage 2 adds the distilled LoRA:
+
+| File | Size |
+| --- | --- |
+| `diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors` | 42.0 GB |
+| `loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors` | 8.9 GB |
+
+Holding two `DiffusionStage` instances needs substantially more system RAM than the distilled pipeline. Set `LTX_GPU_MEMORY_MB` (and `LTX_GPU_TIMEOUT`) before deploying, and treat the first live clip as a measurement, not a feature. Only one pipeline is resident at a time: switching between the distilled and audio engines releases the previous one.
+
+Conditioning audio is downloaded and measured with ffprobe on the **CPU** API before any GPU container starts, so an over-long or undecodable line is rejected without GPU cost. `LTX_MAX_AUDIO_SECONDS` (default 10) bounds one shot; longer speech is refused with the measured duration rather than truncated. Tuning knobs for the spike: `LTX_A2V_STEPS`, `LTX_A2V_CFG_SCALE`, `LTX_A2V_STG_SCALE`, `LTX_A2V_RESCALE_SCALE`, `LTX_A2V_MODALITY_SCALE`, `LTX_A2V_SKIP_STEP`, `LTX_A2V_STG_BLOCKS`, `LTX_A2V_NEGATIVE_PROMPT`.
+
+### Validation status: audio works, video does not (as of the first live runs)
+
+Three live attempts at 768x512 / 20 steps, ~14.8 GPU-minutes total:
+
+| | Result |
+| --- | --- |
+| Supplied speech | **Preserved exactly** - 0.9991 waveform correlation, 0 ms offset |
+| Invented speech | **None** - silent spans stay quiet (0.087 relative energy, same as a static control) |
+| Clip length from audio | Correct - 6.288 s speech -> 153 frames -> 6.375 s clip |
+| MP4 / archival | Correct - 768x512 h264 + aac, stored in Supabase |
+| **Video content** | **Unusable** - frame 0 shows the conditioning portrait, then degrades to pure noise |
+
+Frame 0 reproduces the reference image, so image conditioning and audio conditioning both apply; the denoise then diverges. That pattern points at guidance, not the VAE - a VAE fault would corrupt frame 0 equally.
+
+Upstream community guidance for LTX-2.5 custom-audio lip-sync is to use **CFG 1 for both video and audio and to disable modality guidance**. The defaults here came from the documented LTX-2.3/2.4 preset (cfg 3.0, stg 1.0, modality 3.0), which is the opposite. Retune via `LTX_A2V_CFG_SCALE=1`, `LTX_A2V_STG_SCALE=0`, `LTX_A2V_MODALITY_SCALE=1`, `LTX_A2V_RESCALE_SCALE=0` before changing any code - these are deploy-time env values, so no code change is needed to test it.
+
+**Lip-sync quality remains unverified**: no usable video has been produced, so there is nothing to judge. Upstream notes the dubbing pipeline is still tuned for LTX 2.3 and that 2.5 is stricter about what it will say, so passing the contract tests is not evidence that lip-sync works.
 
 ## Deployment
 
@@ -51,7 +91,7 @@ Run from the repository root in PowerShell. Python and Modal stay in `.venv-moda
 
 ## Job safety and persistence
 
-`POST /jobs` accepts `request_id` (UUID), `prompt`, optional `image_base64`, `seed`, `width`, `height`, `num_frames`. It returns an accepted job ID immediately. `GET /jobs/{id}` reports progress; `GET /jobs/{id}/file` downloads a completed MP4. `POST /exports` submits a validated timeline to CPU FFmpeg. `GET /health` verifies the cache without starting a GPU.
+`POST /jobs` accepts `request_id` (UUID), `prompt`, optional `image_base64`, optional `audio_url`, `seed`, `width`, `height`, `num_frames`. With `audio_url` the frame count may be omitted and is derived from the measured speech; without it the 121-frame cap still applies. `audio_url` must be an HTTPS storage URL on the same allowlist the exporter uses, and its signature is excluded from the idempotency fingerprint so refreshing a signed link is not a new job. It returns an accepted job ID immediately. `GET /jobs/{id}` reports progress; `GET /jobs/{id}/file` downloads a completed MP4. `POST /exports` submits a validated timeline to CPU FFmpeg. `GET /health` verifies the cache without starting a GPU.
 
 The API reserves each request ID before spawning. Retrying an accepted request with identical requirements reuses its ID. Changed requirements with the same ID return 409. An ambiguous spawn window returns a diagnostic rather than blindly generating a duplicate; inspect Modal logs before retrying. There are no automatic GPU generation retries.
 

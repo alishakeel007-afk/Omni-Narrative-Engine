@@ -1,4 +1,4 @@
-import type { MovieCharacterVoice } from "@/types/video";
+import type { MovieCharacterVoice } from "@/types/audio";
 
 // Models exposed by this application's current Deepgram Aura-2 voice library.
 export const SUPPORTED_DEEPGRAM_VOICES = new Set([

@@ -5,6 +5,8 @@ import type {
   StudioState,
   StudioTake,
 } from "@/types/studio";
+import { clipSeconds } from "@/lib/film/duration";
+import { precedingSceneContext } from "@/lib/film/prompt";
 
 export function characterReferences(character: StudioCharacter) {
   const refs = [...(character.references || [])];
@@ -70,7 +72,7 @@ export function continuityProblem(
   take: StudioTake,
 ): string | undefined {
   if (
-    take.stale ||
+    take.stale || (scene.outdated && !take.sourceRequirements) ||
     (take.sourceRequirements &&
       take.sourceRequirements !== sceneRequirements(state, scene))
   )
@@ -98,28 +100,57 @@ export function continuityProblem(
       ? "Appearance drift was detected. Generate a revised take."
       : "This take needs a successful appearance check before it can be selected or exported.";
 }
+/**
+ * Everything a generated take depends on.
+ *
+ * A take whose requirements no longer match the scene is stale, so anything
+ * that changes what the worker is asked for has to appear here. Clip length and
+ * internal cuts both do: a take generated as one 5s shot is not the take a 20s
+ * three-shot sequence asks for.
+ */
 export function sceneRequirements(state: StudioState, scene: StudioScene) {
   return JSON.stringify({
     title: state.title,
     premise: state.premise,
     world: state.world,
+    visualStyle: state.visualStyle,
+    creativeBrief: state.creativeBrief,
+    continuityContext: precedingSceneContext(state, scene),
+    // Spoken language routes to a different pipeline entirely.
+    language: state.language ?? "en",
     scene: {
       id: scene.id,
       title: scene.title,
       description: scene.description,
+      direction: scene.direction,
       characterIds: scene.characterIds,
       dialogues: scene.dialogues.map(({ character, text }) => ({
         character,
         text,
       })),
+      // The requested length, resolved the same way generation resolves it.
+      seconds: clipSeconds(scene.requestedSeconds ?? state.clipSeconds),
+      requestedSeconds: scene.requestedSeconds ?? state.clipSeconds ?? 5,
+      // Internal cuts, if any. Absent means one continuous shot.
+      beats: scene.beats?.map(({ visualAction, dialogueIds }) => ({
+        visualAction,
+        dialogueIds: dialogueIds ?? [],
+      })),
     },
     cast: sceneIdentity(state, scene),
   });
 }
-export function filmContinuityProblem(state: StudioState) {
-  for (const id of state.timeline) {
+
+/**
+ * Whether a named set of scenes is fit to assemble or export.
+ *
+ * Takes a scene-id list rather than reading one field, so the same check serves
+ * the v1 timeline, the four-step assemble step, and the clip timeline.
+ */
+export function sceneSetContinuityProblem(state: StudioState, sceneIds: string[]) {
+  for (const id of sceneIds) {
     const scene = state.scenes.find((item) => item.id === id);
-    if (!scene) return "A timeline scene is missing.";
+    if (!scene) return "A scene on the timeline is missing.";
     const take = scene.takes.find(
       (item) => item.id === scene.selectedVideoId && item.status === "complete",
     );
@@ -127,4 +158,8 @@ export function filmContinuityProblem(state: StudioState) {
     const problem = continuityProblem(state, scene, take);
     if (problem) return `${scene.title}: ${problem}`;
   }
+}
+
+export function filmContinuityProblem(state: StudioState) {
+  return sceneSetContinuityProblem(state, state.timeline);
 }

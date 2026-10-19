@@ -194,6 +194,8 @@ async function testDirector() {
     "next/server": nextResponse,
     "@/lib/supabase/server": auth,
     "@/lib/studio/store": store,
+    // Only DELETE queries the database; these assertions never reach it.
+    "@/lib/prisma": {},
     "@/lib/studio/ai": {
       directorReply: async () => ({
         reply: "Your image",
@@ -292,6 +294,8 @@ async function testDirector() {
     "next/server": nextResponse,
     "@/lib/supabase/server": auth,
     "@/lib/studio/store": store,
+    // These assertions use the chat-image path, which never queries scene jobs.
+    "@/lib/prisma": {},
     fetch: async () => {
       mediaFetches++;
       return new Response("image-bytes", {

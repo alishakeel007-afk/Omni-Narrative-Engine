@@ -23,7 +23,7 @@ const { loadTs } = require("../scripts/test-studio.cjs");
   );
   assert.equal(entry.studioEntryFromPath(entry.studioEntryPath(id)), id);
   assert.equal(
-    entry.studioEntryFromPath("https://other.example/studio?start=" + id),
+    entry.studioEntryFromPath("https://other.example/dashboard?start=" + id),
     null,
   );
   entry.linkStudioEntry(id, "owned-project", storage);
@@ -37,18 +37,24 @@ const { loadTs } = require("../scripts/test-studio.cjs");
   );
   assert.equal(entry.readStudioEntry(id, storage), null);
   assert.equal(values.size, 0);
-  const next = "/studio?start=12345678-1234-1234-1234-123456789012";
-  const { getSafeRedirectPath } = loadTs("lib/auth-redirect.ts");
+  // The landing demo hands off here now, not to the removed /studio route.
+  assert.match(entry.studioEntryPath(id), /^\/dashboard\?start=/);
+  const next = "/dashboard?start=12345678-1234-1234-1234-123456789012";
+  const { getSafeRedirectPath, DEFAULT_AUTH_REDIRECT } = loadTs(
+    "lib/auth-redirect.ts",
+  );
   assert.equal(getSafeRedirectPath(next), next);
   for (const unsafe of [
     "https://evil.example",
     "//evil.example",
     "/\\evil.example",
-    "/auth?next=/studio",
+    "/auth?next=/dashboard",
     "/a/../signup",
     "/\nevil.example",
   ])
-    assert.equal(getSafeRedirectPath(unsafe), "/studio", unsafe);
+    // The guarded property is that an unsafe value never survives; the safe
+    // landing path itself is allowed to change as navigation changes.
+    assert.equal(getSafeRedirectPath(unsafe), DEFAULT_AUTH_REDIRECT, unsafe);
   let signedIn = false,
     badCode = false;
   const cookies = {
@@ -103,13 +109,24 @@ const { loadTs } = require("../scripts/test-studio.cjs");
   response = await updateSession(
     request("/auth?next=" + encodeURIComponent("//evil.example")),
   );
-  assert.equal(response.url, "https://local.example/studio");
-  badCode = true;
-  response = await updateSession(request(next + "&code=expired"));
-  assert.equal(new URL(response.url).searchParams.get("next"), next);
-  assert.equal(new URL(response.url).pathname, "/auth");
+  assert.equal(response.url, "https://local.example" + DEFAULT_AUTH_REDIRECT);
   console.log(
-    "PASS: prompt fidelity, size limits, expiration, project linking, safe redirects, query preservation, confirmation failure recovery, and redirect cookies.",
+    "PASS: prompt fidelity, size limits, expiration, project linking, safe redirects, query preservation, and redirect cookies.",
+  );
+  const callback = loadTs("app/auth/callback/route.ts", {
+    "@/lib/supabase/server": { createClient: async () => ({ auth: {
+      exchangeCodeForSession: async code => ({ error: code === "expired" ? new Error("Expired") : null }),
+    } }) },
+  });
+  response = await callback.GET(request('/auth/callback?code=valid&next=' + encodeURIComponent(next)));
+  assert.equal(response.headers.get('location'), 'https://local.example' + next);
+  response = await callback.GET(request('/auth/callback?code=expired&next=' + encodeURIComponent(next)));
+  assert.equal(new URL(response.headers.get('location')).searchParams.get('next'), next);
+  assert.equal(new URL(response.headers.get('location')).searchParams.get('error'), 'confirmation_expired');
+  response = await updateSession(request('/reset-password'));
+  assert.ok(!response.url, 'A signed-in user must be able to open password recovery');
+  console.log(
+    "PASS: confirmation code exchange, expired-link recovery preserving next, and signed-in password recovery.",
   );
 })().catch((error) => {
   console.error(error);
