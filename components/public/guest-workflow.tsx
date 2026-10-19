@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
+import { Check, Loader2, Lock, RotateCcw } from "lucide-react";
 import { FILM_STEPS } from "@/lib/film/steps";
 import { FILM_LANGUAGES } from "@/lib/film/language";
 import { CLIP_CHOICES, clipCapability } from "@/lib/film/duration";
@@ -79,7 +79,7 @@ export function GuestWorkflow({ embedded = false }: { embedded?: boolean }) {
     visualStyle: "",
     clipSeconds: capability.defaultSeconds,
   });
-  const [stage, setStage] = useState<"setup" | "preview">("setup");
+  const [stage, setStage] = useState<"setup" | "preview" | "generate" | "edit">("setup");
   const [restored, setRestored] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewDraft, setPreviewDraft] = useState("");
@@ -143,6 +143,11 @@ export function GuestWorkflow({ embedded = false }: { embedded?: boolean }) {
 
   const language = FILM_LANGUAGES.find((item) => item.id === draft.language) ?? FILM_LANGUAGES[0];
   const ready = draft.idea.trim().length >= 10;
+  const selectStage = (index: number) => {
+    if (index === 0) setStage("setup");
+    else if (index === 1) setStage("preview");
+    else setStage(index === 2 ? "generate" : "edit");
+  };
 
   async function buildPreview() {
     if (!ready || busy) return;
@@ -211,18 +216,19 @@ export function GuestWorkflow({ embedded = false }: { embedded?: boolean }) {
       <div className="guest-progress-overview">
       <ol className="guest-steps" aria-label="The four steps">
         {FILM_STEPS.map((step, index) => {
-          const active =
-            (index === 0 && stage === "setup") || (index === 1 && stage === "preview");
-          const reached = index === 0 || (index === 1 && stage === "preview");
+          const active = ["setup", "preview", "generate", "edit"][index] === stage;
+          const reached = index === 0 || (index === 1 && Boolean(effectivePreview));
           const circleFill = index === 0 ? (effectivePreview ? 100 : ready ? 55 : 0) : index === 1 && effectivePreview ? 60 : 0;
           return (
             <li
               key={step.id}
-              className={reached ? "reached" : ""}
+              className={`${reached ? "reached" : ""} ${index > 1 ? "locked" : ""}`}
               aria-current={active ? "step" : undefined}
             >
-              <span className="guest-step-number" style={{ "--story-circle-fill": `${circleFill}%` } as CSSProperties}><span>{index + 1}</span></span>
-              <span className="guest-step-title">{step.title}</span>
+              <button type="button" onClick={() => selectStage(index)} aria-current={active ? "step" : undefined}>
+                <span className="guest-step-number" style={{ "--story-circle-fill": `${circleFill}%` } as CSSProperties}><span>{index + 1}</span></span>
+                <span className="guest-step-title">{step.title}</span>
+              </button>
             </li>
           );
         })}
@@ -258,16 +264,41 @@ export function GuestWorkflow({ embedded = false }: { embedded?: boolean }) {
             </> },
           ]} finish={buildPreview} finishLabel={busy ? "Drafting your scenes…" : "See my scenes"} />
         </div>
-      ) : (
+      ) : stage === "preview" && effectivePreview ? (
         <PreviewPanel
           preview={preview}
           draft={draft}
           onBack={() => setStage("setup")}
           onContinue={continueToAccount}
         />
-      )}
+      ) : stage === "preview" ? <PreviewUnlock onBack={() => setStage("setup")} /> : <LockedPreview stage={stage} onContinue={continueToAccount} />}
     </section>
   );
+}
+
+function PreviewUnlock({ onBack }: { onBack: () => void }) {
+  return <div className="guest-panel guest-preview-unlock">
+    <span className="guest-label">Step 2 · Script &amp; Characters</span>
+    <h3>Build your script preview first</h3>
+    <p className="guest-note">Enter a rough idea in Step 1, then choose “See my scenes” to preview the characters and scene plan here.</p>
+    <button type="button" className="guest-back mt-5" onClick={onBack}>Return to Step 1</button>
+  </div>;
+}
+
+function LockedPreview({ stage, onContinue }: { stage: "generate" | "edit"; onContinue: (target: "signup" | "auth") => void }) {
+  const generating = stage === "generate";
+  return <div className="guest-panel guest-locked-preview">
+    <div className="guest-locked-screen" aria-hidden="true">
+      {generating ? <><div className="guest-fake-title">Generate</div>{["Arrival", "The turn", "A new choice"].map((title) => <div className="guest-fake-scene" key={title}><span>{title}</span><i>Generate scene</i></div>)}</> : <><div className="guest-fake-title">Edit your story</div><div className="guest-fake-player" /><div className="guest-fake-timeline"><i /><i /><i /></div></>}
+    </div>
+    <div className="guest-lock-message">
+      <Lock size={18} aria-hidden />
+      <span className="guest-label">Step {generating ? "3" : "4"} · {generating ? "Generate" : "Edit & export"}</span>
+      <h3>Sign up to unlock this preview</h3>
+      <p>Keep your idea, script, and characters, then generate scenes and finish your story in your account.</p>
+      <div className="guest-actions"><button type="button" className="public-button public-button-lime" onClick={() => onContinue("signup")}>Create an account</button><button type="button" className="guest-back" onClick={() => onContinue("auth")}>Sign in</button></div>
+    </div>
+  </div>;
 }
 
 function PreviewPanel({
@@ -374,7 +405,6 @@ function PreviewPanel({
           onClick={() => onContinue("signup")}
         >
           Keep this and create my story
-          <ArrowRight size={17} />
         </button>
         <button type="button" className="guest-back" onClick={() => onContinue("auth")}>
           I already have an account

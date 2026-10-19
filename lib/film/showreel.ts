@@ -22,15 +22,27 @@ export type ShowreelClip = {
 
 const FALLBACK: ShowreelClip[] = [
   {
-    id: "emerald-world",
+    id: "hero-story",
     poster: "/posters/emerald-world.jpg",
-    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/c7c89a51-96c9-4837-9314-328308999bad/validation-text.mp4",
+    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/hero-story/hero-story.mp4",
     caption: "Generated from a written scene",
+  },
+  {
+    id: "emerald-world",
+    poster: "/posters/forest-light.jpg",
+    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/emerald-world/emerald-world.mp4",
+    caption: "Generated from a reference image",
   },
   {
     id: "forest-light",
     poster: "/posters/forest-light.jpg",
-    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/c7c89a51-96c9-4837-9314-328308999bad/validation-image.mp4",
+    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/forest-light/forest-light.mp4",
+    caption: "Generated from a written scene",
+  },
+  {
+    id: "final-story",
+    poster: "/posters/emerald-world.jpg",
+    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/final-story/final-story.mp4",
     caption: "Generated from a reference image",
   },
 ];

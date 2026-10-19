@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { showreelClip } from "@/lib/film/showreel";
 
 /**
@@ -78,10 +78,13 @@ export function CinematicVideo({
   film = "emerald-world",
   priority = false,
   className = "",
+  audioControl = false,
 }: {
   film?: string;
   priority?: boolean;
   className?: string;
+  /** Decorative playback remains muted until the visitor explicitly enables sound. */
+  audioControl?: boolean;
 }) {
   const { paused, canLoad } = useContext(MotionContext);
   const container = useRef<HTMLDivElement>(null);
@@ -93,6 +96,7 @@ export function CinematicVideo({
   const [visible, setVisible] = useState(priority);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
     const element = container.current;
@@ -123,7 +127,7 @@ export function CinematicVideo({
   }, [paused, visible, near]);
 
   return (
-    <div ref={container} className={`public-cinema ${className}`} aria-hidden="true">
+    <div ref={container} className={`public-cinema ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={clip.poster} alt="" className="public-cinema-poster" loading={priority ? "eager" : "lazy"} />
       {near && canLoad && !failed ? (
@@ -132,7 +136,7 @@ export function CinematicVideo({
           src={clip.src}
           poster={clip.poster}
           autoPlay={!paused}
-          muted
+          muted={!soundOn}
           loop
           playsInline
           disablePictureInPicture
@@ -147,6 +151,18 @@ export function CinematicVideo({
           className={ready ? "ready" : ""}
         />
       ) : null}
+      {audioControl ? <button
+        type="button"
+        className="public-video-sound"
+        aria-label={soundOn ? "Mute video sound" : "Play video sound"}
+        aria-pressed={soundOn}
+        onClick={() => {
+          setSoundOn((current) => !current);
+          if (!soundOn) void video.current?.play().catch(() => undefined);
+        }}
+      >
+        {soundOn ? <Volume2 size={15} aria-hidden /> : <VolumeX size={15} aria-hidden />}
+      </button> : null}
     </div>
   );
 }

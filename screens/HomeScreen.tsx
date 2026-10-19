@@ -1,11 +1,10 @@
 "use client";
 
-import { ArrowUpRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { CinematicVideo, PublicMotion } from "@/components/public/cinematic-video";
 import { PublicFooter, PublicHeader } from "@/components/public/public-shell";
 import { HeroSection } from "@/components/hero-section";
 import { GuestWorkflow } from "@/components/public/guest-workflow";
-import { FILM_STEPS } from "@/lib/film/steps";
 
 const questions = [
   [
@@ -60,18 +59,6 @@ export default function HomeScreen() {
               </p>
             </div>
             <div className="public-workflow-grid">
-              {/* The four steps, named exactly as they are in the product. */}
-              <ol className="public-step-list" aria-label="The four steps">
-                {FILM_STEPS.map((step, index) => (
-                  <li className="public-step" key={step.id}>
-                    <span className="public-step-number">0{index + 1}</span>
-                    <div>
-                      <h3>{step.title}</h3>
-                      <p>{step.description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
               <GuestWorkflow embedded />
             </div>
           </section>
@@ -102,16 +89,13 @@ export default function HomeScreen() {
                 },
               ].map(({ film, label, title, prompt }) => (
                 <article className="public-film-card" key={film}>
-                  <CinematicVideo film={film} />
+                  <CinematicVideo film={film} audioControl />
                   <div className="public-film-card-shade" />
                   <div className="public-film-card-copy">
                     <span>{label}</span>
                     <h3>{title}</h3>
                     <button
                       type="button"
-                      aria-label={`Start from this ${
-                        label.includes("FANTASY") ? "fantasy" : "adventure"
-                      } idea`}
                       onClick={() => {
                         window.dispatchEvent(
                           new CustomEvent("omni:home-prompt", { detail: prompt }),
@@ -120,9 +104,7 @@ export default function HomeScreen() {
                           .getElementById("how-it-works")
                           ?.scrollIntoView({ behavior: "smooth" });
                       }}
-                    >
-                      <ArrowUpRight size={22} />
-                    </button>
+                    >Start with this idea</button>
                   </div>
                 </article>
               ))}
@@ -151,7 +133,7 @@ export default function HomeScreen() {
           </section>
 
           <section className="public-final-cta">
-            <CinematicVideo film="forest-light" />
+            <CinematicVideo film="final-story" audioControl />
             <div className="public-final-shade" />
             <div>
               <span className="public-eyebrow light">YOUR NEXT CHAPTER.</span>
@@ -160,7 +142,6 @@ export default function HomeScreen() {
               </h2>
               <a href="#how-it-works" className="public-button public-button-lime">
                 Start your story
-                <ArrowUpRight size={18} />
               </a>
             </div>
           </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CinematicVideo, MotionToggle, PublicMotion } from "./cinematic-video";
 import { ACTIVE_ENTRY_KEY, readStudioEntry, studioEntryPath } from "@/lib/studio/entry";
@@ -66,7 +66,6 @@ export function PublicHeader({ account = false }: { account?: boolean }) {
             href={(entry ? `/signup?next=${encodeURIComponent(entry)}` : "/signup") as Route}
           >
             {account ? "Start your story" : "Start creating"}
-            <ArrowUpRight size={15} />
           </Link>
           <button
             className="public-menu-toggle"
@@ -92,12 +91,10 @@ export function PublicHeader({ account = false }: { account?: boolean }) {
               onClick={() => setOpen(false)}
             >
               {link.label}
-              <ArrowUpRight size={17} />
             </Link>
           ))}
           <Link href={(entry ? `/auth?next=${encodeURIComponent(entry)}` : "/auth") as Route} onClick={() => setOpen(false)}>
             Log in
-            <ArrowUpRight size={17} />
           </Link>
         </nav>
       )}
@@ -123,7 +120,6 @@ export function PublicFooter({ compact = false }: { compact?: boolean }) {
           <Link href="/#questions">Questions</Link>
           <Link href="/auth">
             Your stories
-            <ArrowUpRight size={13} />
           </Link>
         </div>
       </div>
