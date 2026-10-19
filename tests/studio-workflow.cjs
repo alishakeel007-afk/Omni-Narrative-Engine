@@ -158,6 +158,30 @@ class StudioError extends Error {
   assert.equal(state.storyPlan.characterCount, 3, "The planned count grows to fit the script's cast");
   saved = { ...saved, characters: [], storyPlan: undefined, sourceScript: "" };
 
+  // --- "Let Omni do it" ----------------------------------------------------
+  const runId = "6f1c2c1e-6a43-4c0e-9b1e-2f7a1a0e3c11";
+  saved = { ...saved, scenes: [] };
+  assert.equal((await post({ action: "autoDirect", requestId: runId })).status, 400, "Needs a script first");
+  assert.equal((await post({ action: "autoDirect", requestId: "not-a-uuid" })).status, 400);
+  saved = { ...saved, scenes: [{ id: "s1", title: "Arrival", description: "Rain", characterIds: [], dialogues: [], takes: [], direction: { location: "Mine" } }] };
+  scriptReply = { scenes: [{ id: "s1", location: "Omni's", lighting: "Dusk" }] };
+  response = await post({ action: "autoDirect", requestId: runId });
+  assert.equal(response.status, 200);
+  let directedBody = await response.json();
+  assert.deepEqual(directedBody.state.scenes[0].direction, { location: "Mine", lighting: "Dusk" });
+  assert.equal(directedBody.state.directionMode, "omni");
+  assert.equal(directedBody.state.autoDirected.filled, 1);
+  assert.match(directedBody.notices[0], /filled in 1 scene detail\. Anything you had already written was kept/);
+  // A retried request is not applied again, even if the writer cleared a field.
+  saved = { ...saved, scenes: [{ ...saved.scenes[0], direction: { location: "Mine" } }] };
+  directedBody = await (await post({ action: "autoDirect", requestId: runId })).json();
+  assert.deepEqual(directedBody.state.scenes[0].direction, { location: "Mine" }, "The same request id is a no-op");
+  assert.match(directedBody.notices[0], /already filled/);
+  state = (await (await workflow({ directionMode: "director" })).json()).state;
+  assert.equal(state.directionMode, "director");
+  assert.equal((await workflow({ directionMode: "auto" })).status, 400);
+  saved = { ...saved, scenes: [], directionMode: undefined, autoDirected: undefined };
+
   // --- ownership ----------------------------------------------------------
   user = null;
   assert.equal((await workflow({ step: "setup" })).status, 401);

@@ -371,6 +371,84 @@ Project so far: ${projectContext(input.state)}`;
  * notices the user needs to see — a regeneration that cannot safely match a
  * character reports it instead of guessing.
  */
+// Over-long answers are trimmed rather than rejected: a detail cut short is
+// better than a whole "Let Omni do it" run failing on one wordy field.
+const cue = (max: number) => z.string().trim().transform((value) => value.slice(0, max)).nullable().optional();
+const DIRECTION_TEXT = ["location", "timeOfDay", "lighting", "props", "camera", "delivery", "music", "ambience", "soundEffects"] as const;
+const directionReplySchema = z.object({
+  scenes: z.array(z.object({
+    id: z.string(),
+    location: cue(1000), timeOfDay: cue(200), lighting: cue(1000), props: cue(1000), camera: cue(1000),
+    delivery: cue(1000), music: cue(1000), ambience: cue(1000), soundEffects: cue(1000),
+    wardrobe: z.array(z.object({ character: z.string().trim().min(1).max(100), outfit: z.string().trim().min(1).transform((value) => value.slice(0, 1000)) })).nullable().optional(),
+  })).max(24),
+});
+export type DirectionReply = z.infer<typeof directionReplySchema>;
+/** Filler the model writes for a field that does not apply; never worth storing. */
+const PLACEHOLDER = /^(n\/?a|none|not applicable|-+)\.?$/i;
+
+/**
+ * "Let Omni do it": one model call that directs every scene at once, so
+ * locations, props and wardrobe stay continuous across the story. It only
+ * proposes; `fillSceneDirection` decides what is written.
+ */
+export async function directScenes(state: StudioState): Promise<DirectionReply> {
+  const scenes = state.scenes.map((scene) => ({
+    id: scene.id,
+    cast: state.characters.filter((character) => scene.characterIds.includes(character.id)).map((character) => character.name),
+    given: scene.direction ?? {},
+  }));
+  return askTyped(directionReplySchema, `You are the director of this short story. For EVERY scene, decide the details the camera and sound team need. Respond in JSON ONLY matching: {"scenes":[{"id":"scene id","location":"...","timeOfDay":"...","lighting":"...","props":"...","camera":"...","delivery":"how the dialogue is spoken","music":"... or No music","ambience":"...","soundEffects":"...","wardrobe":[{"character":"name","outfit":"..."}]}]}.
+Rules:
+- Stay true to the writer's original idea, setting, culture and people. Do not change the story.
+- Keep continuity: a place, prop or outfit established in one scene stays the same in later scenes unless the story changes it.
+- Fields under "given" were set by the writer. Keep them and build around them; you may omit them from your answer.
+- Wardrobe is only for that scene's cast, by name, and never changes a character's face, age, hair or build.
+- Omit a field that does not apply, such as "delivery" in a scene with no dialogue. Never write "N/A".
+- Be concrete and brief: one or two sentences per field. Write in English; this guides the picture and sound and is never spoken.
+${INJECTION_GUARD}
+
+Current project: ${projectContext(state)}
+Scenes to direct: ${JSON.stringify(scenes)}`);
+}
+
+/**
+ * Writes Omni's direction into EMPTY fields only. Anything the writer typed,
+ * including a single wardrobe line, is left exactly as it was. Returns how
+ * many fields were filled.
+ */
+export function fillSceneDirection(state: StudioState, reply: DirectionReply): number {
+  const byName = new Map<string, string | null>();
+  for (const character of state.characters) {
+    const key = character.name.trim().toLowerCase();
+    // An ambiguous name gets no wardrobe rather than the wrong person's.
+    byName.set(key, byName.has(key) ? null : character.id);
+  }
+  let filled = 0;
+  for (const proposal of reply.scenes) {
+    const scene = state.scenes.find((item) => item.id === proposal.id);
+    if (!scene) continue;
+    const direction = { ...scene.direction };
+    let changed = 0;
+    for (const field of DIRECTION_TEXT) {
+      const value = proposal[field];
+      if (value && !PLACEHOLDER.test(value) && !direction[field]?.trim()) { direction[field] = value; changed++; }
+    }
+    const wardrobe = { ...direction.wardrobe };
+    for (const item of proposal.wardrobe ?? []) {
+      const id = byName.get(item.character.toLowerCase());
+      if (id && scene.characterIds.includes(id) && !wardrobe[id]?.trim()) { wardrobe[id] = item.outfit; changed++; }
+    }
+    if (Object.keys(wardrobe).length) direction.wardrobe = wardrobe;
+    if (!changed) continue;
+    scene.direction = direction;
+    // A take rendered before these details no longer matches the scene.
+    if (scene.takes.length) scene.outdated = true;
+    filled += changed;
+  }
+  return filled;
+}
+
 export function applyFilmScript(state: StudioState, script: FilmScript): string[] {
   const notices: string[] = [];
   state.roughIdea ??= state.premise;

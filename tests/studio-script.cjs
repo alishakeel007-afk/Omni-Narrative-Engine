@@ -343,6 +343,47 @@ class StudioError extends Error {
   ai.applyFilmScript(blank, fits);
   assert.equal(blank.characters.find((item) => item.name === "Samir").appearance, "Short, curly hair, cricket jersey");
 
+  // --- "Let Omni do it" fills only what is empty ---------------------------
+  const directed = {
+    ...project,
+    roughIdea: "A student enters a hostel",
+    characters: [
+      { id: "r", name: "Rohan", appearance: "Blue hoodie", locked: false },
+      { id: "s", name: "Samir", appearance: "Cricket jersey", locked: false },
+    ],
+    scenes: [
+      { id: "a", title: "Arrival", visualAction: "Rohan arrives.", characterIds: ["r"], dialogues: [], takes: [],
+        direction: { location: "Writer's own: Lahore hostel gate at dusk", wardrobe: { r: "Writer's own: grey kurta" } } },
+      { id: "b", title: "Choice", visualAction: "Samir offers a shortcut.", characterIds: ["r", "s"], dialogues: [], takes: [{ id: "t", kind: "video", status: "complete" }] },
+      { id: "c", title: "Quiet", visualAction: "Empty room.", characterIds: [], dialogues: [], takes: [{ id: "t2", kind: "video", status: "complete" }] },
+    ],
+  };
+  asked = [];
+  replies = [{ scenes: [
+    { id: "a", location: "Omni: a generic gate", lighting: "Warm sodium streetlight", delivery: "N/A", wardrobe: [{ character: "Rohan", outfit: "Omni: jeans" }] },
+    { id: "b", location: "Same hostel, corridor", camera: "x".repeat(1500), music: "", wardrobe: [{ character: "samir", outfit: "Cricket jersey, sleeves rolled" }, { character: "Vikram", outfit: "Not in this scene" }, { character: "Rohan", outfit: "Grey kurta" }] },
+    { id: "ghost", location: "A scene that no longer exists" },
+  ] }];
+  const reply = await ai.directScenes(directed);
+  assert.match(asked[0], /"originalIdea":"A student enters a hostel"/, "The rough idea anchors the direction");
+  assert.match(asked[0], /"given":\{"location":"Writer's own/, "The writer's own fields are shown as given");
+  const filledState = structuredClone(directed);
+  const filled = ai.fillSceneDirection(filledState, reply);
+  const [a, b, c] = filledState.scenes;
+  assert.equal(a.direction.location, "Writer's own: Lahore hostel gate at dusk", "A written field is never replaced");
+  assert.equal(a.direction.wardrobe.r, "Writer's own: grey kurta", "A written wardrobe line is never replaced");
+  assert.equal(a.direction.lighting, "Warm sodium streetlight", "An empty field is filled");
+  assert.equal(a.outdated, undefined, "A scene with no takes is not flagged");
+  assert.equal(a.direction.delivery, undefined, "Placeholder filler is not stored");
+  assert.equal(b.direction.camera.length, 1000, "An over-long answer is trimmed, not rejected");
+  assert.equal(b.direction.music, undefined, "A blank answer fills nothing");
+  assert.deepEqual(b.direction.wardrobe, { s: "Cricket jersey, sleeves rolled", r: "Grey kurta" }, "Wardrobe is matched by name to this scene's cast only");
+  assert.equal(b.outdated, true, "A rendered take no longer matches its newly directed scene");
+  assert.equal(c.outdated, undefined, "A scene Omni did not touch keeps its takes current");
+  assert.equal(filled, 5);
+  assert.equal(ai.fillSceneDirection(filledState, reply), 0, "Running it again changes nothing");
+
+  console.log("PASS: Let Omni do it directs every scene from the rough idea and fills only empty fields, by cast, without re-flagging untouched scenes.");
   console.log(
     "PASS: Setup scene count and cast reach the prompt, mismatches are retried, and a build keeps the writer's characters and appearances.",
   );

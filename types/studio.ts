@@ -314,6 +314,13 @@ export type StudioState = {
    * names in Setup live in `characters`; this count includes them.
    */
   storyPlan?: StoryPlan;
+  /**
+   * Who fills scene details: Omni on the backend, or the writer page by page.
+   * Unset until the writer chooses.
+   */
+  directionMode?: "omni" | "director";
+  /** The last "Let Omni do it" run, so a retried request is not applied twice. */
+  autoDirected?: { requestId: string; at: string; filled: number };
   /** Replaced/deleted scenes retain their immutable media and IDs. */
   archivedScenes?: StudioScene[];
   scriptUndo?: { kind?: "rebuild" | "sceneList" | "character"; scenes: StudioScene[]; characters: StudioCharacter[]; title: string; premise: string; world: string };

@@ -28,6 +28,8 @@ import {
   applyFilmScript,
   assistTurn,
   detectScriptCast,
+  directScenes,
+  fillSceneDirection,
   generateFilmScript,
   type AssistReply,
 } from "@/lib/film/ai";
@@ -72,6 +74,7 @@ const directionSchema = z.object({
 }).strict();
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("detectCast") }),
+  z.object({ action: z.literal("autoDirect"), requestId: z.string().uuid() }),
   z.object({ action: z.literal("createCharacter"), name: z.string().trim().min(1).max(100), appearance: z.string().max(5000).default("") }),
   z.object({ action: z.literal("removeCharacter"), characterId: z.string().max(100) }),
   z.object({ action: z.literal("generatePortrait"), characterId: z.string().max(100), requestId: z.string().uuid() }),
@@ -289,6 +292,7 @@ const actionSchema = z.discriminatedUnion("action", [
         sourceScript: z.string().max(24000).optional(),
         creativeBrief: creativeBriefSchema.optional(),
         // Default clip length for the project. Resolved through
+        directionMode: z.enum(["omni", "director"]).optional(),
         // null clears a count so Omni decides it again.
         storyPlan: z
           .object({
@@ -608,6 +612,26 @@ export async function POST(req: Request, context: Context) {
       delete state.undoTimeline;
       delete state.undoEdits;
     } else if (body.action === "createCharacter") {
+    } else if (body.action === "autoDirect") {
+      if (!state.scenes.length) throw new StudioError("Build the script first, then Omni can fill in the scene details.");
+      if (state.autoDirected?.requestId === body.requestId) {
+        notices.push("Omni already filled in these scene details.");
+      } else {
+        const reply = await directScenes(state);
+        // The model call is slow and blur-saves keep landing meanwhile, so
+        // the details are written onto the latest saved project, not the
+        // snapshot the model was shown. Fill-only keeps the writer's edits.
+        loaded = await loadStudio(user.id, loaded.project.id);
+        state = structuredClone(loaded.state);
+        if (state.autoDirected?.requestId !== body.requestId) {
+          const filled = fillSceneDirection(state, reply);
+          state.directionMode = "omni";
+          state.autoDirected = { requestId: body.requestId, at: new Date().toISOString(), filled };
+          notices.push(filled
+            ? `Omni filled in ${filled} scene detail${filled === 1 ? "" : "s"}. Anything you had already written was kept.`
+            : "Every scene detail was already filled in, so nothing changed.");
+        }
+      }
     } else if (body.action === "detectCast") {
       if ((state.sourceScript ?? "").trim().length < 40) throw new StudioError("Paste your script first, then Omni can find its characters.");
       const found = await detectScriptCast(state.sourceScript as string);
