@@ -126,6 +126,28 @@ export function removeStudioEntry(id: string, storage?: EntryStorage) {
   }
 }
 
+/** Removes browser-only recovery data once its linked story is permanently deleted. */
+export function clearProjectBrowserData(projectId: string) {
+  try {
+    const storage = window.localStorage;
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(Boolean) as string[];
+    for (const key of keys) {
+      if (key.startsWith(PREFIX)) {
+        const entry = readStudioEntry(key.slice(PREFIX.length), storage);
+        if (entry?.projectId === projectId || entry?.guestProjectId === projectId) storage.removeItem(key);
+      }
+      if (key.startsWith(`story:${projectId}:`) || key === `omni-film-export:${projectId}`) storage.removeItem(key);
+      if (key.startsWith("omni-home-project:") && storage.getItem(key) === projectId) storage.removeItem(key);
+    }
+    if (storage.getItem(ACTIVE_ENTRY_KEY)) {
+      const active = readStudioEntry(storage.getItem(ACTIVE_ENTRY_KEY), storage);
+      if (!active || active.projectId === projectId || active.guestProjectId === projectId) storage.removeItem(ACTIVE_ENTRY_KEY);
+    }
+  } catch {
+    /* Local recovery data is optional; server deletion has already completed. */
+  }
+}
+
 /** Updates one local draft instead of accumulating a new entry per keystroke. */
 export function updateStudioEntry(id: string | null, text: string, details: Pick<StudioEntry, "setup" | "guestProjectId">) {
   const existing = readStudioEntry(id);

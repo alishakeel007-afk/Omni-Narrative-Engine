@@ -12,6 +12,7 @@ export function DecisionFlow({ storageKey, pages, onBeforeNext, finish, finishLa
   children?: ReactNode; onPageChange?: (id: string) => void;
 }) {
   const [selected, setSelected] = useState(pages[0]?.id ?? "");
+  const [jumpOpen, setJumpOpen] = useState(false);
   const [moving, setMoving] = useState(false);
   const [error, setError] = useState("");
   const anchor = useRef<HTMLDivElement>(null);
@@ -39,13 +40,16 @@ export function DecisionFlow({ storageKey, pages, onBeforeNext, finish, finishLa
   };
   return <div className="decision-flow" ref={anchor}>
     <div className="decision-flow-top"><span>Part {index + 1} of {pages.length}{page.optional ? " · Optional" : ""}</span>
-      <label className="decision-jump"><span className="sr-only">Jump to a small step</span>
-        <select aria-label="Jump to a small step" value={page.id} disabled={moving || busy} onChange={event => {
-          const at = pages.findIndex(item => item.id === event.target.value);
-          setMoving(true);
-          void (async () => { if (!onBeforeNext || await onBeforeNext(page.id)) navigate(at); else setError("Your answer could not be saved."); })().finally(() => setMoving(false));
-        }}>{pages.map((item, at) => <option key={item.id} value={item.id}>{at + 1}. {item.title}</option>)}</select>
-      </label>
+      <div className="decision-jump">
+        <span className="sr-only">Jump to a small step</span>
+        <button type="button" className="decision-jump-trigger" aria-haspopup="listbox" aria-expanded={jumpOpen} disabled={moving || busy} onClick={() => setJumpOpen(open => !open)}>{index + 1}. {page.title}<span aria-hidden>v</span></button>
+        {jumpOpen ? <div className="decision-jump-menu" role="listbox" aria-label="Jump to a small step">
+          {pages.map((item, at) => <button key={item.id} type="button" role="option" aria-selected={item.id === page.id} disabled={moving || busy} onClick={() => {
+            setMoving(true); setJumpOpen(false);
+            void (async () => { if (!onBeforeNext || await onBeforeNext(page.id)) navigate(at); else setError("Your answer could not be saved."); })().finally(() => setMoving(false));
+          }}>{at + 1}. {item.title}</button>)}
+        </div> : null}
+      </div>
     </div>
     <div className="decision-content" key={page.id}>
       <h3 className="decision-heading" tabIndex={-1}>{page.title}</h3>

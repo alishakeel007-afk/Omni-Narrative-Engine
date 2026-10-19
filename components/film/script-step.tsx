@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Scissors, MessageSquare, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Scissors, MessageSquare, Trash2 } from "lucide-react";
 import { CharacterPanel } from "./character-panel";
 import { DecisionFlow, type DecisionPage } from "./decision-flow";
 import { FieldAssist, AssistedInput } from "./field-assist";
@@ -76,8 +76,8 @@ export function ScriptStep({
     { id: "order", title: "Arrange your scenes", description: "Start with the story order. We’ll review each character and scene next.", content: <>
       <ol className="story-scene-list">{state.scenes.map((scene, index) => <li key={scene.id}>
         <span className="story-scene-index">{index + 1}</span><span className="min-w-0 flex-1"><strong>{scene.title}</strong><small>{(scene.visualAction ?? scene.description).slice(0, 110)}</small></span>
-        <div className="flex gap-2"><button type="button" className="film-text-button" aria-label={`Move scene ${index + 1} up`} disabled={!index} onClick={() => void onAction({ action: "sceneList", operation: "move", sceneId: scene.id, toIndex: index - 1 })}>Up</button>
-        <button type="button" className="film-text-button" aria-label={`Move scene ${index + 1} down`} disabled={index === state.scenes.length - 1} onClick={() => void onAction({ action: "sceneList", operation: "move", sceneId: scene.id, toIndex: index + 1 })}>Down</button>
+        <div className="flex gap-2"><button type="button" className="film-text-button" aria-label={`Move scene ${index + 1} up`} disabled={!index} onClick={() => void onAction({ action: "sceneList", operation: "move", sceneId: scene.id, toIndex: index - 1 })}><ArrowUp size={16} aria-hidden /></button>
+        <button type="button" className="film-text-button" aria-label={`Move scene ${index + 1} down`} disabled={index === state.scenes.length - 1} onClick={() => void onAction({ action: "sceneList", operation: "move", sceneId: scene.id, toIndex: index + 1 })}><ArrowDown size={16} aria-hidden /></button>
         <button type="button" className="film-text-button" aria-label={`Remove scene ${index + 1}`} onClick={() => { if (window.confirm("Remove this scene? Its takes and timeline edits are preserved.")) void onAction({ action: "sceneList", operation: "remove", sceneId: scene.id }); }}>Remove</button></div>
       </li>)}</ol><div className="mt-4 flex gap-3"><button type="button" className="guest-pill" onClick={() => void onAction({ action: "sceneList", operation: "add" })}>Add scene</button>
       {state.scriptUndo ? <button type="button" className="film-text-button" onClick={() => void onAction({ action: "undoScript" })}>Undo script change</button> : null}</div>

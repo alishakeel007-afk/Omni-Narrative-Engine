@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import { Film, Loader2, Plus, Trash2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
-import { readStudioEntry, removeStudioEntry, linkStudioEntry } from "@/lib/studio/entry";
+import { clearProjectBrowserData, readStudioEntry, removeStudioEntry, linkStudioEntry } from "@/lib/studio/entry";
 import type { StudioProject } from "@/types/studio";
 
 export default function DashboardScreen() {
@@ -15,6 +15,7 @@ export default function DashboardScreen() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<StudioProject | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false);
   const [handoff, setHandoff] = useState(false);
@@ -128,7 +129,6 @@ export default function DashboardScreen() {
   }, [search, create]);
 
   const remove = useCallback(async (project: StudioProject) => {
-    if (!window.confirm(`Delete "${project.title}"? This cannot be undone.`)) return;
     setDeleting(project.id);
     setError("");
     try {
@@ -137,7 +137,9 @@ export default function DashboardScreen() {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || "The project could not be deleted.");
       }
+      clearProjectBrowserData(project.id);
       setProjects((current) => (current || []).filter((item) => item.id !== project.id));
+      setConfirmingDelete(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The project could not be deleted.");
     } finally {
@@ -245,10 +247,10 @@ export default function DashboardScreen() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => remove(project)}
+                  onClick={() => setConfirmingDelete(project)}
                   disabled={deleting === project.id}
                   aria-label={`Delete ${project.title}`}
-                  className="rounded-full border border-[var(--line)] p-2 text-[var(--ink)] transition hover:bg-black/[0.04] disabled:opacity-60"
+                  className="rounded-full border border-[var(--line)] p-2 text-[var(--ink)] transition hover:border-[var(--accent)] hover:bg-[var(--accent)] disabled:opacity-60"
                 >
                   {deleting === project.id ? (
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -260,6 +262,16 @@ export default function DashboardScreen() {
             ))}
           </ul>
         )}
+        {confirmingDelete ? <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-story-title" className="w-full max-w-md rounded-2xl border border-[var(--ink)] bg-white p-6 shadow-2xl">
+            <h2 id="delete-story-title" className="text-xl font-semibold">Delete “{confirmingDelete.title}”?</h2>
+            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">This permanently removes the story, its scenes, generated media records, jobs, and saved progress from this browser.</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold" disabled={deleting === confirmingDelete.id} onClick={() => setConfirmingDelete(null)}>Keep story</button>
+              <button type="button" className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--ink)]" disabled={deleting === confirmingDelete.id} onClick={() => void remove(confirmingDelete)}>{deleting === confirmingDelete.id ? "Deleting…" : "Delete story"}</button>
+            </div>
+          </section>
+        </div> : null}
       </main>
     </ProtectedRoute>
   );

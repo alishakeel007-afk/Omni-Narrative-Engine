@@ -9,10 +9,9 @@ import { useAuth } from "@/context/AuthContext";
 // The four-step workflow is the only authenticated creation journey, so the
 // nav is just the project list plus a way to start one.
 const navLinks: { href: Route; label: string }[] = [
-  { href: "/dashboard" as Route, label: "Stories" },
+  { href: "/dashboard" as Route, label: "My stories" },
   { href: "/dashboard?new=1" as Route, label: "New story" },
   { href: "/guide" as Route, label: "How it works" },
-  { href: "/account?tab=settings" as Route, label: "Settings" },
 ];
 import { PublicBrand } from "@/components/public/public-shell";
 
@@ -65,7 +64,7 @@ function ProfileDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-transparent p-1 pr-3 transition hover:border-[var(--line)] hover:bg-black/[0.04]"
+        className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-transparent p-1 pr-3 transition hover:border-[var(--line)] hover:bg-transparent"
         aria-label="Open profile menu"
         aria-expanded={isOpen}
         aria-haspopup="menu"
@@ -92,7 +91,7 @@ function ProfileDropdown({
               type="button"
               role="menuitem"
               onClick={() => handleLink("/account?tab=profile")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--accent)] hover:text-[var(--ink)]"
             >
               <User className="h-4 w-4" />
               View Profile
@@ -101,19 +100,10 @@ function ProfileDropdown({
               type="button"
               role="menuitem"
               onClick={() => handleLink("/account?tab=security")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--accent)] hover:text-[var(--ink)]"
             >
               <Settings className="h-4 w-4" />
               Change Password
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => handleLink("/account?tab=settings")}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
             </button>
             <div className="my-1 border-t border-[var(--line)]" />
             <button
@@ -179,8 +169,8 @@ export function Navbar() {
                 href={item.href}
                 className={`rounded-full border px-4 py-2 text-sm transition ${
                   isActive(item.href)
-                    ? "border-[var(--line)] bg-transparent text-[var(--ink)]"
-                    : "border-[var(--line)] bg-white text-[var(--muted)] hover:border-[var(--line)] hover:text-[var(--ink)]"
+                    ? "border-[var(--accent)] bg-transparent text-[var(--ink)] hover:bg-[var(--accent)]"
+                    : "border-[var(--line)] bg-white text-[var(--muted)] hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--ink)]"
                 }`}
               >
                 {item.label}
@@ -192,7 +182,7 @@ export function Navbar() {
             <>
               <Link
                 href="/auth"
-                className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--muted)] transition hover:border-[var(--line)] hover:text-[var(--ink)]"
+                className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--muted)] transition hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--ink)]"
               >
                 Login
               </Link>
@@ -235,8 +225,8 @@ export function Navbar() {
                 onClick={() => setMenuOpen(false)}
                 className={`rounded-[1.2rem] border px-4 py-3 text-sm transition ${
                   isActive(item.href)
-                    ? "border-[var(--line)] bg-transparent text-[var(--ink)]"
-                    : "border-[var(--line)] bg-transparent text-[var(--muted)] hover:border-[var(--line)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
+                    ? "border-[var(--accent)] bg-transparent text-[var(--ink)] hover:bg-[var(--accent)]"
+                    : "border-[var(--line)] bg-transparent text-[var(--muted)] hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--ink)]"
                 }`}
               >
                 {item.label}
@@ -284,7 +274,7 @@ export function Navbar() {
                   <Link
                     href="/account?tab=profile"
                     onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--accent)] hover:text-[var(--ink)]"
                   >
                     <User className="h-4 w-4" />
                     View Profile
@@ -292,18 +282,10 @@ export function Navbar() {
                   <Link
                     href="/account?tab=security"
                     onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--accent)] hover:text-[var(--ink)]"
                   >
                     <Settings className="h-4 w-4" />
                     Change Password
-                  </Link>
-                  <Link
-                    href="/account?tab=settings"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-black/[0.04] hover:text-[var(--ink)]"
-                  >
-                    <Settings className="h-4 w-4" />
-                    Settings
                   </Link>
                   <div className="my-1 border-t border-[var(--line)]" />
                   <button

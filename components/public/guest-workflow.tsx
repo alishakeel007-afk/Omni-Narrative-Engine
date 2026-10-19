@@ -294,9 +294,9 @@ function LockedPreview({ stage, onContinue }: { stage: "generate" | "edit"; onCo
     <div className="guest-lock-message">
       <Lock size={18} aria-hidden />
       <span className="guest-label">Step {generating ? "3" : "4"} · {generating ? "Generate" : "Edit & export"}</span>
-      <h3>Sign up to unlock this preview</h3>
+      <h3>Sign up</h3>
       <p>Keep your idea, script, and characters, then generate scenes and finish your story in your account.</p>
-      <div className="guest-actions"><button type="button" className="public-button public-button-lime" onClick={() => onContinue("signup")}>Create an account</button><button type="button" className="guest-back" onClick={() => onContinue("auth")}>Sign in</button></div>
+      <div className="guest-actions"><button type="button" className="public-button public-button-lime" onClick={() => onContinue("signup")}>Sign up</button><button type="button" className="guest-back" onClick={() => onContinue("auth")}>Sign in</button></div>
     </div>
   </div>;
 }

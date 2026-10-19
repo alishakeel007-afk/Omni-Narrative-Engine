@@ -283,7 +283,7 @@
 .public-brand-light {
   font-weight: 500;
 }
-.public-brand-omni { color: var(--brand-accent); }
+.public-brand-omni { color: var(--brand-accent); -webkit-text-stroke: 0 transparent; text-shadow: none; filter: drop-shadow(0 0 .15px rgba(0,0,0,.38)); }
 .public-brand-dot {
   color: #707070;
 }
@@ -297,6 +297,7 @@
   height: 100%;
   object-fit: contain;
 }
+.public-brand-symbol { filter: drop-shadow(0 0 .15px rgba(0,0,0,.38)); }
 .public-desktop-nav {
   display: flex;
   align-items: center;
@@ -311,8 +312,9 @@
   transition: color 0.15s;
 }
 .public-desktop-nav a:hover,
-.public-login-link:hover {
-  color: #606060;
+.public-login-link:hover,
+.public-mobile-nav a:hover {
+  color: var(--brand-accent);
 }
 .public-header-actions {
   display: flex;
@@ -1245,9 +1247,11 @@
 }
 .public-faq-list summary > svg {
   flex-shrink: 0;
-  color: #8b8b8b;
+  color: var(--brand-ink);
   transition: transform 0.2s;
 }
+.public-faq-list summary:hover > svg,
+.public-faq-list details[open] summary > svg { color: var(--brand-accent); }
 .public-faq-list details[open] summary > svg {
   transform: rotate(45deg);
 }
@@ -2274,6 +2278,10 @@
 .public-hero h1 em { white-space: nowrap; }
 .public-hero-copy > p { max-width: 540px; text-wrap: pretty; }
 .public-hero-panel { min-height: 540px; height: min(600px, 70vw); }
+.public-hero-copy { display: flex; min-height: 540px; flex-direction: column; align-items: center; justify-content: center; padding: 65px; text-align: center; }
+.public-hero h1 { white-space: nowrap; }
+.public-hero-copy > p { margin-inline: auto; }
+.public-hero-actions { justify-content: center; }
 .public-section-heading { flex-wrap: wrap; gap: 14px; }
 .public-section-heading h2 { font-size: clamp(28px, 3.2vw, 46px); }
 .public-section-heading > p { max-width: none; }
@@ -2312,6 +2320,8 @@
 @keyframes public-caret { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .public-caret-field[data-idle="true"]::after { animation: none; } }
 @media (max-width: 700px) {
+  .public-hero-copy { min-height: 480px; padding: 55px 22px 100px; }
+  .public-hero h1 { white-space: normal; }
   .public-hero h1 { font-size: clamp(26px, 7.7vw, 53px); letter-spacing: -1.3px; }
   .public-hero-panel { min-height: 480px; height: auto; }
   .public-hero-copy { padding: 55px 22px 100px; }
@@ -2375,6 +2385,8 @@
 .guest-progress-overview .guest-steps li { display: flex; flex-direction: column; align-items: center; gap: 0; width: 100%; text-align: center; }
 .guest-progress-overview .guest-steps li > button { display: flex; width: 100%; flex-direction: column; align-items: center; color: inherit; }
 .guest-progress-overview .guest-steps li > button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 4px; border-radius: 8px; }
+.guest-progress-overview .guest-step-number::before { display: none; }
+.guest-progress-overview .guest-steps li[aria-current="step"] .guest-step-number { background: var(--brand-accent); border-color: var(--brand-ink); }
 .guest-progress-overview .guest-steps li.locked .guest-step-number { border-style: dashed; }
 .guest-progress-overview .guest-step-number { flex: none; width: 26px; }
 .guest-progress-overview .guest-step-title { display: block; font-size: 9px; line-height: 1.4; min-height: 30px; max-width: 76px; padding-top: 6px; }

@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: "OmniNarrative — Your creative director partner",
   description:
     "Your creative director partner, from first idea to final story. Explore stories, create characters and scenes, and bring it all together in one studio.",
+  icons: {
+    icon: "/omni-mark.png",
+    shortcut: "/omni-mark.png",
+    apple: "/omni-mark.png",
+  },
 };
 
 export default function RootLayout({

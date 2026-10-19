@@ -15,7 +15,7 @@ export function HeroSection() {
             YOUR CREATIVE DIRECTOR PARTNER
           </span>
           <h1 id="public-hero-heading">
-            Your story.<br /><em>Ready for the screen.</em>
+            Your story. <em>Ready for the screen.</em>
           </h1>
           <p>
             From first idea to final story. Create with a director by your side.

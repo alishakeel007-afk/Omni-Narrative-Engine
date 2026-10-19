@@ -131,8 +131,8 @@ async function retryAfterSeconds(response: Response): Promise<number | undefined
   }
 }
 
-/** One message for "every provider is rate-limited", so it reads the same everywhere. */
-export function rateLimitError(seconds?: number) {
+/** One message for a rate-limited provider chain, so it reads the same everywhere. */
+export function rateLimitError(seconds?: number, allProviders = false) {
   const when = seconds === undefined
     ? "Try again in a minute."
     : seconds > 3600
@@ -140,7 +140,8 @@ export function rateLimitError(seconds?: number) {
       : seconds > 90
         ? `Try again in about ${Math.ceil(seconds / 60)} minutes.`
         : `Try again in about ${Math.max(5, seconds)} seconds.`;
-  const error = new StudioError(`Omni is rate-limited by its AI provider right now. Nothing was changed. ${when}`, 429);
+  const source = allProviders ? "both Omni AI providers are rate-limited" : "Omni's AI provider is rate-limited";
+  const error = new StudioError(`${source} right now. Nothing was changed. ${when}`, 429);
   return Object.assign(error, { retryAfter: seconds });
 }
 
@@ -255,7 +256,7 @@ export async function askModel(
     const waits = [await retryAfterSeconds(response),
       primaryError?.status === 429 ? (primaryError as StudioError & { retryAfter?: number }).retryAfter : undefined]
       .filter((value): value is number => value !== undefined);
-    throw rateLimitError(waits.length ? Math.min(...waits) : undefined);
+    throw rateLimitError(waits.length ? Math.min(...waits) : undefined, !!primaryError);
   }
   if (!response.ok)
     throw new StudioError(

@@ -366,8 +366,9 @@ function StepIndicator({ state, onSelect }: { state: StudioState; onSelect: (ste
       </ol>
       <div className="story-progress-track" role="progressbar" aria-label="Story completion" aria-valuenow={progress.percent} aria-valuemin={0} aria-valuemax={100}>
         <span className="story-progress-fill" style={{ width: `${pathPercent}%` }} />
+        <span className="story-progress-percent" style={{ "--story-progress-head": `${pathPercent}%` } as CSSProperties}><span>{progress.percent}%</span><img src="/omni-mark.png" alt="" /></span>
       </div>
-      <div className="story-progress-caption"><span>{progressSummary(progress, state)}</span><span>{progress.percent}% complete</span></div>
+      <div className="story-progress-caption"><span>{progressSummary(progress, state)}</span></div>
     </div>
   </nav>;
 }
