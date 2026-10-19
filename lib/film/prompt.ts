@@ -181,14 +181,20 @@ export function buildFilmPrompt({
 export function sceneDirectionText(state: Pick<StudioState, "characters">, scene: StudioScene) {
   const direction = scene.direction;
   if (!direction) return "";
-  const cues = Object.entries(direction).filter(([key, value]) => key !== "wardrobe" && typeof value === "string" && value.trim())
+  const cues = Object.entries(direction).filter(([key, value]) => key !== "background" && typeof value === "string" && value.trim())
     .map(([key, value]) => `${key}: ${value}`);
-  const wardrobe = Object.entries(direction.wardrobe ?? {}).flatMap(([id, value]) => {
+  // Per-character cues only for people actually cast in this scene.
+  const named = (map?: Record<string, string>) => Object.entries(map ?? {}).flatMap(([id, value]) => {
     const character = state.characters.find(item => item.id === id && scene.characterIds.includes(id));
     return character && value.trim() ? [`${character.name}: ${value}`] : [];
   });
+  const wardrobe = named(direction.wardrobe);
+  const expression = named(direction.expression);
+  const background = direction.background?.trim();
   return [cues.length ? `Scene direction (visual and sound cues, never spoken): ${cues.join("; ")}.` : "",
-    wardrobe.length ? `Intentional wardrobe / styling in THIS scene only: ${wardrobe.join("; ")}. This overrides reference clothing only. Preserve locked facial proportions, age, hair and distinctive identity details.` : ""].filter(Boolean).join("\n");
+    wardrobe.length ? `Intentional wardrobe / styling in THIS scene only: ${wardrobe.join("; ")}. This overrides reference clothing only. Preserve locked facial proportions, age, hair and distinctive identity details.` : "",
+    expression.length ? `Expressions and body language in THIS scene: ${expression.join("; ")}. Expression never changes a character's identity.` : "",
+    background ? `Background (silent extras only, never named characters, never speaking): ${background}.` : ""].filter(Boolean).join("\n");
 }
 
 export function precedingSceneContext(state: Partial<Pick<StudioState, "scenes">>, scene: StudioScene) {

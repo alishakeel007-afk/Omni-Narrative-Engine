@@ -361,7 +361,7 @@ class StudioError extends Error {
   asked = [];
   replies = [{ scenes: [
     { id: "a", location: "Omni: a generic gate", lighting: "Warm sodium streetlight", delivery: "N/A", wardrobe: [{ character: "Rohan", outfit: "Omni: jeans" }] },
-    { id: "b", location: "Same hostel, corridor", camera: "x".repeat(1500), music: "", wardrobe: [{ character: "samir", outfit: "Cricket jersey, sleeves rolled" }, { character: "Vikram", outfit: "Not in this scene" }, { character: "Rohan", outfit: "Grey kurta" }] },
+    { id: "b", location: "Same hostel, corridor", camera: "x".repeat(1500), music: "", background: "Three boys playing carrom", expression: [{ character: "Samir", look: "Sly half-smile" }, { character: "Rohan", look: "None" }, { character: "Vikram", look: "Not cast" }], wardrobe: [{ character: "samir", outfit: "Cricket jersey, sleeves rolled" }, { character: "Vikram", outfit: "Not in this scene" }, { character: "Rohan", outfit: "Grey kurta" }] },
     { id: "ghost", location: "A scene that no longer exists" },
   ] }];
   const reply = await ai.directScenes(directed);
@@ -380,7 +380,10 @@ class StudioError extends Error {
   assert.deepEqual(b.direction.wardrobe, { s: "Cricket jersey, sleeves rolled", r: "Grey kurta" }, "Wardrobe is matched by name to this scene's cast only");
   assert.equal(b.outdated, true, "A rendered take no longer matches its newly directed scene");
   assert.equal(c.outdated, undefined, "A scene Omni did not touch keeps its takes current");
-  assert.equal(filled, 5);
+  assert.equal(b.direction.background, "Three boys playing carrom");
+  assert.deepEqual(b.direction.expression, { s: "Sly half-smile" }, "Expression is matched to this scene's cast, and filler is dropped");
+  assert.match(asked[0], /"expression":\[\{"character":"name","look"/, "Omni is asked for expressions");
+  assert.equal(filled, 7);
   assert.equal(ai.fillSceneDirection(filledState, reply), 0, "Running it again changes nothing");
 
   console.log("PASS: Let Omni do it directs every scene from the rough idea and fills only empty fields, by cast, without re-flagging untouched scenes.");

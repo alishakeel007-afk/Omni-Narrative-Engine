@@ -70,7 +70,9 @@ const directionSchema = z.object({
   lighting: z.string().max(1000).optional(), props: z.string().max(1000).optional(),
   camera: z.string().max(1000).optional(), delivery: z.string().max(1000).optional(),
   music: z.string().max(1000).optional(), ambience: z.string().max(1000).optional(), soundEffects: z.string().max(1000).optional(),
+  background: z.string().max(1000).optional(),
   wardrobe: z.record(z.string().max(100), z.string().max(1000)).optional(),
+  expression: z.record(z.string().max(100), z.string().max(1000)).optional(),
 }).strict();
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("detectCast") }),
@@ -171,7 +173,7 @@ const actionSchema = z.discriminatedUnion("action", [
       "characterAppearance",
       "audience", "purpose", "tone", "genre", "ending",
       "characterName", "motivation", "relationships",
-      "location", "timeOfDay", "lighting", "props", "camera", "delivery", "music", "ambience", "soundEffects", "wardrobe",
+      "location", "timeOfDay", "lighting", "props", "camera", "delivery", "music", "ambience", "soundEffects", "wardrobe", "background", "expression",
       "editAdvice", "overlayText",
     ]),
     sceneId: z.string().max(100).optional(),
@@ -1007,8 +1009,11 @@ export async function POST(req: Request, context: Context) {
         const incoming = body.patch.direction;
         if (incoming.wardrobe && Object.keys(incoming.wardrobe).some(id => !scene.characterIds.includes(id)))
           throw new StudioError("Wardrobe must belong to a character in this scene.");
+        if (incoming.expression && Object.keys(incoming.expression).some(id => !scene.characterIds.includes(id)))
+          throw new StudioError("An expression must belong to a character in this scene.");
         scene.direction = { ...scene.direction, ...incoming,
-          ...(incoming.wardrobe ? { wardrobe: { ...scene.direction?.wardrobe, ...incoming.wardrobe } } : {}) };
+          ...(incoming.wardrobe ? { wardrobe: { ...scene.direction?.wardrobe, ...incoming.wardrobe } } : {}),
+          ...(incoming.expression ? { expression: { ...scene.direction?.expression, ...incoming.expression } } : {}) };
       }
       if (body.patch.requestedSeconds !== undefined) {
         if (body.patch.requestedSeconds === null) delete scene.requestedSeconds;

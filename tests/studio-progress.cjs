@@ -37,4 +37,12 @@ assert.match(scenePrompt(state,'s1').prompt,/yellow raincoat/,'The intermediate 
 assert.equal(state.characters[0].appearance,identity,'A scene outfit cannot rewrite locked identity');
 const other={...scene,id:'s2',direction:{}};
 assert.doesNotMatch(buildFilmPrompt({state,scene:other,language:'en',clipSeconds:5.04}),/yellow raincoat/);
+// Background people and expressions reach both the image and the video prompt.
+scene.direction={...scene.direction,background:'Two students studying in the corner',expression:{c1:'Nervous, avoiding eye contact',ghost:'Should never appear'}};
+for(const text of [buildFilmPrompt({state,scene,language:'en',clipSeconds:5.04}),scenePrompt(state,'s1').prompt]){
+  assert.match(text,/Background \(silent extras only, never named characters, never speaking\): Two students studying in the corner/);
+  assert.match(text,/Expressions and body language in THIS scene: Mira: Nervous, avoiding eye contact/);
+  assert.doesNotMatch(text,/Should never appear/,'An expression for someone not cast is dropped');
+  assert.doesNotMatch(text,/background: Two students/,'Background is not repeated as a generic cue');
+}
 console.log('PASS: state-based progress, stale export invalidation, first-take review, and scene-only wardrobe in real image/video prompts.');

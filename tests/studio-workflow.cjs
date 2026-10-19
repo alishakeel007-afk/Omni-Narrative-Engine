@@ -542,6 +542,13 @@ class StudioError extends Error {
   assert.equal(state.scenes[0].direction.location, "Concert hall");
   assert.deepEqual(state.characters.find(item => item.id === characterId), identityBefore);
   assert.equal((await post({ action: "scenePatch", sceneId: existingId, patch: { direction: { wardrobe: { stranger: "Coat" } } } })).status, 400);
+  state = (await (await post({ action: "scenePatch", sceneId: existingId, patch: { direction: { background: "A quiet crowd", expression: { [characterId]: "Nervous" } } } })).json()).state;
+  state = (await (await post({ action: "scenePatch", sceneId: existingId, patch: { direction: { lighting: "Low" } } })).json()).state;
+  assert.equal(state.scenes[0].direction.background, "A quiet crowd");
+  assert.equal(state.scenes[0].direction.expression[characterId], "Nervous", "Expression merges like wardrobe");
+  assert.equal(state.scenes[0].direction.wardrobe[characterId], "A raincoat", "Expression does not disturb wardrobe");
+  assert.equal((await post({ action: "scenePatch", sceneId: existingId, patch: { direction: { expression: { stranger: "Angry" } } } })).status, 400, "An expression needs a cast member");
+  assert.equal((await post({ action: "scenePatch", sceneId: existingId, patch: { direction: { background: "x".repeat(1001) } } })).status, 400);
   const timelineBefore = structuredClone(saved.clips);
   state = (await (await post({ action: "sceneList", operation: "add" })).json()).state;
   const addedScene = state.scenes.at(-1).id;

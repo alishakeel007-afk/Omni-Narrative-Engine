@@ -308,6 +308,7 @@ export type AssistField =
   | "characterName" | "motivation" | "relationships"
   | "audience" | "purpose" | "tone" | "genre" | "ending"
   | "location" | "timeOfDay" | "lighting" | "props" | "camera" | "delivery" | "music" | "ambience" | "soundEffects" | "wardrobe"
+  | "background" | "expression"
   | "editAdvice" | "overlayText";
 
 /**
@@ -341,10 +342,12 @@ ${
 ${input.message ? `The writer says: ${JSON.stringify(input.message)}` : "Suggest useful options for the selected field using the story already supplied."}
 
 Anchor EVERY suggestion in the writer's original rough idea and existing script. Keep their named people, setting, conflict, culture and intent. Never substitute an unrelated story unless explicitly asked. For the idea field, refine the supplied rough idea; only invent new pitches when no story has been supplied. For other fields, propose ONLY that field's value, not a new premise. In guided mode, choices should be different directions within THIS story. Existing locked identities must be preserved. For wardrobe, change only clothing for this scene. For editAdvice, return concise actionable editing advice, never claim edits were executed. For overlayText, propose short editorial text, not an automatic transcript of speech.
-Keep each proposed value within the field limit: title/sceneTitle 160 characters, characterName 100, audience/purpose/tone/genre 500, timeOfDay 200, ending/motivation/relationships 1500, scene direction/wardrobe 1000, visualStyle 4000. Choices.message is ONLY the field value, never instructions such as 'Use this title'.
+Keep each proposed value within the field limit: title/sceneTitle 160 characters, characterName 100, audience/purpose/tone/genre 500, timeOfDay 200, ending/motivation/relationships 1500, scene direction/wardrobe/background/expression 1000, visualStyle 4000. Choices.message is ONLY the field value, never instructions such as 'Use this title'.
 
 ${input.field === "dialogue" ? `Keep any dialogue under about ${wordBudget(language, seconds)} words so it fits a ${seconds.toFixed(1)}-second clip. Dialogue is spoken by a named character; never write narration.` : ""}
 ${input.field === "visualAction" ? "Describe only what the camera sees. This is never spoken aloud." : ""}
+${input.field === "background" ? "Describe who else is visible in this scene - extras, a crowd, or nobody - and what they are doing. Background people never speak." : ""}
+${input.field === "expression" ? "Describe this one character's facial expression and body language in this scene only. Never change their face, age, hair or build." : ""}
 ${language === "ur" ? "Write audience-facing text in Urdu script, not Roman Urdu." : ""}
 
 ${capabilities(language, seconds)}
@@ -374,13 +377,16 @@ Project so far: ${projectContext(input.state)}`;
 // Over-long answers are trimmed rather than rejected: a detail cut short is
 // better than a whole "Let Omni do it" run failing on one wordy field.
 const cue = (max: number) => z.string().trim().transform((value) => value.slice(0, max)).nullable().optional();
-const DIRECTION_TEXT = ["location", "timeOfDay", "lighting", "props", "camera", "delivery", "music", "ambience", "soundEffects"] as const;
+const DIRECTION_TEXT = ["location", "timeOfDay", "lighting", "props", "camera", "delivery", "music", "ambience", "soundEffects", "background"] as const;
+const personName = z.string().trim().min(1).max(100);
+const personCue = z.string().trim().min(1).transform((value) => value.slice(0, 1000));
 const directionReplySchema = z.object({
   scenes: z.array(z.object({
     id: z.string(),
     location: cue(1000), timeOfDay: cue(200), lighting: cue(1000), props: cue(1000), camera: cue(1000),
-    delivery: cue(1000), music: cue(1000), ambience: cue(1000), soundEffects: cue(1000),
-    wardrobe: z.array(z.object({ character: z.string().trim().min(1).max(100), outfit: z.string().trim().min(1).transform((value) => value.slice(0, 1000)) })).nullable().optional(),
+    delivery: cue(1000), music: cue(1000), ambience: cue(1000), soundEffects: cue(1000), background: cue(1000),
+    wardrobe: z.array(z.object({ character: personName, outfit: personCue })).nullable().optional(),
+    expression: z.array(z.object({ character: personName, look: personCue })).nullable().optional(),
   })).max(24),
 });
 export type DirectionReply = z.infer<typeof directionReplySchema>;
@@ -398,12 +404,13 @@ export async function directScenes(state: StudioState): Promise<DirectionReply> 
     cast: state.characters.filter((character) => scene.characterIds.includes(character.id)).map((character) => character.name),
     given: scene.direction ?? {},
   }));
-  return askTyped(directionReplySchema, `You are the director of this short story. For EVERY scene, decide the details the camera and sound team need. Respond in JSON ONLY matching: {"scenes":[{"id":"scene id","location":"...","timeOfDay":"...","lighting":"...","props":"...","camera":"...","delivery":"how the dialogue is spoken","music":"... or No music","ambience":"...","soundEffects":"...","wardrobe":[{"character":"name","outfit":"..."}]}]}.
+  return askTyped(directionReplySchema, `You are the director of this short story. For EVERY scene, decide the details the camera and sound team need. Respond in JSON ONLY matching: {"scenes":[{"id":"scene id","location":"...","timeOfDay":"...","lighting":"...","props":"...","camera":"...","delivery":"how the dialogue is spoken","music":"... or No music","ambience":"...","soundEffects":"...","background":"who else is in frame","wardrobe":[{"character":"name","outfit":"..."}],"expression":[{"character":"name","look":"face and body language"}]}]}.
 Rules:
 - Stay true to the writer's original idea, setting, culture and people. Do not change the story.
 - Keep continuity: a place, prop or outfit established in one scene stays the same in later scenes unless the story changes it.
 - Fields under "given" were set by the writer. Keep them and build around them; you may omit them from your answer.
-- Wardrobe is only for that scene's cast, by name, and never changes a character's face, age, hair or build.
+- Wardrobe and expression are only for that scene's cast, by name, and never change a character's face, age, hair or build.
+- "background" is the extras or crowd in frame, or "Nobody else". Background people never speak.
 - Omit a field that does not apply, such as "delivery" in a scene with no dialogue. Never write "N/A".
 - Be concrete and brief: one or two sentences per field. Write in English; this guides the picture and sound and is never spoken.
 ${INJECTION_GUARD}
@@ -434,12 +441,18 @@ export function fillSceneDirection(state: StudioState, reply: DirectionReply): n
       const value = proposal[field];
       if (value && !PLACEHOLDER.test(value) && !direction[field]?.trim()) { direction[field] = value; changed++; }
     }
-    const wardrobe = { ...direction.wardrobe };
-    for (const item of proposal.wardrobe ?? []) {
-      const id = byName.get(item.character.toLowerCase());
-      if (id && scene.characterIds.includes(id) && !wardrobe[id]?.trim()) { wardrobe[id] = item.outfit; changed++; }
+    const perPerson = {
+      wardrobe: proposal.wardrobe?.map((item) => [item.character, item.outfit] as const),
+      expression: proposal.expression?.map((item) => [item.character, item.look] as const),
+    };
+    for (const key of ["wardrobe", "expression"] as const) {
+      const map = { ...direction[key] };
+      for (const [name, value] of perPerson[key] ?? []) {
+        const id = byName.get(name.toLowerCase());
+        if (id && scene.characterIds.includes(id) && !PLACEHOLDER.test(value) && !map[id]?.trim()) { map[id] = value; changed++; }
+      }
+      if (Object.keys(map).length) direction[key] = map;
     }
-    if (Object.keys(wardrobe).length) direction.wardrobe = wardrobe;
     if (!changed) continue;
     scene.direction = direction;
     // A take rendered before these details no longer matches the scene.

@@ -236,8 +236,12 @@ export type SceneDirection = {
   music?: string;
   ambience?: string;
   soundEffects?: string;
+  /** Who else is in frame: extras, a crowd, or an empty room. Never speaks. */
+  background?: string;
   /** Keyed by stable character ID; applies to this scene only. */
   wardrobe?: Record<string, string>;
+  /** Keyed by stable character ID: face and body language in this scene only. */
+  expression?: Record<string, string>;
 };
 /** Only sizes the worker actually supports are offered. */
 export type FilmFormat = "landscape";
