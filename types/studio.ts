@@ -7,6 +7,11 @@ export type StudioCharacter = {
   referenceId?: string;
   references?: { id: string; label: string }[];
   locked: boolean;
+  /**
+   * "user" when the writer created or saved this character. A script rebuild
+   * never drops it and never replaces an appearance it already has.
+   */
+  origin?: "user";
   motivation?: string;
   relationships?: string;
   /** Urdu only. English speech is generated natively and is not selectable. */
@@ -215,6 +220,12 @@ export type CreativeBrief = {
   genre?: string;
   ending?: string;
 };
+export const MAX_STORY_SCENES = 12;
+export const MAX_STORY_CHARACTERS = 12;
+export type StoryPlan = {
+  sceneCount?: number;
+  characterCount?: number;
+};
 export type SceneDirection = {
   location?: string;
   timeOfDay?: string;
@@ -298,6 +309,11 @@ export type StudioState = {
   /** Writer's rough starting idea, kept when a generated script refines the premise. */
   roughIdea?: string;
   creativeBrief?: CreativeBrief;
+  /**
+   * Story size chosen in Setup. Unset means Omni decides. Characters the user
+   * names in Setup live in `characters`; this count includes them.
+   */
+  storyPlan?: StoryPlan;
   /** Replaced/deleted scenes retain their immutable media and IDs. */
   archivedScenes?: StudioScene[];
   scriptUndo?: { kind?: "rebuild" | "sceneList" | "character"; scenes: StudioScene[]; characters: StudioCharacter[]; title: string; premise: string; world: string };

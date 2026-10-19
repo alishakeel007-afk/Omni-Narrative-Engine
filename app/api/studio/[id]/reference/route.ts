@@ -139,6 +139,7 @@ export async function POST(req: Request, context: Context) {
         referenceId: reference.id,
         references: [{ id: reference.id, label: label || "Primary" }],
         locked: false,
+        origin: "user",
       });
     state.messages.push({
       id: randomUUID(),

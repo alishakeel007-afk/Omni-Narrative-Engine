@@ -262,6 +262,14 @@ export default function FilmStudioScreen() {
                 onSave={save}
                 onGenerateScript={buildScript}
                 onContinue={() => void goToStep("script")}
+                characters={{
+                  onCharacter: (characterId, patch) => act({ action: "character", characterId, ...patch }),
+                  onReference: (characterId, referenceId, operation) =>
+                    act({ action: "reference", characterId, referenceId, operation }),
+                  onUpload: upload,
+                  onVoice: (characterId, voice) => act({ action: "voice", characterId, voice }),
+                  onAction: act,
+                }}
               />
             ) : current === "script" ? (
               <ScriptStep

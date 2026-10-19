@@ -264,6 +264,88 @@ class StudioError extends Error {
     (error) => /did not return any options/.test(error.message),
   );
 
+  // --- Setup's scene count and cast drive the script ----------------------
+  const scene = (title, cast) => ({ title, visualAction: `${title} happens.`, characters: cast, dialogues: [] });
+  const planned = {
+    ...project,
+    storyPlan: { sceneCount: 3, characterCount: 3 },
+    characters: [
+      { id: "u1", name: "Rohan", appearance: "Tall, round glasses, blue hoodie", locked: false, origin: "user" },
+      { id: "u2", name: "Samir", appearance: "", locked: false, origin: "user" },
+    ],
+  };
+  const fits = {
+    ...good,
+    characters: [
+      { name: "Rohan", appearance: "Tall, round glasses, blue hoodie" },
+      { name: "Samir", appearance: "Short, curly hair, cricket jersey" },
+      { name: "Vikram", appearance: "Broad, leather jacket, gold chain" },
+    ],
+    scenes: [scene("Arrival", ["Rohan"]), scene("Temptation", ["Vikram", "Rohan"]), scene("Choice", ["Samir", "Rohan"])],
+  };
+  asked = [];
+  replies = [fits];
+  script = await ai.generateFilmScript({ state: planned, idea: "hostel" });
+  assert.equal(script.scenes.length, 3);
+  assert.match(asked[0], /exactly 3 scenes/);
+  assert.match(asked[0], /"name":"Rohan","appearance":"Tall, round glasses, blue hoodie"/, "The writer's characters are sent as required");
+  assert.match(asked[0], /the 2 above plus 1 you create/);
+
+  // A wrong scene count, a dropped character, or too many characters is sent
+  // back once with the reason, never silently accepted.
+  for (const wrong of [
+    { ...fits, scenes: fits.scenes.slice(0, 2) },
+    { ...fits, characters: fits.characters.filter((item) => item.name !== "Samir") },
+    { ...fits, characters: [...fits.characters, { name: "Deepak", appearance: "x" }] },
+  ]) {
+    asked = [];
+    replies = [wrong, fits];
+    script = await ai.generateFilmScript({ state: planned, idea: "hostel" });
+    assert.equal(asked.length, 2, "A count mismatch is re-asked");
+    assert.equal(script.characters.length, 3);
+  }
+  replies = [{ ...fits, scenes: fits.scenes.slice(0, 1) }, { ...fits, scenes: fits.scenes.slice(0, 1) }];
+  await assert.rejects(() => ai.generateFilmScript({ state: planned, idea: "hostel" }), (error) => error.status === 502);
+
+  // Exactly the writer's cast: Omni is told not to invent anyone.
+  asked = [];
+  replies = [{ ...fits, characters: fits.characters.slice(0, 2), scenes: [scene("One", ["Rohan"]), scene("Two", ["Samir"]), scene("Three", ["Rohan"])] }];
+  await ai.generateFilmScript({ state: { ...planned, storyPlan: { sceneCount: 3, characterCount: 2 } }, idea: "hostel" });
+  assert.match(asked[0], /Use ONLY the characters listed above/);
+
+  // No plan keeps the old behaviour.
+  asked = [];
+  replies = [good];
+  await ai.generateFilmScript({ state: project, idea: "x" });
+  assert.match(asked[0], /between 3 and 6 scenes/);
+  assert.doesNotMatch(asked[0], /already created these characters/);
+
+  // --- a build keeps what the writer set up -------------------------------
+  const built = structuredClone(planned);
+  ai.applyFilmScript(built, {
+    ...fits,
+    characters: [
+      { name: "Rohan", appearance: "Model's different idea of Rohan" },
+      { name: "Vikram", appearance: "Broad, leather jacket" },
+    ],
+    scenes: [scene("Arrival", ["Rohan"])],
+  });
+  const rohan = built.characters.find((item) => item.name === "Rohan");
+  assert.equal(rohan.id, "u1", "Identity is kept");
+  assert.equal(rohan.appearance, "Tall, round glasses, blue hoodie", "A written appearance is never replaced");
+  const samir = built.characters.find((item) => item.name === "Samir");
+  assert.ok(samir, "A character the writer created is kept even when the script forgets them");
+  assert.equal(samir.id, "u2");
+  assert.equal(built.characters.find((item) => item.name === "Vikram").origin, undefined, "Omni's characters are not marked as the writer's");
+
+  // A blank appearance is filled by the script.
+  const blank = structuredClone(planned);
+  ai.applyFilmScript(blank, fits);
+  assert.equal(blank.characters.find((item) => item.name === "Samir").appearance, "Short, curly hair, cricket jersey");
+
+  console.log(
+    "PASS: Setup scene count and cast reach the prompt, mismatches are retried, and a build keeps the writer's characters and appearances.",
+  );
   console.log(
     "PASS: narration rejection with retry, silent scenes, duration-derived dialogue budgets, optional shot sequences with complete line assignment, Urdu script and single-turn guards, and guided/custom prompt contracts.",
   );

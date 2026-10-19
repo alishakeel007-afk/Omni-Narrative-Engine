@@ -196,6 +196,34 @@ async function askTyped<T extends z.ZodType>(schema: T, prompt: string): Promise
   );
 }
 
+const scriptCastSchema = z.object({
+  characters: z
+    .array(z.object({ name: z.string().trim().min(1).max(100), appearance: z.string().trim().max(4000).default("") }))
+    .max(12),
+});
+
+/**
+ * The people a pasted script already names, so Setup can show them as the
+ * writer's cast before any scenes exist. Appearance is only what the script
+ * states; nothing is invented here.
+ */
+export async function detectScriptCast(sourceScript: string) {
+  const { characters } = await askTyped(scriptCastSchema, `List the characters who appear in this script. Respond in JSON ONLY matching: {"characters":[{"name":"...","appearance":"..."}]}.
+Use each name exactly as the script writes it, once per person. Never list a narrator, voiceover or crowd.
+"appearance" is ONLY what the script says about how they look; leave it "" if it says nothing. Do not invent details.
+${INJECTION_GUARD}
+
+Script:
+${sourceScript}`);
+  const seen = new Set<string>();
+  return characters.filter((item) => {
+    const key = item.name.toLowerCase();
+    if (seen.has(key) || NARRATOR.test(item.name)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function generateFilmScript(input: {
   state: StudioState;
   idea: string;
@@ -206,11 +234,36 @@ export async function generateFilmScript(input: {
   // The real requested length, not a guess: it sets the dialogue budget the
   // model writes against.
   const seconds = resolveClipSeconds(input.state.clipSeconds);
+  // The Setup choices. Unset counts leave the decision to the model.
+  const sceneCount = input.sceneCount ?? input.state.storyPlan?.sceneCount;
+  const cast = input.state.characters.filter((character) => character.origin === "user" || character.locked || characterReferences(character).length);
+  const characterCount = input.state.storyPlan?.characterCount;
+  const invented = characterCount === undefined ? undefined : Math.max(0, characterCount - cast.length);
+  const castRules = [
+    cast.length
+      ? `The writer has already created these characters. Include EVERY one in "characters" with exactly this name. Where an appearance is given, copy it unchanged; where it is empty, write one that fits the story:\n${JSON.stringify(cast.map(({ name, appearance }) => ({ name, appearance })))}`
+      : "",
+    invented === undefined
+      ? ""
+      : invented
+        ? `The story has exactly ${characterCount} characters in total: ${cast.length ? `the ${cast.length} above plus ${invented} you create` : `${invented} you create`}.`
+        : `Use ONLY the characters listed above. Do not add anyone else.`,
+  ].filter(Boolean).join("\n");
+  const names = new Set(cast.map((character) => character.name.trim().toLowerCase()));
+  // A wrong count is sent back through the self-correcting retry like any
+  // other contract breach, rather than quietly accepted.
+  const schema = filmScriptSchema
+    .refine((script) => !sceneCount || script.scenes.length === sceneCount, `Produce exactly ${sceneCount} scenes.`)
+    .refine((script) => [...names].every((name) => script.characters.some((item) => item.name.trim().toLowerCase() === name)),
+      "Include every character the writer created, with the same name.")
+    .refine((script) => characterCount === undefined || script.characters.length === Math.max(characterCount, cast.length),
+      `List exactly ${characterCount} characters.`);
   const prompt = `You are a story director building a short story with a writer. Respond in JSON ONLY matching: {"title":"...","premise":"...","world":"visual style and setting","characters":[{"name":"...","appearance":"visible visual details"}],"scenes":[{"title":"...","visualAction":"...","characters":["names"],"dialogues":[{"character":"name","text":"line"}],"shots":[{"visualAction":"...","lines":[1]}]}]}.
 
 ${scriptRules(language, seconds)}
 
-Produce ${input.sceneCount ? `${input.sceneCount} scenes` : "between 3 and 6 scenes"}. Give every character a concrete appearance: hair, build, clothing and one distinctive detail, so the same person can be drawn repeatedly.
+Produce ${sceneCount ? `exactly ${sceneCount} scene${sceneCount === 1 ? "" : "s"}` : "between 3 and 6 scenes"}. Give every character a concrete appearance: hair, build, clothing and one distinctive detail, so the same person can be drawn repeatedly.
+${castRules}
 
 ${capabilities(language, seconds)}
 ${INJECTION_GUARD}
@@ -218,7 +271,7 @@ ${INJECTION_GUARD}
 Current project: ${projectContext(input.state)}
 ${input.sourceScript ? `The writer supplied this existing script. Preserve its characters, order and intent; restructure it into scenes rather than replacing it:\n${input.sourceScript}` : `The writer's idea:\n${input.idea}`}`;
 
-  const script = await askTyped(filmScriptSchema, prompt);
+  const script = await askTyped(schema, prompt);
   if (language === "ur") {
     const problem = urduScriptProblem([
       script.title,
@@ -361,11 +414,12 @@ state.title = script.title;
         const existing = matchable.get(key(incoming.name));
         if (existing && !claimed.has(existing.id)) {
           claimed.add(existing.id);
-          // A locked appearance was reviewed by the user; the model does not
-          // get to overwrite it.
+          // A locked appearance, one the writer typed, or one read from their
+          // photo was reviewed by the user; the model only fills a blank.
+          const reviewed = existing.locked || existing.origin === "user" || characterReferences(existing).length > 0;
           return {
             ...existing,
-            appearance: existing.locked ? existing.appearance : incoming.appearance,
+            appearance: reviewed && existing.appearance.trim() ? existing.appearance : incoming.appearance,
           };
         }
         return {
@@ -380,13 +434,15 @@ state.title = script.title;
       const preserved = state.characters.filter(
         (character) =>
           !claimed.has(character.id) &&
-          (character.locked || characterReferences(character).length > 0),
+          (character.locked || character.origin === "user" || characterReferences(character).length > 0),
       );
       for (const character of preserved)
         notices.push(
           ambiguous.has(key(character.name))
             ? `"${character.name}" names more than one character here, so the new script was not matched onto it. Its references are kept; rename to keep them apart.`
-            : `The new script does not include "${character.name}". Its reference views are kept, unused.`,
+            : characterReferences(character).length
+              ? `The new script does not include "${character.name}". Its reference views are kept, unused.`
+              : `The new script does not include "${character.name}". They are kept; add them to a scene's cast in Step 2.`,
         );
       state.characters = [...rebuilt, ...preserved];
 

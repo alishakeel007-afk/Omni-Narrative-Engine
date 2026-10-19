@@ -122,6 +122,42 @@ class StudioError extends Error {
   assert.equal((await workflow({ revision: 99 })).status, 400, "Unknown fields are rejected");
   assert.equal((await workflow({ format: "portrait" })).status, 400, "Only supported formats are offered");
 
+  // --- story size chosen in Setup -----------------------------------------
+  state = (await (await workflow({ storyPlan: { sceneCount: 5, characterCount: 3 } })).json()).state;
+  assert.deepEqual(state.storyPlan, { sceneCount: 5, characterCount: 3 });
+  // One count changes without resetting the other.
+  state = (await (await workflow({ storyPlan: { sceneCount: 4 } })).json()).state;
+  assert.deepEqual(state.storyPlan, { sceneCount: 4, characterCount: 3 });
+  // null hands the decision back to Omni.
+  state = (await (await workflow({ storyPlan: { characterCount: null } })).json()).state;
+  assert.deepEqual(state.storyPlan, { sceneCount: 4 });
+  assert.equal((await workflow({ storyPlan: { sceneCount: 0 } })).status, 400);
+  assert.equal((await workflow({ storyPlan: { sceneCount: 13 } })).status, 400, "Scenes are capped at the script limit");
+  assert.equal((await workflow({ storyPlan: { sceneCount: 2.5 } })).status, 400);
+  assert.equal((await workflow({ storyPlan: { extras: 2 } })).status, 400, "Unknown plan fields are rejected");
+
+  // Characters named in Setup count towards the cast.
+  await workflow({ storyPlan: { characterCount: 1 } });
+  state = (await (await post({ action: "createCharacter", name: "Rohan" })).json()).state;
+  state = (await (await post({ action: "createCharacter", name: "Samir" })).json()).state;
+  assert.equal(state.characters.length, 2);
+  assert.equal(state.storyPlan.characterCount, 2, "Adding past the planned count raises it");
+  response = await workflow({ storyPlan: { characterCount: 1 } });
+  assert.equal(response.status, 400, "The count cannot drop below the characters already set up");
+  assert.match((await response.json()).error, /already have 2 characters/);
+  assert.equal(saved.storyPlan.characterCount, 2, "A refused count changes nothing");
+  // A pasted script's names become the writer's cast, without duplicates.
+  assert.equal((await post({ action: "detectCast" })).status, 400, "Detection needs a script");
+  saved = { ...saved, sourceScript: "ROHAN enters the hostel. SAMIR waves. DEEPAK, in a red cap, watches from the stairs." };
+  scriptReply = { characters: [{ name: "Rohan", appearance: "" }, { name: "Deepak", appearance: "Red cap" }, { name: "Narrator", appearance: "" }] };
+  response = await post({ action: "detectCast" });
+  state = (await response.json()).state;
+  assert.deepEqual(state.characters.map((item) => item.name), ["Rohan", "Samir", "Deepak"], "Existing names are not duplicated and a narrator is never cast");
+  assert.equal(state.characters[2].appearance, "Red cap");
+  assert.equal(state.characters[2].origin, "user");
+  assert.equal(state.storyPlan.characterCount, 3, "The planned count grows to fit the script's cast");
+  saved = { ...saved, characters: [], storyPlan: undefined, sourceScript: "" };
+
   // --- ownership ----------------------------------------------------------
   user = null;
   assert.equal((await workflow({ step: "setup" })).status, 401);
