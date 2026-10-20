@@ -1,100 +1,114 @@
 # Omni-Narrative Engine
 
-A cinematic Next.js frontend for an AI-powered multimedia storytelling platform.
+A Next.js storytelling studio with four steps: Setup, Script & Characters,
+Generate Video, and Edit & Export. The homepage includes a guest story demo.
+Saved projects are available at `/dashboard` and `/film/[id]` (`/story/[id]`
+also opens the project flow).
 
-## Stack
+## Local setup
 
-- Next.js App Router
-- React
-- Tailwind CSS
-- TypeScript
-- Prisma ORM
-- Supabase PostgreSQL and Supabase Storage
+Requirements: Node.js/npm, Supabase PostgreSQL and Storage, and configured model
+providers. Use `.env.example` as a configuration reference and keep private
+values in `.env.local`.
 
-## Pages
-
-- `/` Landing page
-- `/setup` Story setup wizard
-- `/story` Main interactive story experience
-- `/video` Scenario-to-movie module with Gemini story generation and dialogue voice output
-- `/dashboard` User dashboard
-
-## Key Frontend Features
-
-- Guided story mode and custom story mode
-- Hybrid choice flow with AI options plus free-text user action
-- Story memory timeline modal
-- Character consistency panel
-- Generated media panel
-- Backend API route for Gemini scene generation and multi-character Deepgram dialogue voices
-- Database-ready story projects with multiple draft versions
-- Character image and voice-sample metadata for personalized media generation
-- Supabase Storage metadata for generated images, audio, and short MVP videos
-
-## Database And Storage
-
-The MVP uses Supabase in two parts:
-
-- Supabase PostgreSQL stores users, story projects, drafts, characters, scenes, choices, memories, media metadata, and video-generation jobs.
-- Supabase Storage stores uploaded character photos, recorded voice samples, generated audio, generated images, and short video outputs.
-
-Prisma reads the Supabase PostgreSQL connection string from `DATABASE_URL`.
-
-## Video Voice Casting
-
-The `/video` module asks Gemini to label each dialogue line with a character voice archetype
-such as `hero_male`, `hero_female`, `villain_male`, `villain_female`, `mentor_male`,
-`mentor_female`, `young_male`, `young_female`, or `creature_robot`.
-The backend maps those archetypes to distinct Deepgram Aura-2 voice models and keeps the
-same character on the same voice across scenes.
-Users can select multiple genres and multiple tones. Gemini assigns each scene its own
-`sceneGenre` and `sceneTone`, while each dialogue line receives a situation-specific
-`delivery` and `voiceTone`. The backend lightly adjusts punctuation and pauses before
-Deepgram synthesis so suspenseful lines, funny lines, emotional lines, and heroic lines
-have different pacing while preserving the character's base voice identity.
-
-## AI API Keys
-
-The backend reads these server-side values from `.env.local`:
-
-```bash
-DATABASE_URL=your_supabase_postgres_connection_string
-DIRECT_URL=your_supabase_direct_connection_string_for_prisma_migrations
-JWT_SECRET=your_random_64_character_session_secret
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-RESEND_API_KEY=your_resend_api_key
-EMAIL_FROM="Omni Narrative <onboarding@resend.dev>"
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-GEMINI_API_KEY=your_gemini_key
-GEMINI_MODEL=gemini-2.5-flash
-DEEPGRAM_TTS_API_KEY=your_deepgram_key
-DEEPGRAM_TTS_MODEL=aura-2-thalia-en
-```
-
-For compatibility with the current prototype, the API route also accepts the existing
-`.env.example` labels `gemini llm api key` and `deepgramtts`.
-
-## Run Locally
-
-```bash
-npm install
+```powershell
+npm ci
 npm run prisma:generate
+npm run prisma:deploy
 npm run dev
 ```
 
-To apply the schema to a fresh Supabase project:
+`npm run dev` starts Next.js and the scene queue worker. Both processes are needed
+for queued generation and archival. For production, build with `npm run build`,
+run `npm start`, and run `npm run studio:worker` as a separate persistent process.
 
-```bash
-npm run prisma:migrate
+Database connections use `DATABASE_URL`. Supabase connections verify TLS against
+`certs/prod-ca-2021.crt`; `SUPABASE_DB_CA_PATH` can specify a different trusted CA.
+Keep this certificate in deployments. Its official source is
+[Supabase's certificate distribution](https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt).
+
+## Video worker
+
+The native LTX 2.5 service runs on Modal. Local Python tooling uses `.venv-modal`;
+model weights and worker artifacts reside in persistent Modal volumes.
+
+```powershell
+python -m venv .venv-modal
+.\.venv-modal\Scripts\python.exe -m pip install -r workers/video/requirements.txt
 ```
 
-If the Supabase database password contains special characters such as `@`, encode them in both URLs.
-For example, `my@pass` becomes `my%40pass`.
+Configure the Modal secrets `my-huggingface-secret` (`HF_TOKEN`) and
+`ltx25-api-secret` (`STUDIO_LTX_TOKEN`), then prepare and deploy:
 
-## Build
-
-```bash
-npm run build
+```powershell
+.\.venv-modal\Scripts\python.exe -X utf8 -m modal run workers/video/app.py --download
+.\.venv-modal\Scripts\python.exe -X utf8 -m modal deploy workers/video/app.py
 ```
+
+The server configuration includes:
+
+```ini
+STUDIO_VIDEO_BACKEND=modal-ltx
+STUDIO_LTX_URL=https://YOUR-DEPLOYED-WORKER.modal.run
+STUDIO_LTX_TOKEN=your-private-worker-token
+STUDIO_CLIP_SECONDS=5,10,15,20
+STUDIO_CLIP_MAX_SECONDS=20
+```
+
+Restart the web server and scene worker after changing their configuration.
+Worker `/health` reports supported frame counts without starting the GPU.
+The native worker supports up to 481 frames at 24 fps for the enabled lengths;
+the app checks longer requests against its reported capability. Actual output
+duration is measured. English clips include a single mixed native soundtrack.
+Urdu/audio-conditioned generation remains disabled pending usable-output
+validation. Voice cloning and separate native dialogue/music stems are unavailable.
+
+Render retries preserve accepted provider IDs and stable request IDs to avoid
+duplicate submissions. Unknown interrupted submissions require provider review.
+Take deletion coordinates application storage and native worker artifact cleanup.
+Do not delete model volumes when cleaning render artifacts.
+
+## Character and reference workflow
+
+Characters can have optional gender, age, nationality, ethnicity/community,
+religion and clothing preferences, including custom values. Saved choices take
+priority over creative defaults; names and uploaded faces do not establish
+religion or nationality. Omni fills blank unreferenced appearance profiles when
+directing, while preserving authored descriptions and reference identities.
+
+Scenes without character reference photos can generate video directly. Scenes
+with character references require a scene image, either checked successfully or
+explicitly accepted with **Skip check and use this image**. That approval retains
+the original review result and is bound to the current image and requirements.
+
+Pakistan-focused creative guidance fills missing context only. Explicit setting,
+clothing, head-covering and other requirements override defaults. Regional notes
+draw on [Pakistan's official cultural overview](https://mofa.gov.pk/mazar-e-sharif-culture),
+[UNESCO's Lahore heritage reference](https://whc.unesco.org/en/list/171/),
+[UNESCO's Makli/Thatta reference](https://whc.unesco.org/en/list/143/) and
+[Gilgit-Baltistan's tourism department](https://www.visitgilgitbaltistan.gov.pk/categories/posts/3/8).
+
+## Checks
+
+```powershell
+npm run test:studio
+npm run test:studio:character-details:browser
+npm run test:studio:reference:browser
+npm run test:studio:dialogue:browser
+npm run test:studio:controls:browser
+npm run test:worker
+npx tsc --noEmit --incremental false
+```
+
+Browser checks require Chrome. The isolated suites use fixtures and mocked
+providers; the separate live/media scripts can require accounts or paid services.
+
+## Assets and generated files
+
+`public/films/ltx-hero-20s.mp4` is the project's generated 20-second LTX hero with
+native audio; `public/posters/ltx-hero-20s.jpg` is its matching first frame.
+Keep public media and the font license at `public/fonts/Manrope-OFL.txt`.
+
+`.next`, `.next-dev`, `.studio-worker`, `node_modules` and `.venv-modal` are local
+build/runtime directories. Diagnostic screenshots, downloaded documentation and
+scratch render copies are not required source files and are ignored by Git.
