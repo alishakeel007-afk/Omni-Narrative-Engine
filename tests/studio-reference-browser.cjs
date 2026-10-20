@@ -13,19 +13,19 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
 
 (async () => {
   const { EMPTY_STUDIO } = loadTs("types/studio.ts");
-  const { sceneImageRequirements } = loadTs("lib/studio/identity.ts");
+  const { sceneImageRequirements, sceneIdentity } = loadTs("lib/studio/identity.ts");
   const { clipCapability } = loadTs("lib/film/duration.ts");
-  let state = { ...structuredClone(EMPTY_STUDIO), title: "Reference workflow", step: "generate", premise: "A writer waits for an idea at a wooden desk.", characters: [], scenes: [
-    { id: "s1", title: "The study", visualAction: "A writer sits at a desk beside the blue evening window.", description: "A writer sits at a desk beside the blue evening window.", characterIds: [], dialogues: [], takes: [] },
+  let state = { ...structuredClone(EMPTY_STUDIO), title: "Reference workflow", step: "generate", premise: "A writer waits for an idea at a wooden desk.", characters: [{ id: "writer", name: "Writer", appearance: "Dark hair, blue shirt", locked: true, referenceId: "uploaded-photo" }], scenes: [
+    { id: "s1", title: "The study", visualAction: "A writer sits at a desk beside the blue evening window.", description: "A writer sits at a desk beside the blue evening window.", characterIds: ["writer"], dialogues: [], takes: [] },
   ] };
-  const take = (id, verdict) => ({ id, providerId: id, kind: "image", provider: "cloudflare", status: "complete", url: `/${id}.jpg`, prompt: "A writer at a desk", createdAt: new Date().toISOString(), sourceImageRequirements: sceneImageRequirements(state, state.scenes[0]), continuity: {
+  const take = (id, verdict) => ({ id, providerId: id, kind: "image", provider: "cloudflare", status: "complete", url: `/${id}.jpg`, prompt: "A writer at a desk", identity: sceneIdentity(state, state.scenes[0]), createdAt: new Date().toISOString(), sourceImageRequirements: sceneImageRequirements(state, state.scenes[0]), continuity: {
     status: verdict === "match" ? "passed" : "failed", method: "visual-review", checks: [],
     sceneCheck: { verdict, notes: verdict === "match" ? "The writer, desk and window match." : "The generated image shows a beach; the requested desk and window are missing." },
   } });
   state.scenes[0].takes = [take("bad", "mismatch"), take("good", "match")];
   const jobs = [], submissions = [], deletions = [], actions = [];
   state.scenes[0].takes.push({ ...take("bad-video", "mismatch"), kind: "video", url: "/sample.mp4", nativeAudio: true, duration: 10.04 });
-  let selectRequests = 0, failSelection = true, stalePoll = true, initialPollCompleted = false, failImageCleanup = true;
+  let selectRequests = 0, failSelection = true, stalePoll = true, initialPollCompleted = false, failImageCleanup = true, failNextSubmission = false, failQueue = false;
   const bundle = await esbuild.build({ stdin: { contents: `import React from 'react';import {createRoot} from 'react-dom/client';import Film from './screens/FilmStudioScreen';createRoot(document.getElementById('root')).render(<Film/>);`, resolveDir: process.cwd(), loader: "tsx" },
     bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic", banner: { js: "var process={env:{}};" }, define: { "process.env.NODE_ENV": '"production"' },
     plugins: [{ name: "reference-fixtures", setup(build) {
@@ -46,6 +46,7 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
     if (req.url === "/sample.mp4") { res.setHeader("Content-Type", "video/mp4"); res.end(fs.readFileSync("public/films/ltx-hero-20s.mp4")); return; }
     if (req.url.startsWith("/api/studio/project")) {
       if (req.method === "GET") {
+        if (failQueue && req.url.endsWith("/jobs")) { respond({ error: "The queue is temporarily unavailable. Retry shortly." }, 503); return; }
         const snapshot = structuredClone(state);
         if (stalePoll && req.url.endsWith("/jobs")) { stalePoll = false; await sleep(4600); initialPollCompleted = true; }
         respond(req.url.endsWith("/jobs") ? { state: snapshot, jobs } : { state: snapshot, capability: clipCapability() }); return;
@@ -55,13 +56,15 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
       actions.push(`${input.action}:${input.takeId ?? input.kind ?? ""}`);
       if (req.url.endsWith("/jobs")) {
         submissions.push(input); await sleep(1000);
+        if (failNextSubmission) { failNextSubmission = false; respond({ error: "The video could not be queued. Try again." }, 503); return; }
         const job = { id: `job-${submissions.length}`, sceneId: input.sceneId, kind: input.kind, status: "queued", phase: "prepare", cancelRequested: false, createdAt: new Date().toISOString() };
         jobs.push(job); stalePoll = true; respond({ job }, 202); return;
       }
       if (input.action === "select") {
         selectRequests++; await sleep(1400);
         if (failSelection) { failSelection = false; respond({ error: "The reference selection could not be saved. Please retry." }, 503); return; }
-        state = { ...state, revision: state.revision + 1, scenes: state.scenes.map(scene => ({ ...scene, selectedImageId: input.takeId })) };
+        state = { ...state, revision: state.revision + 1, scenes: state.scenes.map(scene => ({ ...scene, selectedImageId: input.takeId,
+          takes: scene.takes.map(take => input.skipCheck && take.id === input.takeId ? { ...take, reviewOverride: { approvedAt: new Date().toISOString(), requirements: sceneImageRequirements(state, scene), sourceUrl: take.url } } : take) })) };
       }
       if (input.action === "scenePatch") state = { ...state, revision: state.revision + 1, scenes: state.scenes.map(scene => ({ ...scene, ...input.patch, outdated: true })) };
       if (input.action === "keepTakes") state = { ...state, revision: state.revision + 1, scenes: state.scenes.map(scene => ({ ...scene, takes: scene.takes.map(take => input.takeIds.includes(take.id) ? { ...take, savedForLater: true } : take) })) };
@@ -104,11 +107,12 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
     await imageStage.getByText("Saved image takes (1)", { exact: true }).click();
     await expect(bad).toBeHidden();
     await videoStage.getByRole("button", { name: "Generate another video", exact: true }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Generate a reference image first" })).toBeVisible();
+    await expect(videoStage.getByRole("alert").filter({ hasText: "scene image first" })).toBeVisible();
     assert.equal(submissions.length, 0, "Video cannot be queued before image approval");
     await good.getByRole("button", { name: "Use this reference", exact: true }).click();
     await expect(page.getByText("Saving your selection…", { exact: true })).toBeVisible({ timeout: 350 });
-    await expect(page.getByRole("alert").filter({ hasText: "reference selection could not be saved" }).first()).toBeVisible();
+    await expect(good.getByRole("alert").filter({ hasText: "reference selection could not be saved" })).toBeVisible();
+    assert.equal(await page.locator(".action-error-toast").count(), 0, "Reference errors are shown beside the clicked take, not duplicated at the page top");
     await good.getByRole("button", { name: "Use this reference", exact: true }).click();
     await expect(good.getByRole("button", { name: "Using this reference" })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("combobox", { name: "Video length", exact: true }).click();
@@ -170,7 +174,63 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     fs.mkdirSync(".run-screenshots", { recursive: true });
     await page.screenshot({ path: ".run-screenshots/reference-first-mobile.png", fullPage: true });
+    // A failed check can be explicitly accepted, without changing its result.
+    jobs.length = 0; stalePoll = false; failSelection = true;
+    state.scenes[0].takes = [{ ...take("skip", "mismatch"), url: "/bad.jpg" }];
+    delete state.scenes[0].selectedImageId; delete state.scenes[0].selectedVideoId; state.revision++;
+    await page.reload();
+    const skipTake = page.locator(".scene-reference-option");
+    await skipTake.getByRole("button", { name: "Skip check and use this image", exact: true }).click();
+    const selectionError = skipTake.getByRole("alert").filter({ hasText: "reference selection could not be saved" });
+    await expect(selectionError).toBeVisible(); await expect(selectionError).toBeInViewport();
+    await expect(page.locator(".action-error-toast")).toHaveCount(0);
+    await skipTake.getByRole("button", { name: "Skip check and use this image", exact: true }).click();
+    await expect(skipTake.getByText("Image check skipped. You chose to use this image.", { exact: true })).toBeVisible();
+    await expect(skipTake.getByRole("button", { name: "Using this reference", exact: true })).toHaveAttribute("aria-pressed", "true");
+    assert.equal(state.scenes[0].takes[0].continuity.status, "failed");
+    assert.ok(state.scenes[0].takes[0].reviewOverride);
+    await page.reload();
+    await expect(skipTake.getByRole("button", { name: "Using this reference", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Generate video", exact: true }).click();
+    await expect(page.getByText(/Video queued using your selected/)).toBeVisible();
+    assert.equal(submissions.at(-1).direct, false);
+    // A character written without an uploaded reference needs no image stage.
+    jobs.length = 0; stalePoll = false;
+    state = { ...state, revision: state.revision + 1, characters: [{ id: "writer", name: "Writer", appearance: "Dark hair and a blue shirt", locked: false }],
+      scenes: [{ id: "s1", title: "The study", description: "A writer closes a book at a desk.", characterIds: ["writer"], dialogues: [], takes: [] }] };
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "1. Reference image", exact: true })).toHaveCount(0);
+    await expect(page.getByText("Add a reference image (optional)", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate reference image", exact: true })).toBeHidden();
+    failNextSubmission = true;
+    const generateDirect = page.getByRole("button", { name: "Generate video", exact: true });
+    await generateDirect.click();
+    const videoError = page.getByRole("region", { name: "Video", exact: true }).getByRole("alert").filter({ hasText: "video could not be queued" });
+    await expect(videoError).toBeVisible(); await expect(videoError).toBeInViewport();
+    await generateDirect.click();
+    await expect(page.getByText(/Video queued directly from your scene/)).toBeVisible();
+    assert.equal(submissions.at(-1).direct, true);
+    assert.equal(submissions.at(-1).kind, "video");
+    // An old optional frame must not trap a writer in image-based generation.
+    jobs.length = 0; stalePoll = false;
+    state.scenes[0].takes = [{ ...take("old", "mismatch"), url: "/bad.jpg", sourceImageRequirements: "old scene" }];
+    state.scenes[0].selectedImageId = "old"; state.revision++;
+    await page.reload();
+    await page.getByRole("checkbox", { name: "Use the selected opening image", exact: true }).uncheck();
+    await generateDirect.click();
+    await expect(page.getByText(/Video queued directly from your scene/)).toBeVisible();
+    assert.equal(submissions.at(-1).direct, true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: ".run-screenshots/direct-video-mobile.png", fullPage: true });
+    // Page-level errors remain visible wherever the writer has scrolled.
+    failQueue = true;
+    await page.evaluate(() => { window.scrollTo(0, document.body.scrollHeight); document.dispatchEvent(new Event("visibilitychange")); });
+    const toast = page.locator(".action-error-toast");
+    await expect(toast).toContainText("queue is temporarily unavailable");
+    await expect(toast).toBeInViewport(); await expect(toast).toHaveCSS("position", "fixed");
+    await toast.getByRole("button", { name: "Dismiss error", exact: true }).click();
+    await expect(toast).toHaveCount(0); failQueue = false;
     assert.deepEqual(errors, []);
-    console.log("PASS: keep/delete choices, persisted collapsed mismatches, icon-only deletion, cleanup before replacement, retryable cleanup, green selection, custom duration dropdown and mobile layout. No provider calls.");
+    console.log("PASS: persisted skip-check approval, nearby in-viewport selection/submit errors, direct generation without cast references, bypassing an optional old frame, keep/delete choices, cleanup retries, green selections, duration dropdown and mobile layout. No provider calls.");
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

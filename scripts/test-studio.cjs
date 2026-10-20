@@ -162,6 +162,7 @@ const SUITES = [
   "tests/studio-ltx.cjs",
   "tests/studio-scene-retry.cjs",
   "tests/studio-reference.cjs",
+  "tests/studio-reference-policy.cjs",
   "tests/studio-take-deletion.cjs",
 ];
 

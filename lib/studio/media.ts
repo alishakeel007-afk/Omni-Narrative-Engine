@@ -23,7 +23,7 @@ import { generationBlockedReason } from "@/lib/film/language";
 import { clipLengthProblem, clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
 import { buildFilmPrompt } from "@/lib/film/prompt";
 import { clipProblem } from "@/lib/film/shots";
-import { referenceTakeProblem } from "@/lib/film/reference";
+import { referenceTakeProblem, sceneReferenceProblem } from "@/lib/film/reference";
 
 export async function magicHour(path: string, body?: object) {
   const key = getEnvValue(["MAGIC_HOUR_API_KEY"]);
@@ -173,6 +173,8 @@ export async function startMedia(
     throw new StudioError(
       "A scene character is missing. Update the cast first.",
     );
+  if (cast.some(character => !character.locked && characterReferences(character).length))
+    throw new StudioError("Review and lock this scene's character references in Script & Characters before generating.");
   if (
     cast.some(
       (character) =>
@@ -189,6 +191,10 @@ export async function startMedia(
     throw new StudioError(
       "A scene with locked character references needs a checked scene image first.",
     );
+  if (kind === "video" && (!direct || cast.some(character => characterReferences(character).length))) {
+    const problem = sceneReferenceProblem(state, scene);
+    if (problem) throw new StudioError(problem);
+  }
   const identity = anchoredCast.map(character => ({ ...identityProfile(character),
     ...(scene.direction?.wardrobe?.[character.id] ? { sceneWardrobe: scene.direction.wardrobe[character.id] } : {}) }));
   let result;
@@ -218,7 +224,6 @@ export async function startMedia(
     );
     const lockedReferences = anchoredCast;
     if (nativeVideoEnabled()) {
-      if (!direct && cast.length && !image?.url) throw new StudioError("Choose a checked scene image first.");
       if (image && !direct) {
         if (!image.url) throw new StudioError("The selected scene image is unavailable.");
         const problem = referenceTakeProblem(state, scene, image);

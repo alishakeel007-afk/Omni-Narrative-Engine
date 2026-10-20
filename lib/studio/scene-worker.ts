@@ -257,7 +257,7 @@ export async function runSceneJob(
         parentTakeId: parent?.id,
         sourceRequirements: snapshot.requirements,
       });
-      if (take.kind === "image" && !take.continuity)
+      if (take.identity?.length && !take.continuity)
         take.continuity = { status: "pending", method: "visual-review" };
       await update({ providerTake: json(take), phase: "poll", error: null });
     };
@@ -449,7 +449,7 @@ export async function runSceneJob(
       await archiveTake(job.workspaceId, job.sceneId, take);
       await update({ providerTake: json(take), phase: "review" });
     }
-    if ((take.identity?.length || take.kind === "image") && take.continuity?.status === "pending") {
+    if (take.identity?.length && take.continuity?.status === "pending") {
       try {
         take.continuity = await reviewTake(job.workspaceId, take, scene);
       } catch (error) {

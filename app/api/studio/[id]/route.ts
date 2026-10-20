@@ -19,6 +19,7 @@ import {
   characterReferences,
   continuityProblem,
   sceneSetContinuityProblem,
+  sceneImageRequirements,
 } from "@/lib/studio/identity";
 import { reviewTake } from "@/lib/studio/continuity";
 import { referenceTakeProblem } from "@/lib/film/reference";
@@ -151,6 +152,7 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("select"),
     sceneId: z.string(),
     takeId: z.string(),
+    skipCheck: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("timeline"),
@@ -926,6 +928,10 @@ export async function POST(req: Request, context: Context) {
         (item) => item.id === body.takeId && item.status === "complete",
       );
       if (!take) throw new StudioError("This take is not ready.");
+      if (body.skipCheck) {
+        if (take.kind !== "image" || !take.url) throw new StudioError("Only a completed image can be approved without its check.");
+        take.reviewOverride = { approvedAt: new Date().toISOString(), requirements: sceneImageRequirements(state, scene!), sourceUrl: take.url };
+      }
       const problem = take.kind === "image" ? referenceTakeProblem(state, scene!, take) : continuityProblem(state, scene!, take);
       if (problem) throw new StudioError(problem);
       delete take.savedForLater;

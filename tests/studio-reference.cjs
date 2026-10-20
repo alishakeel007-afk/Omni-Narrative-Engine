@@ -9,8 +9,13 @@ class StudioError extends Error { constructor(message, status = 400) { super(mes
   const scene = { id: "s", title: "The study", description: "A writer sits at a desk beside a window.", characterIds: [], dialogues: [], takes: [] };
   let state = { ...structuredClone(EMPTY_STUDIO), title: "Film", scenes: [scene] };
   const image = { id: "image", providerId: "image-provider", kind: "image", status: "complete", prompt: "The opening frame", url: "https://demo.supabase.co/storage/v1/object/public/images/reference.png", createdAt: new Date().toISOString() };
-  assert.match(sceneReferenceProblem(state, scene), /Generate a reference image first/);
-  assert.match(referenceTakeProblem(state, scene, image), /Check this reference image/);
+  assert.equal(sceneReferenceProblem(state, scene), undefined, "Scenes without character references can generate video directly");
+  assert.equal(referenceTakeProblem(state, scene, image), undefined, "Optional images do not need approval checks");
+  state.characters = [{ id: "writer", name: "Writer", appearance: "Dark curly hair and a blue shirt", locked: true, referenceId: "uploaded-photo" }];
+  scene.characterIds = ["writer"];
+  image.identity = identity.sceneIdentity(state, scene);
+  assert.match(sceneReferenceProblem(state, scene), /scene image first/);
+  assert.match(referenceTakeProblem(state, scene, image), /check/i);
   image.continuity = { status: "failed", method: "visual-review", checks: [], sceneCheck: { verdict: "mismatch", notes: "The result shows a beach instead of the requested study." } };
   assert.match(referenceTakeProblem(state, scene, image), /beach/);
   image.continuity = { status: "passed", method: "visual-review", checks: [], sceneCheck: { verdict: "match", notes: "The desk, writer and window match." } };
@@ -28,9 +33,9 @@ class StudioError extends Error { constructor(message, status = 400) { super(mes
     "./ltx": { mediaSource: url => ({ url, headers: {} }) },
     fetch: async () => new Response("image", { headers: { "content-type": "image/png" } }),
   });
-  assert.equal((await reviewer.reviewTake("workspace", image, scene)).status, "failed", "Scenario checks also apply with no locked character");
+  assert.equal((await reviewer.reviewTake("workspace", { ...image, identity: [] }, scene)).status, "failed", "An explicitly requested scenario check can run without character references");
   modelResult = { checks: [] };
-  await assert.rejects(() => reviewer.reviewTake("workspace", image, scene), /incomplete result/);
+  await assert.rejects(() => reviewer.reviewTake("workspace", { ...image, identity: [] }, scene), /incomplete result/);
 
   let writes = 0;
   const route = loadTs("app/api/studio/[id]/route.ts", {
@@ -72,7 +77,7 @@ class StudioError extends Error { constructor(message, status = 400) { super(mes
   });
   const selectedId = state.scenes[0].selectedImageId;
   delete state.scenes[0].selectedImageId;
-  await assert.rejects(() => queueApi.enqueueSceneJob("owner", "workspace", { requestId: "request", sceneId: "s", kind: "video", text: "Generate the study", plan: false }), /Generate a reference image first/);
+  await assert.rejects(() => queueApi.enqueueSceneJob("owner", "workspace", { requestId: "request", sceneId: "s", kind: "video", text: "Generate the study", plan: false }), /scene image first/);
   state.scenes[0].selectedImageId = selectedId;
   state.scenes[0].dialogues = [{ id: "too-long", character: "Writer", text: Array(50).fill("word").join(" ") }];
   await assert.rejects(() => queueApi.enqueueSceneJob("owner", "workspace", { requestId: "long-dialogue", sceneId: "s", kind: "video", text: "Generate the study", plan: false }), /spoken words total across all speakers/, "Over-budget dialogue is rejected before any queue transaction or paid render");
@@ -92,5 +97,5 @@ class StudioError extends Error { constructor(message, status = 400) { super(mes
   const restore = await route.POST(new Request("https://app.test/api/studio/workspace", { method: "POST", body: JSON.stringify({ action: "select", sceneId: "s", takeId: "kept-mismatch" }) }), { params: Promise.resolve({ id: "workspace" }) });
   assert.equal(restore.status, 200);
   assert.equal((await restore.json()).state.scenes[0].takes.find(take => take.id === "kept-mismatch").savedForLater, undefined, "Selecting a now-matching saved take restores it to the main view");
-  console.log("PASS: image-first selection guards, scenario mismatches without locked cast, incomplete checks rejected, duration-independent opening images, and actionable selection API failures.");
+  console.log("PASS: conditional image approval, reference-based selection guards, explicit scenario reviews, incomplete checks rejected, duration-independent opening images, and actionable selection API failures.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

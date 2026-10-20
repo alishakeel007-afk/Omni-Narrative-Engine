@@ -2486,3 +2486,8 @@ button[data-color-swatch][aria-pressed="true"] { outline: 2px solid var(--accent
 .decision-jump-menu button:not(:disabled):is(:hover, :focus-visible),
 [role="menu"] [role="menuitem"]:is(:hover, :focus-visible) { background: var(--accent); color: var(--ink); }
 .omni-select-option[aria-disabled="true"] { opacity: .4; cursor: default; }
+.action-error-toast { position: fixed; z-index: 100; right: 20px; bottom: 20px; display: flex; align-items: flex-start; gap: 10px; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; padding: 16px; border: 1px solid var(--ink); border-radius: 12px; background: white; color: var(--ink); box-shadow: 0 8px 32px rgb(0 0 0 / .18); font-size: 14px; overflow-wrap: anywhere; }
+.action-error-toast > svg { flex-shrink: 0; margin-top: 2px; }
+.action-error-toast p { flex: 1; }
+.action-error-toast button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; }
+.action-error-toast button:hover, .action-error-toast button:focus-visible { background: var(--accent); }

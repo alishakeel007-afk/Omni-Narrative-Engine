@@ -5,6 +5,7 @@ import {
   characterReferences,
   sceneRequirements,
   sceneImageRequirements,
+  sceneHasCharacterReferences,
 } from "./identity";
 import { normalizeStudioState, type StudioState, type StudioTake } from "@/types/studio";
 import { clipFrames, clipLengthProblem, generationLockMs, VALIDATED_MAX_FRAMES } from "@/lib/film/duration";
@@ -256,6 +257,8 @@ export async function enqueueSceneJob(
   const cast = loaded.state.characters.filter((character) =>
     scene.characterIds.includes(character.id),
   );
+  if (kind !== "chat" && cast.some(character => !character.locked && characterReferences(character).length))
+    throw new StudioError("Review and lock this scene's character references in Script & Characters before generating.");
   if (
     kind !== "chat" &&
     (cast.length !== scene.characterIds.length ||
@@ -267,11 +270,11 @@ export async function enqueueSceneJob(
     throw new StudioError(
       "A locked character is missing its approved reference image. Add one or unlock that character to generate from its written description.",
     );
-  if (kind === "video" && input.direct === true && cast.length)
+  if (kind === "video" && input.direct === true && sceneHasCharacterReferences(loaded.state, scene))
     throw new StudioError(
-      "Character scenes require a checked reference image. Use reference-based generation to preserve their appearance.",
+      "This scene uses a character reference. Select a scene image after its check, or skip the check and use that image, before generating video.",
     );
-  if (kind === "video") {
+  if (kind === "video" && (input.direct !== true || sceneHasCharacterReferences(loaded.state, scene))) {
     const referenceProblem = sceneReferenceProblem(loaded.state, scene);
     if (referenceProblem) throw new StudioError(referenceProblem);
   }
@@ -497,7 +500,9 @@ export async function publishSceneTake(
       : take.sourceRequirements !== sceneRequirements(state, scene);
     const index = scene.takes.findIndex((item) => item.id === take.id);
     if (index < 0) scene.takes.push(take);
-    else scene.takes[index] = { ...take, ...(scene.takes[index].savedForLater ? { savedForLater: true } : {}) };
+    else scene.takes[index] = { ...take,
+      ...(scene.takes[index].savedForLater ? { savedForLater: true } : {}),
+      ...(scene.takes[index].reviewOverride ? { reviewOverride: scene.takes[index].reviewOverride } : {}) };
     try {
       await saveStudio(loaded, state);
       return true;

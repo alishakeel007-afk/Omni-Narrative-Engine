@@ -73,6 +73,15 @@ export function sceneIdentity(state: StudioState, scene: StudioScene) {
     )
     .map(identityProfile);
 }
+/** Written character profiles alone do not require image approval. */
+export function sceneHasCharacterReferences(state: StudioState, scene: StudioScene) {
+  return state.characters.some(character => scene.characterIds.includes(character.id) && characterReferences(character).length > 0);
+}
+export function imageReviewOverridden(state: StudioState, scene: StudioScene, take: StudioTake) {
+  return take.kind === "image" && !!take.reviewOverride &&
+    take.reviewOverride.sourceUrl === take.url &&
+    take.reviewOverride.requirements === sceneImageRequirements(state, scene);
+}
 export function continuityProblem(
   state: StudioState,
   scene: StudioScene,
@@ -85,10 +94,6 @@ export function continuityProblem(
       : take.sourceRequirements && take.sourceRequirements !== sceneRequirements(state, scene))
   )
     return "This take uses an older scene or story revision. Create a new take from the current requirements.";
-  if (take.continuity?.sceneCheck?.verdict === "mismatch")
-    return `This ${take.kind} does not match the scene: ${take.continuity.sceneCheck.notes} ${take.kind === "image" ? "Regenerate the image before generating video." : "Generate a revised video from an approved reference image."}`;
-  if (take.continuity?.sceneCheck?.verdict === "uncertain")
-    return "The scene match could not be confirmed. Retry the check or regenerate this take before selecting it.";
   const identities = sceneIdentity(state, scene);
   if (!identities.length) return;
   if (
@@ -97,6 +102,11 @@ export function continuityProblem(
       JSON.stringify(identities.map((item) => item.key))
   )
     return "Character references changed or this take predates consistency checks. Generate a new take.";
+  if (imageReviewOverridden(state, scene, take)) return;
+  if (take.continuity?.sceneCheck?.verdict === "mismatch")
+    return `This ${take.kind} does not match the scene: ${take.continuity.sceneCheck.notes} ${take.kind === "image" ? "Regenerate it or choose Skip check and use this image." : "Generate a revised video from an approved reference image."}`;
+  if (take.continuity?.sceneCheck?.verdict === "uncertain")
+    return "The scene match could not be confirmed. Retry the check or choose another take.";
   if (take.continuity?.status !== "passed")
     return take.continuity?.status === "failed"
       ? "Appearance drift was detected. Generate a revised take."

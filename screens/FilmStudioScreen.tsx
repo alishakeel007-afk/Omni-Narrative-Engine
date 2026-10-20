@@ -11,6 +11,7 @@ import { SetupStep } from "@/components/film/setup-step";
 import { ScriptStep } from "@/components/film/script-step";
 import { GenerateStep } from "@/components/film/generate-step";
 import { EditStep } from "@/components/film/edit-step";
+import { ActionErrorToast } from "@/components/ui/action-error-toast";
 import type { ClipCapability } from "@/lib/film/duration";
 import type { FilmBeat, FilmStep, StudioState } from "@/types/studio";
 
@@ -100,7 +101,7 @@ export default function FilmStudioScreen() {
         savedTimer.current = setTimeout(() => setSaveState("idle"), 2000);
         return true;
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "That change could not be saved.");
+        if (!rethrow) setError(cause instanceof Error ? cause.message : "That change could not be saved.");
         setSaveState("failed");
         if (rethrow) throw cause;
         return false;
@@ -267,14 +268,7 @@ export default function FilmStudioScreen() {
         </header>
 
 
-        {error ? (
-          <p
-            role="alert"
-            className="mt-6 rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-medium text-[var(--ink)]"
-          >
-            {error}
-          </p>
-        ) : null}
+        <ActionErrorToast message={error} onDismiss={() => setError("")} />
 
         {notices.length ? (
           <ul
@@ -338,12 +332,12 @@ export default function FilmStudioScreen() {
                 state={state}
                 capability={capability}
                 onState={acceptState}
-                onAssemble={() => act({ action: "assemble" })}
-                onSelect={(sceneId, takeId) => act({ action: "select", sceneId, takeId }, true)}
+                onAssemble={() => act({ action: "assemble" }, true)}
+                onSelect={(sceneId, takeId, skipCheck) => act({ action: "select", sceneId, takeId, ...(skipCheck ? { skipCheck: true } : {}) }, true)}
                 onReview={(sceneId, takeId) => act({ action: "reviewTake", sceneId, takeId }, true)}
                 onScenePatch={(sceneId, patch) => act({ action: "scenePatch", sceneId, patch }, true)}
                 onGoToStep={(step) => void goToStep(step)}
-                onLockAll={() => act({ action: "lockCharacters" })}
+                onLockAll={() => act({ action: "lockCharacters" }, true)}
               />
             ) : (
               <EditStep

@@ -31,6 +31,8 @@ export type StudioDialogue = {
   audioError?: string;
 };
 export type StudioTake = {
+  /** Explicit image approval; does not rewrite the automated review result. */
+  reviewOverride?: { approvedAt: string; requirements: string; sourceUrl: string };
   /** Explicitly kept after a mismatch; shown inside Saved takes. */
   savedForLater?: boolean;
   generationInstructions?: string;

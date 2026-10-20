@@ -7,25 +7,38 @@ this project. Hosted API options are distinguished from the self-hosted worker.
 
 ## User workflow
 
-1. Generate one opening reference image for a scene.
-2. Check its scenario and any locked character references. The image must finish
-   and pass its checks before it can be selected. The page shows concrete mismatch
-   notes, a check retry, additional image instructions, and image regeneration.
-3. Click **Use this reference**. Selection shows progress immediately, then a
-   selected state after the server confirms the save. A blocked or failed click
-   displays an explanation next to the scene.
-4. Choose the video length, optionally add video instructions, and generate the
-   video from the approved image. Review and select the completed video.
+Workflow updated on 21 October 2026:
 
-Video submission is guarded on the server as well as in the page. It no longer
-silently creates an image and proceeds directly into video generation. Scenario
-checks also run for images without locked cast members. Uncertain or unavailable
-checks are distinguished from a confirmed mismatch. A sampled check is not proof
-that every video frame is identical.
+1. A scene without uploaded/approved character references can generate video
+   directly from its script. The optional opening-image controls start collapsed;
+   no image generation or automatic visual approval check is required. References
+   belonging to characters outside the scene's cast do not impose a gate.
+2. A scene with character references first uses a scene image, conditioned on the
+   reviewed, locked character profiles. The page shows concrete scenario/character
+   mismatch notes, a check retry, additional instructions and image regeneration.
+3. Click **Use this reference** after a successful check, or explicitly choose
+   **Skip check and use this image** for a failed, uncertain or unavailable check.
+   Explicit approval is saved separately: the original check result stays intact.
+   It is bound to that image URL and the current image/character requirements;
+   it cannot revive stale images or images made against an obsolete identity.
+4. Choose the video length, optionally add video instructions, and generate the
+   video. With character references the selected scene image is supplied to the
+   video model. Without character references, the writer can also uncheck
+   **Use the selected opening image** to render directly, even if an old optional
+   frame remains selected. Review and select the completed video.
+
+The server enforces the same conditional rules as the page. Video generation
+never silently purchases an image first. Automatic checks run only on takes with
+character-reference conditioning; an explicitly requested scenario check can
+still run independently. A sampled check is not proof that every video frame is
+identical. Generation, selection, check and duration feedback appears beside the
+relevant control. Page-level errors use dismissible, fixed-position notifications
+so the writer does not have to scroll to the header.
 
 New reference images record image-specific requirements. Changing a video's length
 or dialogue does not invalidate an otherwise matching opening image. Visual scene,
-cast, reference or wardrobe changes still do.
+cast, reference or wardrobe changes still do. Those changes also invalidate a
+saved skip-check approval. Late provider updates preserve explicit approval.
 
 ### Writing within a scene's duration
 
@@ -166,9 +179,13 @@ its retry submits a new render.
   Rapid repeated clicks are guarded before React rerenders.
 
 The delayed-response browser regression uses 1–1.4 second simulated requests and
-requires local click feedback within 350 ms. It covers selection failures,
-blocked references, image/video ordering, instructions, duplicate protection and
-mobile layout. It does not claim the network or GPU completes within that time.
+requires local click feedback within 350 ms. It covers conditional reference
+requirements, saved skip-check approvals, direct video without image generation,
+optional image bypass, nearby in-viewport selection/submission errors,
+image/video ordering, instructions, duplicate protection and mobile layout.
+Server/worker regressions verify approval invalidation, real image conditioning,
+late-update preservation and avoiding automatic checks on unreferenced images.
+These checks do not claim the network or GPU completes within that time.
 
 ## Urdu
 
