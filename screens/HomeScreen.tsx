@@ -5,6 +5,7 @@ import { CinematicVideo, PublicMotion } from "@/components/public/cinematic-vide
 import { PublicFooter, PublicHeader } from "@/components/public/public-shell";
 import { HeroSection } from "@/components/hero-section";
 import { GuestWorkflow } from "@/components/public/guest-workflow";
+import type { ClipCapability } from "@/lib/film/duration";
 
 const questions = [
   [
@@ -29,7 +30,7 @@ const questions = [
   ],
 ];
 
-export default function HomeScreen() {
+export default function HomeScreen({ capability }: { capability?: ClipCapability }) {
   return (
     <PublicMotion>
       <div className="public-site">
@@ -59,7 +60,7 @@ export default function HomeScreen() {
               </p>
             </div>
             <div className="public-workflow-grid">
-              <GuestWorkflow embedded />
+              <GuestWorkflow embedded capability={capability} />
             </div>
           </section>
 

@@ -6,7 +6,7 @@ import type { Route } from "next";
 import { Check, Loader2, Lock, RotateCcw } from "lucide-react";
 import { FILM_STEPS } from "@/lib/film/steps";
 import { FILM_LANGUAGES } from "@/lib/film/language";
-import { CLIP_CHOICES, clipCapability } from "@/lib/film/duration";
+import { CLIP_CHOICES, clipCapability, type ClipCapability } from "@/lib/film/duration";
 import {
   STUDIO_ENTRY_LIMIT,
   readStudioEntry,
@@ -69,9 +69,11 @@ type Preview = {
   generationBlocked: string | null;
 };
 
-export function GuestWorkflow({ embedded = false }: { embedded?: boolean }) {
+export function GuestWorkflow({ embedded = false, capability: serverCapability }: { embedded?: boolean; capability?: ClipCapability }) {
   const router = useRouter();
-  const capability = useMemo(() => clipCapability(), []);
+  // The browser cannot read private deployment settings. Use the same server
+  // capability that decides which lengths real generation requests may use.
+  const capability = useMemo(() => serverCapability ?? clipCapability(), [serverCapability]);
   const [draft, setDraft] = useState<Draft>({
     idea: "",
     assist: "guided",
