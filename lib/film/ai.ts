@@ -3,10 +3,11 @@ import { characterReferences } from "@/lib/studio/identity";
 import { z } from "zod";
 import { askModel } from "@/lib/studio/ai";
 import { StudioError } from "@/lib/studio/store";
-import { wordBudget } from "./dialogue";
+import { wordBudget, wordCount } from "./dialogue";
 import { clipSeconds as resolveClipSeconds } from "./duration";
 import { MAX_BEATS } from "./shots";
 import type { FilmAssist, FilmLanguage, StudioState } from "@/types/studio";
+import { spokenDialogue } from "@/types/studio";
 
 const URDU_SCRIPT = /[\u0600-\u06FF]/;
 const LATIN_LETTER = /[A-Za-z]/;
@@ -140,15 +141,16 @@ function scriptRules(language: FilmLanguage, seconds: number) {
   return [
     `Write every scene as "visualAction": what the camera sees - action, setting, blocking, light. It guides the picture and is NEVER spoken aloud.`,
     `Spoken content is ONLY dialogue attributed to a named character.`,
+    `Follow LTX 2.5 shot guidance: use present-tense observable action, one coherent lighting setup, a small clearly identified cast, and one simple camera movement. Prefer a single continuous shot when animating a first-frame image. Do not add camera cuts or extra actions the writer did not request.`,
     `Never produce narration, voiceover, a narrator, an announcer, or prose intended to be read aloud. Never use "Narrator" or "Voiceover" as a character.`,
     `A scene with no dialogue is valid and often good. Leave "dialogues" empty rather than inventing speech.`,
-    `A scene is generated as ONE clip of about ${seconds.toFixed(1)} seconds. Keep each dialogue line under about ${wordBudget(
+    `A scene is generated as ONE clip of about ${seconds.toFixed(1)} seconds. Keep the TOTAL spoken dialogue across ALL speakers within about ${wordBudget(
       language,
       seconds,
-    )} words, and keep a scene's dialogue short enough that all of it fits that one clip. Split a long exchange across scenes rather than writing one long speech.`,
+    )} words per scene, leaving room for action and pauses. This budget is shared, not per line. Split a long exchange across scenes rather than writing one long speech.`,
     language === "ur"
       ? `Urdu clips are lip-synced from one supplied speech track, so give each scene AT MOST ONE dialogue line, spoken by one character. Put a reply in the next scene. Omit "shots" entirely.`
-      : `Optionally give a scene "shots": 2-${MAX_BEATS} cuts inside that one clip, each with its own "visualAction" and the 1-based positions of the scene's dialogue lines it contains. Every line must be assigned to exactly one shot. Use shots when a scene genuinely benefits from a change of angle or a reply in a new framing; omit "shots" for a single continuous take.`,
+      : `Optionally give a scene "shots": 2-${Math.min(MAX_BEATS, 4)} cuts inside that one clip, each with its own "visualAction" and the 1-based positions of the scene's dialogue lines it contains. Every line must be assigned to exactly one shot. Use shots when a scene genuinely benefits from a change of angle or a reply in a new framing; omit "shots" for a single continuous take.`,
     language === "ur"
       ? "Write every audience-facing value - title, premise, scene titles, visual action and dialogue - in Urdu script. Do not use Roman Urdu."
       : "Write in English.",
@@ -325,9 +327,18 @@ export async function assistTurn(input: {
   currentValue?: string;
   message?: string;
   subject?: string;
+  sceneId?: string;
+  dialogueId?: string;
 }): Promise<AssistReply> {
   const language = input.state.language ?? "en";
-  const seconds = resolveClipSeconds(input.state.clipSeconds);
+  const scene = input.state.scenes.find(item => item.id === input.sceneId);
+  const seconds = resolveClipSeconds(scene?.requestedSeconds ?? input.state.clipSeconds);
+  const otherWords = scene ? spokenDialogue(scene).filter(line => !input.dialogueId || line.id !== input.dialogueId)
+    .reduce((total, line) => total + wordCount(line.text), 0) : 0;
+  const remainingWords = Math.max(0, wordBudget(language, seconds) - otherWords);
+  if (input.field === "dialogue" && !remainingWords) {
+    return { reply: `The other lines already use the speech budget for this ${seconds.toFixed(1)}s scene (about ${wordBudget(language, seconds)} words total). Shorten those lines, split the scene, or choose a longer scene before adding more dialogue. Your draft is preserved.`, choices: [], value: null };
+  }
   const guided = input.assist === "guided";
   const prompt = `You are a story director helping a writer at one specific point in their project. Respond in JSON ONLY: {"reply":"one short warm paragraph","choices":[{"label":"short specific title","description":"one or two sentences","message":"the complete value the writer would be choosing"}],"value":"a single proposed value, or null"}.
 
@@ -344,7 +355,7 @@ ${input.message ? `The writer says: ${JSON.stringify(input.message)}` : "Suggest
 Anchor EVERY suggestion in the writer's original rough idea and existing script. Keep their named people, setting, conflict, culture and intent. Never substitute an unrelated story unless explicitly asked. For the idea field, refine the supplied rough idea; only invent new pitches when no story has been supplied. For other fields, propose ONLY that field's value, not a new premise. In guided mode, choices should be different directions within THIS story. Existing locked identities must be preserved. For wardrobe, change only clothing for this scene. For editAdvice, return concise actionable editing advice, never claim edits were executed. For overlayText, propose short editorial text, not an automatic transcript of speech.
 Keep each proposed value within the field limit: title/sceneTitle 160 characters, characterName 100, audience/purpose/tone/genre 500, timeOfDay 200, ending/motivation/relationships 1500, scene direction/wardrobe/background/expression 1000, visualStyle 4000. Choices.message is ONLY the field value, never instructions such as 'Use this title'.
 
-${input.field === "dialogue" ? `Keep any dialogue under about ${wordBudget(language, seconds)} words so it fits a ${seconds.toFixed(1)}-second clip. Dialogue is spoken by a named character; never write narration.` : ""}
+${input.field === "dialogue" ? `Keep each proposed line to at most ${remainingWords} words so it fits a ${seconds.toFixed(1)}-second clip. Other lines already use ${otherWords} words of the scene's shared ${wordBudget(language, seconds)}-word speech budget. Never repeat a whole scene exchange in this one line. Dialogue is spoken by a named character; never write narration.` : ""}
 ${input.field === "visualAction" ? "Describe only what the camera sees. This is never spoken aloud." : ""}
 ${input.field === "background" ? "Describe who else is visible in this scene - extras, a crowd, or nobody - and what they are doing. Background people never speak." : ""}
 ${input.field === "expression" ? "Describe this one character's facial expression and body language in this scene only. Never change their face, age, hair or build." : ""}
@@ -355,7 +366,10 @@ ${INJECTION_GUARD}
 
 Project so far: ${projectContext(input.state)}`;
 
-  const reply = await askTyped(assistReplySchema, prompt);
+  const schema = input.field === "dialogue" ? assistReplySchema.refine(reply =>
+    [reply.value, ...(reply.choices ?? []).map(choice => choice.message)].every(value =>
+      !value || wordCount(value) <= remainingWords), `Keep every proposed dialogue line to at most ${remainingWords} words; the other lines share the clip's speech budget.`) : assistReplySchema;
+  const reply = await askTyped(schema, prompt);
   if (guided && !reply.choices?.length && !reply.value) {
     // Guided must open with something choosable; an empty turn is a failure.
     throw new StudioError(
@@ -408,6 +422,7 @@ export async function directScenes(state: StudioState): Promise<DirectionReply> 
 Rules:
 - Stay true to the writer's original idea, setting, culture and people. Do not change the story.
 - Keep continuity: a place, prop or outfit established in one scene stays the same in later scenes unless the story changes it.
+- Follow LTX 2.5 image-to-video guidance: keep the approved first-frame composition and identities; describe motion and sound rather than inventing a new visual scene. Prefer one camera move and a few plausible actions. For intentional multi-shot scenes prefer two to four shots, explicit prose cuts, recurring subject descriptors and continuous audio. State the actual requested music, ambience and quoted dialogue; never invent speech.
 - Fields under "given" were set by the writer. Keep them and build around them; you may omit them from your answer.
 - Wardrobe and expression are only for that scene's cast, by name, and never change a character's face, age, hair or build.
 - "background" is the extras or crowd in frame, or "Nobody else". Background people never speak.

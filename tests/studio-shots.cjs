@@ -45,20 +45,17 @@ function scene(overrides = {}) {
     ],
   });
   prompt = buildFilmPrompt({ state, scene: sequence, language: "en", clipSeconds: 12 });
-  assert.match(prompt, /ONE continuous 12\.0-second video/, "One video, not several");
-  assert.match(prompt, /cut internally into 2 shots/);
-  assert.match(prompt, /single unbroken piece of footage/);
-  assert.match(prompt, /Do not produce separate clips/);
-  assert.match(prompt, /CUT TO/, "Cuts are explicit");
+  assert.match(prompt, /one 12\.0-second scene/, "One video, not several");
+  assert.match(prompt, /2 connected shots in chronological order/);
+  assert.match(prompt, /A hard cut transitions/, "Cuts are explicit prose");
   assert.doesNotMatch(prompt, /\|/, "Still no pipe separators");
   // Chronological, with times, in the written order.
   assert.ok(
-    prompt.indexOf("Shot 1") < prompt.indexOf("CUT TO") &&
-      prompt.indexOf("CUT TO") < prompt.indexOf("Shot 2"),
+    prompt.indexOf("she pushes the door") < prompt.indexOf("A hard cut") &&
+      prompt.indexOf("A hard cut") < prompt.indexOf("Close on Bilal"),
     "Shots read in order with the cut between them",
   );
-  assert.match(prompt, /Shot 1 — 0\.0s to/);
-  assert.match(prompt, /Shot 2 — .*to 12\.0s/);
+  assert.doesNotMatch(prompt, /Shot \d+ —|\d+\.\ds to \d+\.\ds/, "No numbered shot-list syntax in the conditioning prompt");
   // Recurring character details: the distinguishing phrase is repeated at the
   // speaker in each shot, which is what holds identity across a cut.
   assert.match(prompt, /Ayesha \(Dark suit, long black hair\./);

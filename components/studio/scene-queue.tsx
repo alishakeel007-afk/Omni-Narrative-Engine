@@ -340,6 +340,7 @@ export const SceneQueue = forwardRef<SceneQueueHandle, Props>(
                 {take?.status === "complete" && scene && (
                   <button
                     className="studio-btn primary"
+                    aria-pressed={take.kind === "video" ? scene.selectedVideoId === take.id : scene.selectedImageId === take.id}
                     disabled={!!problem}
                     onClick={() => props.onSelect(scene.id, take)}
                   >

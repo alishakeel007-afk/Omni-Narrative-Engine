@@ -138,6 +138,8 @@ export async function POST(req: Request, context: Context) {
     let state = await merge(user.id, loaded.project.id, (state) => {
       if (state.renderJobs?.some((item) => item.requestId === requestId))
         return;
+      if (exportSignature(state) !== job.sourceSignature)
+        throw new StudioError("The edit changed before export was queued. Review the current clips and try again.", 409);
       if (state.renderJobs?.some((item) => pending.includes(item.status)))
         throw new StudioError(
           "An export is already running. Check its status before starting another.",

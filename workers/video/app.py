@@ -82,7 +82,7 @@ def prepare_models(download: bool = False, audio: bool = False):
 
 @app.cls(image=gpu_image, gpu=os.getenv("LTX_GPU", "A100-80GB"),
          memory=int(os.getenv("LTX_GPU_MEMORY_MB", "98304")),
-         timeout=int(os.getenv("LTX_GPU_TIMEOUT", "1200")), startup_timeout=900,
+         timeout=int(os.getenv("LTX_GPU_TIMEOUT", "1800")), startup_timeout=900,
          min_containers=0, max_containers=1, scaledown_window=30,
          volumes={"/models": models, "/artifacts": artifacts}, secrets=[hf_secret])
 class VideoWorker:
@@ -147,7 +147,7 @@ def render_export(job_id: str, payload: dict):
     return {"id": job_id, "status": jobs[job_id]["status"]}
 
 
-@app.function(image=api_image, secrets=[api_secret], volumes={"/models": models, "/artifacts": artifacts},
+@app.function(image=api_image.env({"LTX_MAX_VIDEO_FRAMES": os.getenv("LTX_MAX_VIDEO_FRAMES", "481")}), secrets=[api_secret], volumes={"/models": models, "/artifacts": artifacts},
               min_containers=0, max_containers=1, timeout=180)
 @modal.concurrent(max_inputs=1)
 @modal.asgi_app()

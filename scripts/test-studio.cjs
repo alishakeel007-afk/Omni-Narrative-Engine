@@ -160,6 +160,9 @@ const SUITES = [
   "tests/studio-consistency.cjs",
   "tests/studio-director.cjs",
   "tests/studio-ltx.cjs",
+  "tests/studio-scene-retry.cjs",
+  "tests/studio-reference.cjs",
+  "tests/studio-take-deletion.cjs",
 ];
 
 // Each suite runs in its own process: some self-run on require and some mutate

@@ -79,11 +79,16 @@ export function continuityProblem(
   take: StudioTake,
 ): string | undefined {
   if (
-    take.stale || (scene.outdated && !take.sourceRequirements) ||
-    (take.sourceRequirements &&
-      take.sourceRequirements !== sceneRequirements(state, scene))
+    take.stale || (scene.outdated && !take.sourceRequirements && !take.sourceImageRequirements) ||
+    (take.kind === "image" && take.sourceImageRequirements
+      ? take.sourceImageRequirements !== sceneImageRequirements(state, scene)
+      : take.sourceRequirements && take.sourceRequirements !== sceneRequirements(state, scene))
   )
     return "This take uses an older scene or story revision. Create a new take from the current requirements.";
+  if (take.continuity?.sceneCheck?.verdict === "mismatch")
+    return `This ${take.kind} does not match the scene: ${take.continuity.sceneCheck.notes} ${take.kind === "image" ? "Regenerate the image before generating video." : "Generate a revised video from an approved reference image."}`;
+  if (take.continuity?.sceneCheck?.verdict === "uncertain")
+    return "The scene match could not be confirmed. Retry the check or regenerate this take before selecting it.";
   const identities = sceneIdentity(state, scene);
   if (!identities.length) return;
   if (
@@ -136,6 +141,17 @@ export function sceneRequirements(state: StudioState, scene: StudioScene) {
     },
     cast: sceneIdentity(state, scene),
   });
+}
+
+/** Changing a video's duration or dialogue does not change its opening image. */
+export function sceneImageRequirements(state: StudioState, scene: StudioScene) {
+  const requirements = JSON.parse(sceneRequirements(state, scene));
+  delete requirements.scene.seconds;
+  delete requirements.scene.requestedSeconds;
+  delete requirements.scene.dialogues;
+  requirements.scene.openingAction = scene.beats?.[0]?.visualAction ?? scene.visualAction ?? scene.description;
+  delete requirements.scene.beats;
+  return JSON.stringify(requirements);
 }
 
 /**

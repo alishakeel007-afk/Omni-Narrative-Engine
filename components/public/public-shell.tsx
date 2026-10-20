@@ -125,7 +125,7 @@ export function PublicFooter({ compact = false }: { compact?: boolean }) {
       </div>
       <div className="public-footer-bottom">
         <span>© 2026 OmniNarrative</span>
-        <span>Made for the storyteller in you.</span>
+        <span className="public-footer-tagline">Made for the storyteller in you.</span>
         <MotionToggle />
       </div>
     </footer>

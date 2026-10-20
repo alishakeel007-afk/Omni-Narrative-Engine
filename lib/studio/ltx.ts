@@ -8,7 +8,19 @@ import type { StudioIdentity, StudioTake } from "@/types/studio";
 export function nativeVideoEnabled() {
   return getEnvValue(["STUDIO_VIDEO_BACKEND"]) === "modal-ltx";
 }
-export async function ltxRequest(path: string, body?: object) {
+// Legacy scene-as-written jobs can rebuild the same request from their saved
+// snapshot. New jobs also save the final input before contacting the worker.
+export function canResumeLtxSubmission(job: {
+  kind: string;
+  phase: string;
+  snapshot: unknown;
+}) {
+  const snapshot = job.snapshot as { plan?: boolean; ltxSubmission?: LtxVideoInput } | null;
+  return job.kind === "video" && job.phase === "submitting" &&
+    nativeVideoEnabled() && !!snapshot &&
+    (!!snapshot.ltxSubmission || snapshot.plan === false);
+}
+export async function ltxRequest(path: string, body?: object, method?: "DELETE") {
   const endpoint = getEnvValue(["STUDIO_LTX_URL"]);
   const token = getEnvValue(["STUDIO_LTX_TOKEN"]);
   if (!endpoint || !token)
@@ -25,17 +37,27 @@ export async function ltxRequest(path: string, body?: object) {
     )
   )
     throw new StudioError("Use HTTPS for the video worker.");
-  const response = await fetch(`${endpoint.replace(/\/$/, "")}${path}`, {
-    method: body ? "POST" : "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    redirect: "error",
-    cache: "no-store",
-    signal: AbortSignal.timeout(45000),
-  });
+  const submitting = path === "/jobs" && !!body;
+  let response: Response;
+  try {
+    response = await fetch(`${endpoint.replace(/\/$/, "")}${path}`, {
+      method: method ?? (body ? "POST" : "GET"),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(submitting ? 120000 : 45000),
+    });
+  } catch (error) {
+    if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name))
+      throw new StudioError(submitting
+        ? "The video worker did not confirm the submission within 120 seconds. Retry this scene to recover the same request."
+        : "The video worker did not respond within 45 seconds. Retry to resume the saved render.", 504);
+    throw error;
+  }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new StudioError(
@@ -137,7 +159,7 @@ export async function exportSourceUrl(url: string) {
     );
   return `${parsed.origin}/storage/v1${data.signedURL}`;
 }
-export async function startLtxVideo(input: {
+export type LtxVideoInput = {
   prompt: string;
   imageUrl?: string;
   identity: StudioIdentity[];
@@ -150,11 +172,19 @@ export async function startLtxVideo(input: {
    * and, once polled, the measured result.
    */
   seconds?: number;
-}): Promise<StudioTake> {
+};
+export async function startLtxVideo(
+  input: LtxVideoInput,
+  onSubmission?: (input: LtxVideoInput) => Promise<void>,
+): Promise<StudioTake> {
   const problem = clipLengthProblem(input.seconds);
   if (problem) throw new StudioError(problem);
   const takeId = randomUUID();
   const numFrames = clipFrames(input.seconds);
+  // Persist the final prompt, image source and stable request ID before any
+  // network work. Retrying must not run the director again or change its input.
+  input = { ...input, requestId: input.requestId || takeId };
+  await onSubmission?.(input);
   const response = await ltxRequest("/jobs", {
     request_id: input.requestId || takeId,
     prompt: input.prompt,

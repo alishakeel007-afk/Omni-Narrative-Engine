@@ -21,6 +21,7 @@ import {
   sceneSetContinuityProblem,
 } from "@/lib/studio/identity";
 import { reviewTake } from "@/lib/studio/continuity";
+import { referenceTakeProblem } from "@/lib/film/reference";
 import { pollQwenImage } from "@/lib/studio/qwen";
 import { pollLtxVideo, nativeVideoEnabled } from "@/lib/studio/ltx";
 import { studioEditSchema, textOverlaySchema } from "@/lib/studio/edits";
@@ -55,6 +56,7 @@ import {
   undo as undoEdit,
 } from "@/lib/film/edit";
 import { listSceneJobs } from "@/lib/studio/scene-jobs";
+import { deleteSceneTake } from "@/lib/studio/take-deletion";
 import type { SceneJob, StudioTake } from "@/types/studio";
 
 export const runtime = "nodejs";
@@ -75,6 +77,8 @@ const directionSchema = z.object({
   expression: z.record(z.string().max(100), z.string().max(1000)).optional(),
 }).strict();
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("keepTakes"), sceneId: z.string().min(1).max(100), takeIds: z.array(z.string().min(1).max(100)).min(1).max(100) }),
+  z.object({ action: z.literal("deleteTake"), sceneId: z.string().min(1).max(100), takeId: z.string().min(1).max(100) }),
   z.object({ action: z.literal("detectCast") }),
   z.object({ action: z.literal("autoDirect"), requestId: z.string().uuid() }),
   z.object({ action: z.literal("answerGenerateAll"), offerId: z.string().uuid() }),
@@ -368,6 +372,10 @@ export async function POST(req: Request, context: Context) {
     } = await (await createClient()).auth.getUser();
     if (!user) throw new StudioError("Unauthorized", 401);
     const body = actionSchema.parse(await req.json());
+    if (body.action === "deleteTake") {
+      const result = await deleteSceneTake(user.id, (await context.params).id, body.sceneId, body.takeId);
+      return NextResponse.json(result, { status: result.error ? 502 : 200 });
+    }
     let loaded = await loadStudio(user.id, (await context.params).id);
     if (
       body.action !== "assist" && loaded.state.operation &&
@@ -400,6 +408,35 @@ export async function POST(req: Request, context: Context) {
         : undefined;
     if ("sceneId" in body && body.sceneId && body.action !== "chat" && !scene)
       throw new StudioError("Scene not found.", 404);
+    if (body.action === "keepTakes") {
+      if (body.takeIds.some(id => !scene!.takes.some(take => take.id === id && take.status === "complete")))
+        throw new StudioError("A take to keep could not be found. Reload the scene and try again.", 404);
+      for (const take of scene!.takes) if (body.takeIds.includes(take.id)) {
+        take.savedForLater = true;
+        if (scene!.selectedImageId === take.id) delete scene!.selectedImageId;
+        if (scene!.selectedVideoId === take.id) delete scene!.selectedVideoId;
+      }
+      return NextResponse.json({ state: await saveStudio(loaded, state), capability: clipCapability() });
+    }
+    if (body.action === "reviewTake") {
+      const take = scene!.takes.find(item => item.id === body.takeId && item.status === "complete");
+      if (!take) throw new StudioError("Wait for this take to finish before checking it.");
+      let continuity: StudioTake["continuity"];
+      try { continuity = await reviewTake(loaded.project.id, take, scene); }
+      catch (cause) {
+        continuity = { method: "visual-review", status: "error", error: cause instanceof Error ? cause.message : "The check could not finish. Retry the check." };
+      }
+      // Review without holding the project's edit lock, then merge just this
+      // result into the latest project so ordinary clicks remain available.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const latest = await loadStudio(user.id, loaded.project.id);
+        const target = latest.state.scenes.find(item => item.id === body.sceneId)?.takes.find(item => item.id === body.takeId);
+        if (!target) throw new StudioError("This take was removed while it was being checked.", 409);
+        target.continuity = continuity;
+        try { return NextResponse.json({ state: await saveStudio(latest, latest.state) }); }
+        catch (cause) { if (!(cause instanceof StudioError && cause.status === 409) || attempt === 2) throw cause; }
+      }
+    }
     const submitChatImage = async (message: StudioMessage) => {
       if (!message.imageRequest)
         throw new StudioError("Image request not found.", 404);
@@ -889,8 +926,9 @@ export async function POST(req: Request, context: Context) {
         (item) => item.id === body.takeId && item.status === "complete",
       );
       if (!take) throw new StudioError("This take is not ready.");
-      const problem = continuityProblem(state, scene!, take);
+      const problem = take.kind === "image" ? referenceTakeProblem(state, scene!, take) : continuityProblem(state, scene!, take);
       if (problem) throw new StudioError(problem);
+      delete take.savedForLater;
       if (take.kind === "image") scene!.selectedImageId = take.id;
       else {
         scene!.selectedVideoId = take.id;
@@ -996,6 +1034,8 @@ export async function POST(req: Request, context: Context) {
       assist = await assistTurn({
         state: { ...state, ...body.context, roughIdea: body.context?.premise ?? state.roughIdea ?? state.premise, creativeBrief: { ...state.creativeBrief, ...body.context?.creativeBrief } },
         assist: state.assist ?? "guided",
+        sceneId: scene?.id,
+        dialogueId: line?.id,
         field: body.field,
         message: body.message,
         currentValue:

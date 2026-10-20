@@ -8,7 +8,7 @@ class StudioError extends Error{constructor(message,status=400){super(message);t
     operation:{id:'another-job',startedAt:new Date().toISOString()},characters:[{id:'hina',name:'Hina',appearance:'Black hair and brown eyes.',locked:true}],
     scenes:[{id:'classroom',title:'The classroom',description:'Hina opens the archive.',visualAction:'Hina opens the archive.',characterIds:['hina'],dialogues:[{id:'line',character:'Hina',text:'These are our stories.'}],takes:[]}]};
   let owner='owner', saves=0, prompt='';
-  const ai=loadTs('lib/film/ai.ts',{'@/lib/studio/store':{StudioError},'@/lib/studio/ai':{askModel:async text=>{prompt=text;state={...state,revision:5,title:'Saved while thinking'};return {reply:'For this classroom, try a slow push in.',choices:[{label:'The archive reveal',message:'Slow push in as Hina opens the village archive.'}]};}}});
+  const ai=loadTs('lib/film/ai.ts',{'@/lib/studio/store':{StudioError},'@/lib/studio/ai':{askModel:async text=>{prompt=text;state={...state,revision:5,title:'Saved while thinking'};return {reply:'For this classroom, try a slow push in.',choices:[{label:'The archive reveal',message:text.includes('You are working on: dialogue')?'We keep these stories.':'Slow push in as Hina opens the village archive.'}]};}}});
   const route=loadTs('app/api/studio/[id]/route.ts',{
     '@/lib/supabase/server':{createClient:async()=>({auth:{getUser:async()=>({data:{user:owner?{id:owner}:null}})}})},
     '@/lib/prisma':{prisma:{}},'@/lib/studio/store':{StudioError,loadStudio:async(user,id)=>{if(user!=='owner'||id!=='project')throw new StudioError('Project not found.',404);return {project:{id,userId:user},state:structuredClone(state)};},saveStudio:async()=>{saves++;throw new Error('A proposal must never save an old snapshot');}},
@@ -22,6 +22,16 @@ class StudioError extends Error{constructor(message,status=400){super(message);t
   assert.equal((await post({action:'assist',field:'camera',sceneId:'other'})).status,404);
   assert.equal((await post({action:'assist',field:'dialogue',sceneId:'classroom',dialogueId:'other'})).status,404);
   assert.equal((await post({action:'assist',field:'wardrobe',sceneId:'classroom',characterId:'other'})).status,404);
+  state.clipSeconds=20;state.scenes[0].requestedSeconds=5;
+  state.scenes[0].dialogues=[{id:'line',character:'Hina',text:'These are our stories.'},{id:'other',character:'Hina',text:'One two three four five six.'}];
+  assert.equal((await post({action:'assist',field:'dialogue',sceneId:'classroom',dialogueId:'line'})).status,200);
+  assert.match(prompt,/at most 4 words so it fits a 5\.0-second clip/,'Scene override and other lines determine the remaining budget');
+  assert.match(prompt,/Other lines already use 6 words/);
+  state.scenes[0].dialogues[1].text='One two three four five six seven eight nine ten.';
+  prompt='no request';
+  const full=await post({action:'assist',field:'dialogue',sceneId:'classroom',dialogueId:'line'});
+  assert.equal(full.status,200);assert.match((await full.json()).assist.reply,/already use the speech budget/);
+  assert.equal(prompt,'no request','No model call when the other lines fill the speech budget');
   owner='intruder';assert.equal((await post({action:'assist',field:'title'})).status,404);owner=null;assert.equal((await post({action:'assist',field:'title'})).status,401);
   const requests=[], bodies=[];
   const model=loadTs('lib/studio/ai.ts',{'@/lib/studio/store':{StudioError},'@/lib/env':{getEnvValue:names=>({GEMINI_API_KEY:'test-gemini',GROQ_API_KEY:'test-groq'})[names[0]]||''},fetch:async (url,init)=>{requests.push(url);bodies.push(init&&init.body);if(url.includes('googleapis'))throw new TypeError('Network unavailable');return new Response(JSON.stringify({choices:[{message:{content:'{"reply":"Use your mountain setting."}'}}]}),{status:200,headers:{'content-type':'application/json'}});}});
@@ -49,5 +59,5 @@ class StudioError extends Error{constructor(message,status=400){super(message);t
   // Another Groq failure is not reported as a rate limit.
   let other;await limited(()=>geminiLimited('8s'),()=>new Response('{}',{status:500})).askModel('Help').catch(error=>{other=error;});
   assert.equal(other.status,502);assert.match(other.message,/backup AI provider is unavailable \(500\)/);
-  console.log('PASS: contextual field assistance, no snapshot writes during concurrent saves, help during media work, scoped ownership/IDs, text fallback on network failure, visual checks falling back to a vision model with every image, and plain rate-limit messages with the provider's retry time. No provider calls were made.');
+  console.log("PASS: contextual field assistance, no snapshot writes during concurrent saves, help during media work, scoped ownership/IDs, text fallback on network failure, visual checks falling back to a vision model with every image, and plain rate-limit messages with the provider's retry time. No provider calls were made.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

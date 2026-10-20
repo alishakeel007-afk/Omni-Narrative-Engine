@@ -8,6 +8,9 @@ import type {
 import { spokenDialogue } from "@/types/studio";
 import { estimateSpokenSeconds } from "./dialogue";
 
+/** Official guidance: https://docs.ltx.io/api-documentation/implementation-guides/prompting-guide */
+export const LTX_PROMPT_GUIDANCE = "Write LTX 2.5 prompts as chronological, present-tense cinematic prose. Establish the shot, scene, concrete action, recurring subjects, camera movement and audio. For image-to-video let the approved opening image define appearance and composition; focus on motion and sound instead of reimagining it. Prefer one continuous shot, one coherent lighting setup and plausible actions. For requested multi-shot scenes prefer two to four shots with explicit prose transitions, repeated subject descriptors and audio continuity. Preserve exact quoted dialogue and named speakers. Add essential titles in post-production. Do not invent speech or add unrequested cuts.";
+
 /**
  * Builds the generation prompt for one clip.
  *
@@ -78,9 +81,7 @@ export function resolveBeats(
 
 function castBlock(cast: StudioCharacter[]) {
   if (!cast.length) return "";
-  return `\nCast appearing in this video:\n${cast
-    .map((character) => `- ${character.name}: ${character.appearance}`)
-    .join("\n")}\n`;
+  return `The cast is ${cast.map(character => `${character.name}, ${character.appearance}`).join("; ")}.`;
 }
 
 function speechLine(
@@ -117,6 +118,7 @@ function audioDirection(
 }
 
 export type FilmPromptInput = {
+  imageConditioned?: boolean;
   state: Pick<StudioState, "world" | "visualStyle" | "characters"> & Partial<Pick<StudioState, "scenes">>;
   scene: StudioScene;
   language: FilmLanguage;
@@ -135,6 +137,7 @@ export function buildFilmPrompt({
   clipSeconds,
   suppliedSpeech = false,
   instructions,
+  imageConditioned = false,
 }: FilmPromptInput) {
   const cast = state.characters.filter((character) => scene.characterIds.includes(character.id));
   const beats = resolveBeats(scene, language, clipSeconds);
@@ -145,25 +148,24 @@ export function buildFilmPrompt({
   const length = clipSeconds.toFixed(1);
 
   const header = multiShot
-    ? `This is ONE continuous ${length}-second video at 24 frames per second, cut internally into ${beats.length} shots. Render it as a single unbroken piece of footage in the order written below. Do not produce separate clips, a split screen, a montage grid or any on-screen titles between shots.`
+    ? `This is one ${length}-second scene at 24 frames per second, with ${beats.length} connected shots in chronological order.`
     : `This is ONE continuous ${length}-second take at 24 frames per second, with no cuts.`;
 
   const body = beats
     .map((beat, index) => {
-      const label = multiShot
-        ? `Shot ${index + 1} — ${beat.startSeconds.toFixed(1)}s to ${beat.endSeconds.toFixed(1)}s.`
-        : "Action.";
-      const speech = beat.lines.map((line) => speechLine(line, cast, language)).join("\n");
-      return `${label}\n${beat.visualAction}${speech ? `\n${speech}` : "\nNo one speaks during this shot."}`;
+      const label = index === 0 ? "The shot opens as" : "A hard cut transitions to the next view as";
+      const speech = beat.lines.map((line) => speechLine(line, cast, language)).join(". ");
+      const returning = multiShot && index > 0 && cast.length ? ` The same ${cast.map(character => `${character.name} (${shortDescriptor(character.appearance)})`).join(" and ")} retain their established appearance; the ambience and score continue across the cut.` : "";
+      return `${label} ${beat.visualAction}${speech ? ` ${speech}.` : " No one speaks during this shot."}${returning}`;
     })
-    .join("\n\nCUT TO —\n\n");
+    .join(" ");
 
   return [
-    `${scene.title}`,
     header,
-    style ? `Visual style: ${style}` : "",
-    castBlock(cast),
-    precedingSceneContext(state, scene),
+    imageConditioned ? "The approved first-frame image establishes the composition, location, faces, wardrobe, props and lighting. Animate that image with the following actions while preserving its established appearance." : "",
+    style && !imageConditioned ? `Visual style: ${style}` : "",
+    imageConditioned ? "" : castBlock(cast),
+    imageConditioned ? "" : precedingSceneContext(state, scene),
     direction,
     body,
     audioDirection(language, hasSpeech, multiShot, suppliedSpeech),
@@ -173,7 +175,7 @@ export function buildFilmPrompt({
     instructions ? `\nDirector's requirements:\n${instructions}` : "",
   ]
     .filter(Boolean)
-    .join("\n")
+    .join(" ").replace(/\s+/g, " ")
     .trim();
 }
 

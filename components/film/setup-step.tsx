@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useState } from "react";
 import type { ClipCapability } from "@/lib/film/duration";
 import { clipCapability } from "@/lib/film/duration";
@@ -7,6 +9,7 @@ import { MAX_STORY_CHARACTERS, MAX_STORY_SCENES, type CreativeBrief, type Studio
 import { CharacterPanel } from "./character-panel";
 import { DecisionFlow, type DecisionPage } from "./decision-flow";
 import { FieldAssist } from "./field-assist";
+import { ScriptLengthGuidance } from "./speech-guidance";
 
 type CharacterHandlers = Pick<Parameters<typeof CharacterPanel>[0], "onCharacter" | "onReference" | "onUpload" | "onVoice" | "onAction">;
 
@@ -40,7 +43,7 @@ export function SetupStep({ projectId, state, busy, capability, onSave, onGenera
   const ready = mode === "script" ? sourceScript.trim().length > 40 : idea.trim().length > 10;
   // Characters added on the cast page always count, even past the number picked.
   const castCount = characterCount === undefined ? undefined : Math.max(characterCount, state.characters.length);
-  const draft = { ...state, premise: idea, roughIdea: idea, title, sourceScript: mode === "script" ? sourceScript : "", visualStyle, creativeBrief: brief, assist: assistMode };
+  const draft = { ...state, premise: idea, roughIdea: idea, title, sourceScript: mode === "script" ? sourceScript : "", visualStyle, creativeBrief: brief, assist: assistMode, clipSeconds: seconds, language };
   const saveAll = () => onSave({ title: title.trim() || "Untitled story", premise: idea,
     sourceScript: mode === "script" ? sourceScript : "", visualStyle, creativeBrief: brief, assist: assistMode, clipSeconds: seconds, language,
     storyPlan: { sceneCount: sceneCount ?? null, characterCount: castCount ?? null } });
@@ -51,7 +54,7 @@ export function SetupStep({ projectId, state, busy, capability, onSave, onGenera
     { id: "idea", title: "What is your story about?", description: "Start rough. A person, a problem, or a moment is enough. Every AI suggestion after this will build on your idea.", ready,
       content: <><div className="mb-4 flex gap-2">{(["idea", "script"] as const).map(item => <button key={item} type="button" className={`guest-pill ${mode === item ? "active" : ""}`} aria-pressed={mode === item} onClick={() => setMode(item)}>{item === "idea" ? "I have an idea" : "I have a script"}</button>)}</div>
         {mode === "idea" ? <><label className="sr-only" htmlFor="story-idea">Story idea</label><textarea id="story-idea" aria-label="Story idea" className="decision-input" rows={6} maxLength={5000} value={idea} onChange={event => setIdea(event.target.value)} placeholder="A young teacher returns to her mountain village and discovers…" />
-          {helper("idea", "develop my idea", idea, setIdea)}</> : <><label className="sr-only" htmlFor="existing-script">Your existing script</label><textarea id="existing-script" className="decision-input" rows={9} value={sourceScript} onChange={event => setSourceScript(event.target.value)} maxLength={24000} placeholder="Paste your script here. We’ll keep your characters and story." /><p className="film-help">We’ll organise your script into scenes while preserving your story.</p></>}
+          {helper("idea", "develop my idea", idea, setIdea)}</> : <><label className="sr-only" htmlFor="existing-script">Your existing script</label><textarea id="existing-script" aria-describedby="script-length-help" className="decision-input" rows={9} value={sourceScript} onChange={event => setSourceScript(event.target.value)} maxLength={24000} placeholder="Paste your script here. We’ll keep your characters and story." /><p className="film-help">We’ll organise your script into scenes while preserving your story.</p><div id="script-length-help"><ScriptLengthGuidance language={language} seconds={seconds} sceneCount={sceneCount} /></div></>}
         <details className="mt-5"><summary className="cursor-pointer text-xs text-[var(--muted)]">How much help from Omni would you like?</summary><div className="mt-3 flex gap-2">{(["guided", "custom"] as const).map(item => <button type="button" key={item} className={`guest-pill ${assistMode === item ? "active" : ""}`} aria-pressed={assistMode === item} onClick={() => setAssistMode(item)}>{item === "guided" ? "Offer me options" : "Follow my direction"}</button>)}</div></details></> },
     { id: "scenes", title: "How many scenes?", description: "Each scene becomes one short video clip. Pick a number, or let Omni choose what fits your story.",
       content: <CountChoice label="Scenes" value={sceneCount} min={1} max={MAX_STORY_SCENES} onChange={setSceneCount} /> },
@@ -79,9 +82,9 @@ export function SetupStep({ projectId, state, busy, capability, onSave, onGenera
     ] as const).map(([field, heading, description]) => ({ id: field, title: heading, description, optional: true,
       content: <><textarea className="decision-input" aria-label={field[0].toUpperCase() + field.slice(1)} rows={3} maxLength={field === "ending" ? 1500 : 500} value={brief[field] ?? ""} onChange={event => setBrief(current => ({ ...current, [field]: event.target.value }))} placeholder="Your answer, or leave open" />{helper(field, `suggest ${field}`, brief[field] ?? "", answer => setBrief(current => ({ ...current, [field]: answer })))}</> })),
     { id: "format", title: "Set the basics", description: "Your story will use landscape video. English generation is currently available.", content: <>
-      <label className="block text-sm font-medium" htmlFor="story-language">Language</label><select id="story-language" className="decision-input mt-2" value={language} onChange={event => setLanguage(event.target.value as "en" | "ur")}><option value="en">English</option><option value="ur" disabled>Urdu — Coming soon</option></select>
+      <label className="block text-sm font-medium" htmlFor="story-language">Language</label><Select id="story-language" aria-label="Language" className="decision-input mt-2" value={language} onChange={event => setLanguage(event.target.value as "en" | "ur")}><option value="en">English</option><option value="ur" disabled>Urdu — Coming soon</option></Select>
       <p className="film-help">Urdu drafts are preserved. Urdu video generation is coming soon.</p>
-      <fieldset className="mt-6"><legend className="text-sm font-medium">Default scene length</legend><div className="mt-3 flex flex-wrap gap-2">{caps.choices.map(choice => <button type="button" key={choice.seconds} disabled={!choice.available} className={`guest-pill ${seconds === choice.seconds ? "active" : ""}`} aria-pressed={seconds === choice.seconds} onClick={() => setSeconds(choice.seconds)}>{choice.seconds}s{choice.available ? "" : " · Coming soon"}</button>)}</div></fieldset></> },
+      <fieldset className="mt-6"><legend className="text-sm font-medium">Default scene length</legend><div className="mt-3 flex flex-wrap gap-2">{caps.choices.map(choice => <button type="button" key={choice.seconds} disabled={!choice.available} className={`guest-pill ${seconds === choice.seconds ? "active" : ""}`} aria-pressed={seconds === choice.seconds} onClick={() => setSeconds(choice.seconds)}>{choice.seconds}s{choice.available ? "" : " · Coming soon"}</button>)}</div></fieldset><ScriptLengthGuidance language={language} seconds={seconds} sceneCount={sceneCount} /></> },
     { id: "review", title: "Ready to shape your scenes?", description: "We’ll use your story and the decisions you made. You can edit every scene and character afterwards.", ready,
       content: <><dl className="story-review"><dt>Story</dt><dd>{title || "Untitled story"}</dd><dt>Your starting point</dt><dd className="whitespace-pre-wrap">{mode === "script" ? sourceScript : idea}</dd><dt>Scenes</dt><dd>{sceneCount ?? "Omni decides"}</dd><dt>Characters</dt><dd>{castCount ?? "Omni decides"}{state.characters.length ? ` · ${state.characters.map(item => item.name).join(", ")}` : ""}</dd>{visualStyle ? <><dt>Visual feel</dt><dd>{visualStyle}</dd></> : null}{Object.entries(brief).filter(([, value]) => value).map(([key, value]) => <div key={key}><dt className="capitalize">{key}</dt><dd>{value}</dd></div>)}</dl>
         {state.scenes.length ? <div className="mt-5 rounded-xl border border-[var(--line)] p-4"><p className="text-sm">Your story already has {state.scenes.length} scenes.</p><button type="button" className="film-text-button mt-2" disabled={busy || rebuilding} onClick={async () => {

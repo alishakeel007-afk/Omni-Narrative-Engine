@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Lock, MessageSquare, Star, Trash2, Unlock, Upload } from "lucide-react";
 import { FieldAssist, AssistedInput } from "./field-assist";
@@ -148,6 +150,12 @@ function CharacterCard({
   const portraitRequest = useRef<string | null>(null);
   const views = character.references ?? [];
   const dirty = name !== character.name || appearance !== character.appearance;
+  const changeReference = async (referenceId: string, operation: "primary" | "remove") => {
+    setBusy(`reference:${referenceId}`); setError("");
+    try { if (!await onReference(character.id, referenceId, operation)) throw new Error("The reference change was not saved. Please try again."); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "The reference could not be changed."); }
+    finally { setBusy(""); }
+  };
 
   const save = async (locked: boolean) => {
     setBusy(locked ? "lock" : "save");
@@ -181,6 +189,7 @@ function CharacterCard({
 
   return (
     <li className="rounded-2xl border border-[var(--line)] p-4">
+      {busy ? <p role="status" aria-live="polite" className="film-action-feedback"><Loader2 size={14} className="animate-spin" aria-hidden />{busy.startsWith("reference:") ? "Updating reference…" : "Working…"}</p> : null}
       <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Character details">
         {([ ["identity", "1. Identity"], ["story", "2. Their story"], ["references", "3. Approve a reference"] ] as const).map(([id, label]) => <button type="button" key={id} className={`guest-pill ${part === id ? "active" : ""}`} aria-pressed={part === id} onClick={async () => { if (dirty && !character.locked) { if (appearance.trim().length < 10 || !name.trim()) { setError("Save a name and appearance before leaving Identity."); return; } if (!await onCharacter(character.id, { name, appearance, locked: false })) return; } setPart(id); }}>{label}</button>)}
       </div>
@@ -316,9 +325,11 @@ function CharacterCard({
                   <div className="mt-1 flex gap-1">
                     <button
                       type="button"
-                      disabled={primary}
+                      disabled={primary || !!busy}
                       aria-label={primary ? "Primary view" : "Make primary"}
-                      onClick={() => void onReference(character.id, view.id, "primary")}
+                      aria-pressed={primary}
+                      data-selection-box
+                      onClick={() => void changeReference(view.id, "primary")}
                       className="rounded-full border border-[var(--line)] p-1 text-[var(--ink)] transition hover:bg-black/[0.04] disabled:bg-[var(--accent)] disabled:opacity-100"
                     >
                       <Star className="h-3 w-3" aria-hidden />
@@ -326,9 +337,10 @@ function CharacterCard({
                     <button
                       type="button"
                       aria-label="Remove view"
+                      disabled={!!busy}
                       onClick={() => {
                         if (window.confirm("Remove this reference view? The character will be unlocked and affected scenes will need review. Existing takes and timeline edits stay saved."))
-                          void onReference(character.id, view.id, "remove");
+                          void changeReference(view.id, "remove");
                       }}
                       className="rounded-full border border-[var(--line)] p-1 text-[var(--ink)] transition hover:bg-black/[0.04]"
                     >
@@ -377,7 +389,7 @@ function CharacterCard({
       {urdu ? (
         <label className="mt-4 block">
           <span className="text-xs font-medium text-[var(--ink)]">Voice</span>
-          <select
+          <Select aria-label="Voice"
             disabled
             title="Urdu video generation and lip-sync are coming soon. Existing voice settings are preserved."
             value={character.voice?.archetype ?? ""}
@@ -395,7 +407,7 @@ function CharacterCard({
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       ) : null}
 

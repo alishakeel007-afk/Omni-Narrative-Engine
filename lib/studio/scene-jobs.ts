@@ -3,19 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { loadStudio, saveStudio, StudioError } from "./store";
 import {
   characterReferences,
-  continuityProblem,
   sceneRequirements,
+  sceneImageRequirements,
 } from "./identity";
-import type { StudioState, StudioTake } from "@/types/studio";
+import { normalizeStudioState, type StudioState, type StudioTake } from "@/types/studio";
 import { clipFrames, clipLengthProblem, generationLockMs, VALIDATED_MAX_FRAMES } from "@/lib/film/duration";
 import { generationBlockedReason } from "@/lib/film/language";
 import { clipProblem } from "@/lib/film/shots";
 import { clipSeconds } from "@/lib/film/duration";
-import { ltxRequest, nativeVideoEnabled } from "./ltx";
+import { canResumeLtxSubmission, ltxRequest, nativeVideoEnabled, type LtxVideoInput } from "./ltx";
+import { sceneReferenceProblem } from "@/lib/film/reference";
 
 export const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 export const activeJobs = ["queued", "waiting", "running"];
 export type JobInput = {
+  instructions?: string;
   requestId: string;
   text: string;
   sceneId?: string;
@@ -36,6 +38,8 @@ export type JobInput = {
   plan?: boolean;
 };
 export type JobSnapshot = {
+  instructions?: string;
+  ltxSubmission?: LtxVideoInput;
   state: StudioState;
   requirements: string;
   key: string;
@@ -104,8 +108,9 @@ export function requestedKind(text: string): "chat" | "image" | "video" {
     ? "image"
     : "video";
 }
-export async function listSceneJobs(userId: string, workspaceId: string) {
-  await loadStudio(userId, workspaceId);
+export async function listSceneJobs(userId: string, workspaceId: string, options: { loaded?: Awaited<ReturnType<typeof loadStudio>>; includeThreads?: boolean } = {}) {
+  if (options.loaded?.project.id !== workspaceId || options.loaded.project.userId !== userId)
+    await loadStudio(userId, workspaceId);
   const [jobs, threads] = await Promise.all([
     prisma.filmSceneJob.findMany({
       where: { workspaceId, userId },
@@ -126,12 +131,29 @@ export async function listSceneJobs(userId: string, workspaceId: string) {
         createdAt: true,
       },
     }),
-    prisma.filmSceneThread.findMany({
+    options.includeThreads === false ? Promise.resolve([]) : prisma.filmSceneThread.findMany({
       where: { workspaceId },
       orderBy: { createdAt: "asc" },
     }),
   ]);
-  return { jobs, threads };
+  // Only uncertain submissions need their private snapshots for recovery.
+  // Completed jobs can contain a whole project snapshot each; never pull all
+  // of those across the database connection on a progress poll.
+  const uncertainIds = jobs.filter(job => job.phase === "submitting" && ["failed", "blocked", "needs_attention"].includes(job.status)).map(job => job.id);
+  const uncertain = uncertainIds.length ? await prisma.filmSceneJob.findMany({
+    where: { id: { in: uncertainIds }, workspaceId, userId },
+    select: { id: true, kind: true, phase: true, snapshot: true },
+  }) : [];
+  return {
+    jobs: jobs.map(job => ({
+      id: job.id, sceneId: job.sceneId, threadId: job.threadId, kind: job.kind,
+      status: job.status, phase: job.phase, text: job.text, error: job.error,
+      result: job.result, dependsOnId: job.dependsOnId, cancelRequested: job.cancelRequested, createdAt: job.createdAt,
+      retryable: ["failed", "blocked", "needs_attention"].includes(job.status) &&
+        (job.phase !== "submitting" || uncertain.some(saved => saved.id === job.id && canResumeLtxSubmission(saved))),
+    })),
+    threads,
+  };
 }
 export async function enqueueSceneJob(
   userId: string,
@@ -208,6 +230,8 @@ export async function enqueueSceneJob(
   // Refused before a job row exists, so an unavailable language or clip length
   // never reaches the worker and never shows up as a queued job that will fail.
   if (kind !== "chat") {
+    if (loaded.state.takeDeletions?.some(item => item.sceneId === scene.id && item.kind === kind && item.pending))
+      throw new StudioError("Finish deleting the old take using Retry deletion before generating a replacement.", 409);
     const unavailable = generationBlockedReason(loaded.state.language);
     if (unavailable) throw new StudioError(unavailable, 503);
     if (kind === "video") {
@@ -247,6 +271,10 @@ export async function enqueueSceneJob(
     throw new StudioError(
       "Character scenes require a checked reference image. Use reference-based generation to preserve their appearance.",
     );
+  if (kind === "video") {
+    const referenceProblem = sceneReferenceProblem(loaded.state, scene);
+    if (referenceProblem) throw new StudioError(referenceProblem);
+  }
   const key = createHash("sha256").update(requirements).digest("hex");
   if (
     parent?.stale ||
@@ -257,6 +285,11 @@ export async function enqueueSceneJob(
     );
   try {
     return await prisma.$transaction(async (tx) => {
+      // Share this short lock with take deletion: a render cannot capture a
+      // reference while another request is reserving its removal.
+      const current = await tx.$queryRaw<{ revision: number }[]>`SELECT "revision" FROM "FilmWorkspace" WHERE "id" = ${workspaceId} AND "userId" = ${userId} FOR UPDATE`;
+      if (!current.length || current[0].revision !== loaded.state.revision)
+        throw new StudioError("This project changed before generation was queued. Review the current scene and try again.", 409);
       const revision = await tx.filmSceneRevision.upsert({
         where: {
           workspaceId_sceneId_key: { workspaceId, sceneId: scene.id, key },
@@ -311,6 +344,7 @@ export async function enqueueSceneJob(
           ]
         : [];
       const snapshot: JobSnapshot = {
+        ...(input.instructions?.trim() ? { instructions: input.instructions.trim() } : {}),
         state: loaded.state,
         requirements,
         key,
@@ -328,40 +362,7 @@ export async function enqueueSceneJob(
           })),
         ],
       };
-      let sequence = (last?.sequence || 0) + 1;
-      const selectedImage = scene.takes.find(
-        (take) =>
-          take.id === scene.selectedImageId && take.status === "complete",
-      );
-      if (
-        kind === "video" &&
-        cast.length &&
-        !snapshot.parent &&
-        !parentJob &&
-        (!selectedImage ||
-          continuityProblem(loaded.state, scene, selectedImage))
-      ) {
-        // Character videos acquire a checked scene image as an explicit job
-        // dependency; its completion never auto-selects it in the project.
-        snapshot.direct = false;
-        const reference = await tx.filmSceneJob.create({
-          data: {
-            workspaceId,
-            userId,
-            sceneId: scene.id,
-            threadId: thread.id,
-            sceneRevisionId: revision.id,
-            requestId: `${input.requestId}:reference`,
-            kind: "image",
-            sequence: sequence++,
-            text: `Create the character-consistent reference frame for this video request: ${input.text}`,
-            snapshot: json(snapshot),
-            dependsOnId,
-            status: dependsOnId ? "waiting" : "queued",
-          },
-        });
-        dependsOnId = reference.id;
-      }
+      const sequence = (last?.sequence || 0) + 1;
       return tx.filmSceneJob.create({
         data: {
           workspaceId,
@@ -443,21 +444,32 @@ export async function changeSceneJob(
         });
     }
   } else {
+    const resumable = canResumeLtxSubmission(job);
     if (
-      !["failed", "blocked"].includes(job.status) ||
-      job.phase === "submitting"
+      !["failed", "blocked", ...(resumable ? ["needs_attention"] : [])].includes(job.status) ||
+      (job.phase === "submitting" && !resumable)
     )
       throw new StudioError(
         "This job cannot be automatically retried. An unconfirmed submission needs a provider-account check before making another render.",
       );
-    await prisma.filmSceneJob.updateMany({
-      where: { id, userId, status: job.status },
-      data: {
-        status: job.dependsOnId ? "waiting" : "queued",
-        phase: job.providerTake ? "poll" : "prepare",
-        cancelRequested: false,
-        error: null,
-      },
+    await prisma.$transaction(async tx => {
+      const current = await tx.$queryRaw<{ state: unknown }[]>`SELECT "state" FROM "FilmWorkspace" WHERE "id" = ${workspaceId} AND "userId" = ${userId} FOR UPDATE`;
+      if (!current.length) throw new StudioError("Project not found.", 404);
+      const state = normalizeStudioState(current[0].state);
+      const snapshot = job.snapshot as unknown as JobSnapshot;
+      const oldScene = snapshot.state.scenes.find(scene => scene.id === job.sceneId);
+      const required = [(job.providerTake as unknown as StudioTake | null)?.id, snapshot.parent?.id, oldScene?.selectedImageId];
+      if (state.takeDeletions?.some(item => required.includes(item.takeId)))
+        throw new StudioError("This generation uses deleted media and cannot be retried. Choose a remaining reference before starting another take.", 409);
+      await tx.filmSceneJob.updateMany({
+        where: { id, userId, status: job.status },
+        data: {
+          status: job.dependsOnId ? "waiting" : "queued",
+          phase: job.providerTake ? "poll" : resumable ? "submitting" : "prepare",
+          cancelRequested: false,
+          error: null,
+        },
+      });
     });
   }
 }
@@ -470,6 +482,7 @@ export async function publishSceneTake(
 ) {
   for (let attempt = 0; attempt < 10; attempt++) {
     const loaded = await loadStudio(userId, workspaceId);
+    if (loaded.state.takeDeletions?.some(item => item.takeId === take.id)) return true;
     if (
       loaded.state.operation &&
       Date.now() - Date.parse(loaded.state.operation.startedAt) <
@@ -479,10 +492,12 @@ export async function publishSceneTake(
     const state = structuredClone(loaded.state);
     const scene = state.scenes.find((scene) => scene.id === sceneId);
     if (!scene) return false;
-    take.stale = take.sourceRequirements !== sceneRequirements(state, scene);
+    take.stale = take.kind === "image" && take.sourceImageRequirements
+      ? take.sourceImageRequirements !== sceneImageRequirements(state, scene)
+      : take.sourceRequirements !== sceneRequirements(state, scene);
     const index = scene.takes.findIndex((item) => item.id === take.id);
     if (index < 0) scene.takes.push(take);
-    else scene.takes[index] = take;
+    else scene.takes[index] = { ...take, ...(scene.takes[index].savedForLater ? { savedForLater: true } : {}) };
     try {
       await saveStudio(loaded, state);
       return true;

@@ -22,6 +22,7 @@ const schema = z.discriminatedUnion("action", [
     // false submits the scene as written, skipping the director's rewrite.
     // The four-step workflow builds its own prompt from the stored scene.
     plan: z.boolean().optional(),
+    instructions: z.string().trim().max(4000).optional(),
   }),
   z.object({ action: z.enum(["cancel", "retry"]), jobId: z.string().uuid() }),
 ]);
@@ -55,10 +56,8 @@ export async function GET(
     } = await (await createClient()).auth.getUser();
     if (!user) throw new StudioError("Unauthorized", 401);
     const id = (await context.params).id;
-    const [queue, loaded] = await Promise.all([
-      listSceneJobs(user.id, id),
-      loadStudio(user.id, id),
-    ]);
+    const loaded = await loadStudio(user.id, id);
+    const queue = await listSceneJobs(user.id, id, { loaded, includeThreads: false });
     return NextResponse.json(
       { ...queue, state: loaded.state },
       { headers: { "Cache-Control": "no-store" } },
@@ -80,7 +79,8 @@ export async function POST(
     const input = schema.parse(await request.json());
     if (input.action === "submit") {
       const job = await enqueueSceneJob(user.id, id, input);
-      return NextResponse.json({ job }, { status: 202 });
+      const { id: jobId, sceneId, threadId, kind, status, phase, text, error, result, dependsOnId, cancelRequested, createdAt } = job;
+      return NextResponse.json({ job: { id: jobId, sceneId, threadId, kind, status, phase, text, error, result, dependsOnId, cancelRequested, createdAt } }, { status: 202 });
     }
     await changeSceneJob(user.id, id, input.jobId, input.action);
     return NextResponse.json({ ok: true });

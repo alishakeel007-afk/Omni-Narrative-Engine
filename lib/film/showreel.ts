@@ -1,47 +1,41 @@
 /**
  * The clips the public pages play behind their copy.
  *
- * These are real output from this project's own pinned pipeline, already in
- * Supabase storage, so the landing page shows what the product actually makes
- * and costs nothing new to run. Overridable per deployment, because a fork will
- * not have these objects.
- *
- * The files referenced here used to be `/films/*.mp4` under `public/`, which
- * never existed in the repository — so the hero video 404'd and the poster
- * showed as a broken image. Anything listed here is verified to exist before
- * being added.
+ * The hero is a local LTX scene with music and its own first-frame poster. The
+ * example scenes are generated output in storage, each with a matching poster.
  */
 export type ShowreelClip = {
   id: string;
   /** Playable MP4 (H.264/AAC, as the exporter writes). */
   src: string;
-  poster: string;
+  poster?: string;
   /** What it is, for the caption under the hero. */
   caption: string;
 };
 
+const HERO: ShowreelClip = {
+  id: "ltx-hero-20s",
+  poster: "/posters/ltx-hero-20s.jpg",
+  src: "/films/ltx-hero-20s.mp4",
+  caption: "A 20-second scene generated with LTX and native stereo audio",
+};
+
 const FALLBACK: ShowreelClip[] = [
   {
-    id: "hero-story",
-    poster: "/posters/emerald-world.jpg",
-    src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/hero-story/hero-story.mp4",
-    caption: "Generated from a written scene",
-  },
-  {
     id: "emerald-world",
-    poster: "/posters/forest-light.jpg",
+    poster: "/posters/emerald-world-frame.jpg",
     src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/emerald-world/emerald-world.mp4",
     caption: "Generated from a reference image",
   },
   {
     id: "forest-light",
-    poster: "/posters/forest-light.jpg",
+    poster: "/posters/forest-light-frame.jpg",
     src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/forest-light/forest-light.mp4",
     caption: "Generated from a written scene",
   },
   {
     id: "final-story",
-    poster: "/posters/emerald-world.jpg",
+    poster: "/posters/final-story-frame.jpg",
     src: "https://yliobvmshbmivwrnsjmp.supabase.co/storage/v1/object/public/generated-videos/studio/public-showreel/final-story/final-story.mp4",
     caption: "Generated from a reference image",
   },
@@ -57,13 +51,13 @@ export function showreel(): ShowreelClip[] {
     .split(",")
     .map((value) => value.trim())
     .filter((value) => /^https:\/\/\S+\.(mp4|webm)$/i.test(value));
-  if (!configured.length) return FALLBACK;
-  return configured.map((src, index) => ({
-    id: `clip-${index}`,
+  if (!configured.length) return [HERO, ...FALLBACK];
+  return [HERO, ...configured.map((src, index) => ({
+    id: FALLBACK[index]?.id ?? `clip-${index}`,
     src,
-    poster: FALLBACK[index]?.poster ?? FALLBACK[0].poster,
+    // A custom video must not briefly show an unrelated default poster.
     caption: FALLBACK[index]?.caption ?? "Generated with OmniNarrative",
-  }));
+  }))];
 }
 
 export function showreelClip(id: string): ShowreelClip {

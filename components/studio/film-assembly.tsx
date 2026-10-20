@@ -1,4 +1,6 @@
 "use client";
+
+import { Select } from "@/components/ui/select";
 import { filmContinuityProblem } from "@/lib/studio/identity";
 
 import { useEffect, useRef, useState } from "react";
@@ -767,7 +769,7 @@ export function FilmAssembly({
             key={id}
             className={`studio-timeline-clip ${at === index ? "active" : ""}`}
           >
-            <button disabled={playing || disabled} onClick={() => setIndex(at)}>
+            <button aria-pressed={at === index} disabled={playing || disabled} onClick={() => setIndex(at)}>
               <p>
                 {at + 1}. {state.scenes.find((item) => item.id === id)?.title}
               </p>
@@ -897,7 +899,7 @@ export function FilmAssembly({
             <div className="studio-mix">
               <label>
                 Vertical position
-                <select
+                <Select aria-label="Vertical position"
                   value={text.y}
                   disabled={playing}
                   onChange={(event) =>
@@ -907,7 +909,7 @@ export function FilmAssembly({
                   <option value={0.08}>Top</option>
                   <option value={0.5}>Center</option>
                   <option value={0.9}>Bottom</option>
-                </select>
+                </Select>
               </label>
               <label>
                 Horizontal position

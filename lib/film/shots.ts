@@ -1,6 +1,6 @@
 import type { FilmLanguage, StudioScene } from "@/types/studio";
 import { spokenDialogue } from "@/types/studio";
-import { sceneSpeechFit, speechBudgetSeconds } from "./dialogue";
+import { sceneSpeechFit, speechBudgetSeconds, wordBudget } from "./dialogue";
 
 /** A scene may be cut into at most this many internal shots. */
 export const MAX_BEATS = 8;
@@ -89,6 +89,6 @@ export function clipProblem(input: {
   if (fit.overBudget)
     return `"${scene.title}" has about ${fit.estimatedSeconds.toFixed(1)}s of dialogue (estimated), more than the ${speechBudgetSeconds(
       clipSeconds,
-    ).toFixed(1)}s that fits a ${clipSeconds.toFixed(1)}s clip. Shorten a line, split the scene, or raise the clip length.`;
+    ).toFixed(1)}s that fits a ${clipSeconds.toFixed(1)}s clip. Aim for about ${wordBudget(language, clipSeconds)} spoken words total across all speakers. Shorten a line, split the scene, or raise the clip length before generating video.`;
   return null;
 }

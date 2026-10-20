@@ -316,6 +316,7 @@ def create_api(jobs, artifacts, models, worker, exporter):
             "audio_models_cached": audio_ready,
             "modes": modes,
             "native_audio": True,
+            "artifact_deletion": True,
             "max_audio_seconds": MAX_AUDIO_SECONDS,
             # Published so the app can read the real caps rather than keep its
             # own copy of them.
@@ -387,9 +388,24 @@ def create_api(jobs, artifacts, models, worker, exporter):
         if get_job(job_id)["status"] != "complete":
             raise HTTPException(409, "Video is not ready")
         artifacts.reload()
-        path = Path(f"/artifacts/{job_id}.mp4")
+        path = Path(ARTIFACTS_DIR) / f"{job_id}.mp4"
         if not path.is_file():
             raise HTTPException(410, "Artifact is no longer available")
         return FileResponse(path, media_type="video/mp4", filename=f"{job_id}.mp4")
+
+    @web.delete("/jobs/{job_id}/file")
+    def delete_file(job_id: str):
+        # Authentication is shared with every route. Keep the request-ID receipt
+        # so a replay cannot spawn a second paid render after its file is removed.
+        with lock:
+            record = get_job(job_id)
+            if record["status"] in {"queued", "rendering"}:
+                raise HTTPException(409, "Wait for this render to finish before deleting its file")
+            artifacts.reload()
+            path = Path(ARTIFACTS_DIR) / f"{job_id}.mp4"
+            path.unlink(missing_ok=True)
+            artifacts.commit()
+            jobs[job_id] = {**jobs[job_id], "file_deleted_at": time.time()}
+            return {"id": job_id, "deleted": True}
 
     return web

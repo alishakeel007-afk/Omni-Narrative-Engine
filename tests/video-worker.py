@@ -230,6 +230,41 @@ class WorkerContracts(unittest.TestCase):
             self.assertEqual(one.json()["id"], two.json()["id"])
             self.assertEqual(len(spawned), 3)
 
+    def test_artifact_deletion_preserves_billing_receipt(self):
+        import tempfile
+        class Volume:
+            commits = 0
+            def reload(self): pass
+            def commit(self): self.commits += 1
+        class Method:
+            def spawn(self, *_): raise AssertionError("Deleting a file must never spawn a render")
+        class Worker:
+            generate = Method()
+        job_id, active_id, request_id = str(uuid4()), str(uuid4()), str(uuid4())
+        payload = service.VideoRequest(request_id=request_id, prompt="A quiet cinematic shot").model_dump(mode="json")
+        fingerprint = service.hashlib.sha256(service.json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        jobs = {job_id: {"id": job_id, "status": "complete"}, active_id: {"id": active_id, "status": "rendering"},
+                f"video:{request_id}": {"id": job_id, "fingerprint": fingerprint, "call_id": "already-rendered"}}
+        volume = Volume()
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"STUDIO_LTX_TOKEN": "test-only"}), patch.object(service, "ARTIFACTS_DIR", directory):
+            path = Path(directory) / f"{job_id}.mp4"
+            path.write_bytes(b"test video bytes")
+            client = TestClient(service.create_api(jobs, volume, volume, Worker, Method()))
+            headers = {"Authorization": "Bearer test-only"}
+            self.assertEqual(client.delete(f"/jobs/{job_id}/file").status_code, 401)
+            self.assertEqual(client.delete(f"/jobs/{active_id}/file", headers=headers).status_code, 409)
+            self.assertEqual(client.delete("/jobs/not-a-uuid/file", headers=headers).status_code, 404)
+            self.assertEqual(client.get(f"/jobs/{job_id}/file", headers=headers).status_code, 200)
+            self.assertEqual(client.delete(f"/jobs/{job_id}/file", headers=headers).status_code, 200)
+            self.assertFalse(path.exists())
+            self.assertEqual(client.get(f"/jobs/{job_id}/file", headers=headers).status_code, 410)
+            self.assertEqual(client.delete(f"/jobs/{job_id}/file", headers=headers).status_code, 200)
+            self.assertIn(f"video:{request_id}", jobs)
+            with patch.object(Path, "exists", return_value=True):
+                replay = client.post("/jobs", headers=headers, json={"request_id": request_id, "prompt": "A quiet cinematic shot"})
+            self.assertEqual(replay.status_code, 202)
+            self.assertEqual(replay.json()["id"], job_id)
+
 
     def test_audio_api_gating_and_idempotency(self):
         jobs, spawned = {}, []

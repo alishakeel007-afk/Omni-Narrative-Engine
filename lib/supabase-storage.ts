@@ -47,12 +47,16 @@ export async function uploadToSupabaseStorage(params: {
 /** Deletes a known server-generated object after its database replacement commits. */
 export async function deleteFromSupabaseStorage(params: { bucket: string; path: string; allowNotFound?: boolean }) {
   const config = requireSupabaseStorageConfig();
-  const response = await fetch(`${config.url}/storage/v1/object/${params.bucket}/${params.path}`, {
+  const response = await fetch(`${config.url}/storage/v1/object/${encodeURIComponent(params.bucket)}`, {
     method: "DELETE",
     headers: {
       apikey: config.serviceRoleKey,
       Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({ prefixes: [params.path] }),
+    signal: AbortSignal.timeout(30000),
+    redirect: "error",
   });
   if (!response.ok && !(params.allowNotFound && response.status === 404)) {
     throw new Error(`Supabase Storage delete failed (${response.status}).`);

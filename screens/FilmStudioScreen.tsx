@@ -37,6 +37,12 @@ export default function FilmStudioScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [attempt, setAttempt] = useState(0);
+  const pendingWrites = useRef(0);
+  const navigation = useRef<FilmStep | null>(null);
+  const acceptState = useCallback((next: StudioState) => {
+    if (pendingWrites.current) return;
+    setState(current => current && current.revision > next.revision ? current : { ...next, step: navigation.current ?? next.step });
+  }, []);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -71,7 +77,11 @@ export default function FilmStudioScreen() {
   // The last project the server returned, for decisions made right after a
   // write, before React has re-rendered with it.
   const saved = useRef<StudioState | null>(null);
-  const act = useCallback((body: Record<string, unknown>): Promise<boolean> => {
+  const act = useCallback((body: Record<string, unknown>, rethrow = false): Promise<boolean> => {
+    const queuedWrite = body.action !== "reviewTake";
+    if (queuedWrite) pendingWrites.current++;
+    setSaveState("saving");
+    setError("");
     const run = async () => {
       if (!id) return false;
       setSaveState("saving"); setError("");
@@ -81,7 +91,8 @@ export default function FilmStudioScreen() {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "That change could not be saved.");
-        setState(result.state);
+        if (body.action === "workflow" && (body.patch as { step?: FilmStep })?.step === navigation.current) navigation.current = null;
+        setState(current => current && current.revision > result.state.revision ? current : { ...result.state, step: navigation.current ?? result.state.step });
         saved.current = result.state;
         if (result.capability) setCapability(result.capability);
         setNotices(result.notices ?? []); setSaveState("saved");
@@ -90,11 +101,15 @@ export default function FilmStudioScreen() {
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "That change could not be saved.");
-        setSaveState("failed"); return false;
+        setSaveState("failed");
+        if (rethrow) throw cause;
+        return false;
       }
     };
-    const next = writes.current.then(run, run);
-    writes.current = next;
+    const next = writes.current.then(run, run).finally(() => { if (queuedWrite) pendingWrites.current--; });
+    // A visual review performs its own merge and must not make navigation and
+    // ordinary edits wait behind a model request.
+    if (body.action !== "reviewTake") writes.current = next;
     return next;
   }, [id]);
   const save = useCallback((patch: Record<string, unknown>) => act({ action: "workflow", patch }), [act]);
@@ -137,7 +152,8 @@ export default function FilmStudioScreen() {
       if (!state || step === state.step) return;
       // Optimistic so navigation never waits on the network; a failed save
       // surfaces its own message and the server stays the source of truth.
-      setState({ ...state, step });
+      navigation.current = step;
+      setState(current => current ? { ...current, step } : current);
       await save({ step });
     },
     [state, save],
@@ -321,10 +337,11 @@ export default function FilmStudioScreen() {
                 projectId={id as string}
                 state={state}
                 capability={capability}
-                onState={setState}
+                onState={acceptState}
                 onAssemble={() => act({ action: "assemble" })}
-                onSelect={(sceneId, takeId) => act({ action: "select", sceneId, takeId })}
-                onReview={(sceneId, takeId) => act({ action: "reviewTake", sceneId, takeId })}
+                onSelect={(sceneId, takeId) => act({ action: "select", sceneId, takeId }, true)}
+                onReview={(sceneId, takeId) => act({ action: "reviewTake", sceneId, takeId }, true)}
+                onScenePatch={(sceneId, patch) => act({ action: "scenePatch", sceneId, patch }, true)}
                 onGoToStep={(step) => void goToStep(step)}
                 onLockAll={() => act({ action: "lockCharacters" })}
               />

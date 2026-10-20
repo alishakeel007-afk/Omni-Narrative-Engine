@@ -19,7 +19,8 @@ export function FieldAssist({ projectId, state, field, label, value = "", sceneI
   const context = { title: state.title, premise: state.premise, sourceScript: state.sourceScript, visualStyle: state.visualStyle, creativeBrief: state.creativeBrief };
   // Blur-saving this same answer can update scene metadata while help is in
   // flight. Cancel only when the actual decision or story context changes.
-  const depends = JSON.stringify([context, sceneId, characterId, dialogueId, value]);
+  const scene = state.scenes.find(item => item.id === sceneId);
+  const depends = JSON.stringify([context, state.clipSeconds, state.language, scene?.requestedSeconds, scene?.dialogues, sceneId, characterId, dialogueId, value]);
   useEffect(() => { assist.cancel(); setResult(undefined); }, [depends, assist.cancel]);
   const ask = async () => {
     setOpen(true); setAcceptError("");
@@ -53,14 +54,21 @@ export function FieldAssist({ projectId, state, field, label, value = "", sceneI
 }
 
 /** Keeps the typed value in the help request even when a blur-save is in flight. */
-export function AssistedInput({ value = "", onSave, inputLabel, rows = 3, ...props }: Omit<ComponentProps<typeof FieldAssist>, "onAccept"> & {
+export function AssistedInput({ value = "", onSave, inputLabel, rows = 3, onDraftChange, describedBy, invalid, ...props }: Omit<ComponentProps<typeof FieldAssist>, "onAccept"> & {
   onSave: (value: string) => Promise<boolean>; inputLabel: string; rows?: number;
+  onDraftChange?: (value: string) => void; describedBy?: string; invalid?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const saveNumber = useRef(0);
-  useEffect(() => setDraft(value), [value]);
+  const priorValue = useRef(value);
+  useEffect(() => {
+    const previous = priorValue.current;
+    priorValue.current = value;
+    // A delayed blur-save must not replace text typed while it was in flight.
+    setDraft(current => current === previous || current === value ? value : current);
+  }, [value]);
   const persist = async (next: string) => {
     if (next === value) return true;
     const request = ++saveNumber.current;
@@ -77,10 +85,10 @@ export function AssistedInput({ value = "", onSave, inputLabel, rows = 3, ...pro
     }
   };
   return <div><label className="block"><span className="text-xs font-medium">{inputLabel}</span>
-    <textarea aria-label={inputLabel} className="decision-input mt-2" rows={rows} value={draft} onChange={event => setDraft(event.target.value)}
+    <textarea aria-label={inputLabel} aria-describedby={describedBy} aria-invalid={invalid || undefined} className="decision-input mt-2" rows={rows} value={draft} onChange={event => { setDraft(event.target.value); onDraftChange?.(event.target.value); }}
       onBlur={() => void persist(draft)} /></label>
-    {saving ? <p className="mt-1 text-xs text-[var(--muted)]">Saving…</p> : null}
+    <p role="status" aria-live="polite" className="mt-1 min-h-4 text-xs text-[var(--muted)]">{saving ? "Saving…" : ""}</p>
     {saveError ? <p className="mt-1 text-xs" role="alert">{saveError}</p> : null}
-    <FieldAssist {...props} value={draft} onAccept={answer => { setDraft(answer); return persist(answer); }} />
+    <FieldAssist {...props} value={draft} onAccept={answer => { setDraft(answer); onDraftChange?.(answer); return persist(answer); }} />
   </div>;
 }

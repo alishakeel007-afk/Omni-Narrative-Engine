@@ -105,3 +105,20 @@ export function sceneSpeechFit(
     lines: spoken.length,
   };
 }
+
+/** Local editor guidance, using exactly the same speech estimate as the render gate. */
+export function sceneSpeechGuidance(
+  scene: Pick<StudioScene, "dialogues">,
+  language: FilmLanguage,
+  clipSeconds: number,
+  availableSeconds: readonly number[] = [],
+) {
+  const fit = sceneSpeechFit(scene, language, clipSeconds);
+  const words = spokenDialogue(scene).reduce((total, line) => total + wordCount(line.text), 0);
+  const budgetWords = wordBudget(language, clipSeconds);
+  const suggestedSeconds = fit.overBudget
+    ? [...availableSeconds].sort((a, b) => a - b).find(seconds =>
+      seconds > clipSeconds && !sceneSpeechFit(scene, language, seconds).overBudget)
+    : undefined;
+  return { ...fit, words, budgetWords, remainingWords: Math.max(0, budgetWords - words), suggestedSeconds };
+}

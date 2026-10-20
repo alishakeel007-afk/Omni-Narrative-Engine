@@ -18,11 +18,12 @@ import {
 import { startQwenImage } from "./qwen";
 import { startCloudflareImage } from "./cloudflare";
 import { imageBackend } from "./image-backend";
-import { audioVideoEnabled, nativeVideoEnabled, startLtxVideo } from "./ltx";
+import { audioVideoEnabled, nativeVideoEnabled, startLtxVideo, type LtxVideoInput } from "./ltx";
 import { generationBlockedReason } from "@/lib/film/language";
 import { clipLengthProblem, clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
 import { buildFilmPrompt } from "@/lib/film/prompt";
 import { clipProblem } from "@/lib/film/shots";
+import { referenceTakeProblem } from "@/lib/film/reference";
 
 export async function magicHour(path: string, body?: object) {
   const key = getEnvValue(["MAGIC_HOUR_API_KEY"]);
@@ -133,7 +134,12 @@ export async function startMedia(
   sceneId: string,
   kind: "image" | "video",
   direct: boolean,
-  options: { instructions?: string; parentReferenceId?: string; requestId?: string } = {},
+  options: {
+    instructions?: string;
+    parentReferenceId?: string;
+    requestId?: string;
+    onLtxSubmission?: (input: LtxVideoInput) => Promise<void>;
+  } = {},
 ): Promise<StudioTake> {
   if (kind === "video") {
     const unavailable = generationBlockedReason(state.language);
@@ -157,11 +163,12 @@ export async function startMedia(
   const failed = [...scene.takes]
     .reverse()
     .find((take) => take.kind === kind && take.continuity?.status === "failed");
-  const corrections = failed?.continuity?.checks
-    ?.filter((check) => check.verdict === "mismatch")
-    .map((check) => check.notes)
-    .join("; ");
-  const prompt = `${basePrompt}${corrections ? `\nCorrect these observed defects from the last rejected take while preserving the approved reference views: ${corrections}` : ""}${options.instructions ? `\nDirector's complete take requirements:\n${options.instructions}` : ""}`;
+  const corrections = [
+    failed?.continuity?.sceneCheck?.verdict === "mismatch" ? failed.continuity.sceneCheck.notes : "",
+    ...(failed?.continuity?.checks?.filter(check => check.verdict === "mismatch").map(check => check.notes) ?? []),
+  ].filter(Boolean).join("; ");
+  const opening = kind === "image" ? "Create ONE coherent opening reference frame for the scene below. Show its starting composition before the main movement begins, with the named cast, setting, lighting and key props. A still image cannot show a whole sequence: use one camera view, never a storyboard, collage, split screen or multiple copies of a character. " : "";
+  const prompt = `${opening}${basePrompt}${corrections ? `\nCorrect these observed defects from the last rejected take while preserving the approved reference views: ${corrections}` : ""}${options.instructions ? `\nDirector's complete take requirements:\n${options.instructions}` : ""}`;
   if (scene.characterIds.length !== cast.length)
     throw new StudioError(
       "A scene character is missing. Update the cast first.",
@@ -214,14 +221,8 @@ export async function startMedia(
       if (!direct && cast.length && !image?.url) throw new StudioError("Choose a checked scene image first.");
       if (image && !direct) {
         if (!image.url) throw new StudioError("The selected scene image is unavailable.");
-        const problem = continuityProblem(state, scene, image);
-        // An unavailable or uncertain visual check should not discard a
-        // legitimate render request. Keep a confirmed mismatch blocked, but
-        // allow the video to proceed and require review before selection/export.
-        const reviewPending = ["pending", "review", "error"].includes(
-          image.continuity?.status || "",
-        );
-        if (problem && !reviewPending) throw new StudioError(problem);
+        const problem = referenceTakeProblem(state, scene, image);
+        if (problem) throw new StudioError(problem);
         if (image.continuityKey ? image.continuityKey !== continuityKey : image.prompt !== basePrompt || lockedReferences.length > 0)
           throw new StudioError("The selected image uses an older scene or character profile. Generate a new scene image first.");
       }
@@ -250,6 +251,7 @@ export async function startMedia(
         .join("\n");
       return startLtxVideo({
         prompt: buildFilmPrompt({
+          imageConditioned: !direct && !!image?.url,
           state,
           scene,
           language,
@@ -261,14 +263,11 @@ export async function startMedia(
         continuityKey,
         requestId: options.requestId,
         seconds: scene.requestedSeconds ?? state.clipSeconds ?? 5,
-      });
+      }, options.onLtxSubmission);
     }
     if (!direct && image) {
       const problem = continuityProblem(state, scene, image);
-      const reviewPending = ["pending", "review", "error"].includes(
-        image.continuity?.status || "",
-      );
-      if (problem && !reviewPending) throw new StudioError(problem);
+      if (problem) throw new StudioError(problem);
       if (
         image.continuityKey
           ? image.continuityKey !== continuityKey

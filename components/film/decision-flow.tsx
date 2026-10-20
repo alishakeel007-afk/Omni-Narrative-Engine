@@ -16,6 +16,15 @@ export function DecisionFlow({ storageKey, pages, onBeforeNext, finish, finishLa
   const [moving, setMoving] = useState(false);
   const [error, setError] = useState("");
   const anchor = useRef<HTMLDivElement>(null);
+  const jump = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!jumpOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!jump.current?.contains(event.target as Node)) setJumpOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [jumpOpen]);
   useEffect(() => {
     try { const saved = localStorage.getItem(storageKey); if (saved) setSelected(saved); } catch { /* storage is optional */ }
   }, [storageKey]);
@@ -40,7 +49,14 @@ export function DecisionFlow({ storageKey, pages, onBeforeNext, finish, finishLa
   };
   return <div className="decision-flow" ref={anchor}>
     <div className="decision-flow-top"><span>Part {index + 1} of {pages.length}{page.optional ? " · Optional" : ""}</span>
-      <div className="decision-jump">
+      <div className="decision-jump" ref={jump}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setJumpOpen(false); }}
+        onKeyDown={event => {
+          if (event.key === "Escape") {
+            setJumpOpen(false);
+            jump.current?.querySelector<HTMLButtonElement>(".decision-jump-trigger")?.focus();
+          }
+        }}>
         <span className="sr-only">Jump to a small step</span>
         <button type="button" className="decision-jump-trigger" aria-haspopup="listbox" aria-expanded={jumpOpen} disabled={moving || busy} onClick={() => setJumpOpen(open => !open)}>{index + 1}. {page.title}<span aria-hidden>v</span></button>
         {jumpOpen ? <div className="decision-jump-menu" role="listbox" aria-label="Jump to a small step">

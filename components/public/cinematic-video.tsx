@@ -97,6 +97,10 @@ export function CinematicVideo({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    setFailed(false);
+  }, [clip.src]);
 
   useEffect(() => {
     const element = container.current;
@@ -129,9 +133,10 @@ export function CinematicVideo({
   return (
     <div ref={container} className={`public-cinema ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={clip.poster} alt="" className="public-cinema-poster" loading={priority ? "eager" : "lazy"} />
+      {clip.poster ? <img src={clip.poster} alt="" className="public-cinema-poster" loading={priority ? "eager" : "lazy"} /> : null}
       {near && canLoad && !failed ? (
         <video
+          key={clip.src}
           ref={video}
           src={clip.src}
           poster={clip.poster}

@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest) {
   const protectedRoutes = ['/dashboard', '/film', '/story', '/account'];
 
   const pathname = request.nextUrl.pathname;
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+  const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
 
   // getUser() above may have refreshed the session onto supabaseResponse. A
   // redirect that does not carry those cookies forward throws the refreshed

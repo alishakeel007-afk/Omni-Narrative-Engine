@@ -162,6 +162,20 @@ function withConfig(values) {
   assert.equal(fit.lines, 2);
   assert.ok(fit.estimatedSeconds > 0);
   assert.equal(fit.overBudget, false, "Two short lines fit a 20s clip");
+  const guidance = dialogue.sceneSpeechGuidance(scene, "en", 5, [20, 10, 15, 5]);
+  assert.equal(guidance.words, 12, "The scene budget counts every speaker, not just one line");
+  assert.equal(guidance.budgetWords, 10);
+  assert.equal(guidance.remainingWords, 0);
+  assert.equal(guidance.overBudget, true);
+  assert.equal(guidance.suggestedSeconds, 10, "Suggest the shortest enabled length that fits");
+  assert.equal(dialogue.sceneSpeechGuidance(scene, "en", 5, [5]).suggestedSeconds, undefined, "Do not recommend unavailable lengths");
+  const boundary = count => ({ dialogues: [{ character: "Ayesha", text: Array(count).fill("word").join(" ") }] });
+  assert.equal(dialogue.sceneSpeechGuidance(boundary(10), "en", 5).overBudget, false);
+  assert.equal(dialogue.sceneSpeechGuidance(boundary(11), "en", 5).overBudget, true);
+  assert.equal(dialogue.sceneSpeechGuidance(boundary(42), "en", 20, [5, 10, 15, 20]).suggestedSeconds, undefined, "Beyond the longest length, shortening or splitting is necessary");
+  assert.equal(dialogue.sceneSpeechGuidance({ dialogues: [] }, "en", 5).remainingWords, 10);
+  assert.equal(dialogue.sceneSpeechGuidance({ dialogues: [{ character: "Narrator", text: long60 }] }, "en", 5).words, 0, "Legacy narration is not spoken");
+  assert.equal(dialogue.sceneSpeechGuidance({ dialogues: [{ character: "Ayesha", text: "One two three four five six seven eight nine." }, { character: "Bilal", text: "Yes." }] }, "en", 5).overBudget, false, "Speakers do not need equal shares");
   assert.equal(
     dialogue.sceneSpeechFit(scene, "en", 2).overBudget,
     true,

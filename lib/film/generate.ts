@@ -98,10 +98,10 @@ export function sceneGeneration(
     (take) => take.kind === "video" && take.status === "complete" && take.url,
   );
   const selected = takes.find((take) => take.id === scene.selectedVideoId);
-  const mine = jobs.filter((job) => job.sceneId === scene.id && job.kind !== "chat");
+  const mine = jobs.filter((job) => job.sceneId === scene.id && job.kind !== "chat").slice().reverse();
   const job =
     mine.find((item) => ACTIVE_JOB.includes(item.status)) ??
-    mine.find((item) => item.status !== "complete") ??
+    mine.find((item) => item.kind === "video") ??
     mine[0];
   const base = { scene, index, takes, job, requestedSeconds };
 

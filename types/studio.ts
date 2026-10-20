@@ -31,6 +31,10 @@ export type StudioDialogue = {
   audioError?: string;
 };
 export type StudioTake = {
+  /** Explicitly kept after a mismatch; shown inside Saved takes. */
+  savedForLater?: boolean;
+  generationInstructions?: string;
+  sourceImageRequirements?: string;
   id: string;
   providerId: string;
   kind: "image" | "video";
@@ -60,6 +64,15 @@ export type StudioTake = {
   sourceRequirements?: string;
   stale?: boolean;
 };
+export type StudioTakeDeletion = {
+  takeId: string;
+  sceneId: string;
+  kind: "image" | "video";
+  deletedAt: string;
+  /** Only retained until storage cleanup succeeds, so interruption is retryable. */
+  pending?: StudioTake;
+  error?: string;
+};
 export type StudioChoice = {
   label: string;
   description?: string;
@@ -81,6 +94,7 @@ export type StudioIdentity = {
   sceneWardrobe?: string;
 };
 export type StudioContinuity = {
+  sceneCheck?: { verdict: "match" | "mismatch" | "uncertain"; notes: string };
   status: "pending" | "passed" | "failed" | "review" | "error";
   checkedAt?: string;
   sampleFps?: number;
@@ -333,6 +347,8 @@ export type StudioState = {
   generateAllOffer?: { id: string; createdAt: string; requestIds: Record<string, string> };
   /** Replaced/deleted scenes retain their immutable media and IDs. */
   archivedScenes?: StudioScene[];
+  /** Small deletion receipts prevent Undo or a late worker from restoring deleted media. */
+  takeDeletions?: StudioTakeDeletion[];
   scriptUndo?: { kind?: "rebuild" | "sceneList" | "character"; scenes: StudioScene[]; characters: StudioCharacter[]; title: string; premise: string; world: string };
   /**
    * Default requested clip length in seconds. The effective value is resolved
@@ -378,6 +394,7 @@ export type SceneThread = {
   parentJobId?: string | null;
 };
 export type SceneJob = {
+  retryable?: boolean;
   id: string;
   sceneId: string;
   threadId: string;
@@ -525,5 +542,18 @@ export function normalizeStudioState(raw: unknown): StudioState {
   state.history = state.history ?? { past: [], future: [] };
   state.step = state.step ?? derivedStep(state);
   state.version = 2;
+  for (const deletion of state.takeDeletions ?? []) discardStudioTake(state, deletion.takeId);
   return state;
+}
+
+/** Remove a deliberately discarded source from saved and undoable views. */
+export function discardStudioTake(state: StudioState, takeId: string) {
+  for (const scene of [...state.scenes, ...(state.archivedScenes ?? []), ...(state.scriptUndo?.scenes ?? [])]) {
+    scene.takes = (scene.takes ?? []).filter(take => take.id !== takeId);
+    if (scene.selectedImageId === takeId) delete scene.selectedImageId;
+    if (scene.selectedVideoId === takeId) delete scene.selectedVideoId;
+  }
+  state.clips = state.clips?.filter(clip => clip.sourceTakeId !== takeId);
+  for (const snapshot of [...(state.history?.past ?? []), ...(state.history?.future ?? [])])
+    snapshot.clips = snapshot.clips.filter(clip => clip.sourceTakeId !== takeId);
 }

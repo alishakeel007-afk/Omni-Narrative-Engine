@@ -1,13 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { EMPTY_STUDIO, normalizeStudioState, type StudioState } from "@/types/studio";
-import { sceneRequirements } from "./identity";
+import { sceneImageRequirements, sceneRequirements } from "./identity";
 import { markStaleClips } from "@/lib/film/edit";
 
 function refreshFreshness(state: StudioState) {
   for (const scene of state.scenes) {
     const requirements = sceneRequirements(state, scene);
     for (const take of scene.takes) {
-      if (take.sourceRequirements) take.stale = take.sourceRequirements !== requirements;
+      if (take.kind === "image" && take.sourceImageRequirements)
+        take.stale = take.sourceImageRequirements !== sceneImageRequirements(state, scene);
+      else if (take.sourceRequirements) take.stale = take.sourceRequirements !== requirements;
     }
   }
   if (state.clips?.length) state.clips = markStaleClips(state, state.clips);

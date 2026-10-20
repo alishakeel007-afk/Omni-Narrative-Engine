@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Type } from "lucide-react";
 import type { StudioTextOverlay, TimelineClip } from "@/types/studio";
@@ -80,7 +82,7 @@ export function OverlayEditor({ clip, length, disabled, onChange }: Props) {
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-xs text-[var(--muted)]">Position</span>
-                  <select
+                  <Select aria-label={`Overlay ${index + 1} position`}
                     value={
                       POSITIONS.find(
                         (option) =>
@@ -100,7 +102,7 @@ export function OverlayEditor({ clip, length, disabled, onChange }: Props) {
                       </option>
                     ))}
                     <option value="custom">Custom</option>
-                  </select>
+                  </Select>
                   <span className="mt-1 flex gap-2">
                     <NumberField
                       label="x"
@@ -145,6 +147,7 @@ export function OverlayEditor({ clip, length, disabled, onChange }: Props) {
                         type="button"
                         disabled={disabled}
                         aria-label={preset.label}
+                        data-color-swatch
                         aria-pressed={text.color.toLowerCase() === preset.value}
                         onClick={() => update(index, { color: preset.value })}
                         style={{ background: preset.value }}

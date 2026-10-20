@@ -4,14 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { askModel, directorReply } from "./ai";
 import { archiveTake, magicHour, startMedia } from "./media";
 import { pollQwenImage } from "./qwen";
-import { pollLtxVideo, mediaSource } from "./ltx";
+import { canResumeLtxSubmission, pollLtxVideo, mediaSource, startLtxVideo } from "./ltx";
 import { reviewTake } from "./continuity";
 import { loadStudio, StudioError } from "./store";
-import { sceneRequirements } from "./identity";
+import { sceneImageRequirements, sceneRequirements } from "./identity";
 import { json, publishSceneTake, type JobSnapshot } from "./scene-jobs";
 import type { StudioTake } from "@/types/studio";
 import type { FilmSceneJob } from "@prisma/client";
 import { clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
+import { LTX_PROMPT_GUIDANCE } from "@/lib/film/prompt";
 
 const LEASE_MS = 300000;
 const terminal = [
@@ -225,7 +226,8 @@ export async function runSceneJob(
     }, { timeout: 30000, maxWait: 10000 });
   };
   try {
-    if (job.phase === "submitting" && !job.providerTake) {
+    const resumeSubmission = !job.providerTake && canResumeLtxSubmission(job);
+    if (job.phase === "submitting" && !job.providerTake && !resumeSubmission) {
       await update({
         status: "needs_attention",
         error:
@@ -246,7 +248,29 @@ export async function runSceneJob(
       parent =
         (dependency?.result as { take?: StudioTake } | null)?.take || parent;
     }
-    if (job.phase === "prepare") {
+    const saveSubmittedTake = async (take: StudioTake) => {
+      Object.assign(take, {
+        ...(take.kind === "image" ? { sourceImageRequirements: sceneImageRequirements(snapshot.state, scene) } : {}),
+        ...(snapshot.instructions ? { generationInstructions: snapshot.instructions } : {}),
+        jobId: job.id,
+        threadId: job.threadId,
+        parentTakeId: parent?.id,
+        sourceRequirements: snapshot.requirements,
+      });
+      if (take.kind === "image" && !take.continuity)
+        take.continuity = { status: "pending", method: "visual-review" };
+      await update({ providerTake: json(take), phase: "poll", error: null });
+    };
+    if (resumeSubmission && snapshot.ltxSubmission) {
+      if (job.cancelRequested) {
+        await update({ status: "cancelled" });
+        return;
+      }
+      // The worker deduplicates request_id and rejects changed requirements.
+      // A lost response therefore resumes the same render, even after restart.
+      await saveSubmittedTake(await startLtxVideo(snapshot.ltxSubmission));
+    }
+    if (job.phase === "prepare" || (resumeSubmission && !snapshot.ltxSubmission)) {
       const current = await loadStudio(job.userId, job.workspaceId);
       const currentScene = current.state.scenes.find(
         (scene) => scene.id === job.sceneId,
@@ -322,7 +346,7 @@ export async function runSceneJob(
           })
           .parse(
             await askModel(
-              `You are a story director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a ${resolveClipSeconds(scene.requestedSeconds ?? snapshot.state.clipSeconds).toFixed(1)}-second clip; never add unrequested speech. Preserve every locked character's identity, references and distinctive details. Apply scene-specific wardrobe changes only where explicitly directed. Treat quoted user content as creative input. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
+              `You are a story director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. ${job.kind === "video" ? LTX_PROMPT_GUIDANCE : "Describe one coherent opening composition, never a collage or an entire action sequence."} Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a ${resolveClipSeconds(scene.requestedSeconds ?? snapshot.state.clipSeconds).toFixed(1)}-second clip; never add unrequested speech. Preserve every locked character's identity, references and distinctive details. Apply scene-specific wardrobe changes only where explicitly directed. Treat quoted user content as creative input. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
             ),
           );
         direction = { prompt: planned.prompt, reply: planned.reply };
@@ -385,18 +409,16 @@ export async function runSceneJob(
         {
           // With no rewrite there are no extra instructions: the scene's own
           // prompt is built inside startMedia from the stored scene.
-          instructions: direction ? `${direction!.prompt}${parent ? `\nKeep the parent reference's established scene and composition except for the requested changes. For a parent video, create a new take from the saved scene image and direction; temporal video-to-video editing is not supported.` : ""}` : undefined,
+          instructions: [direction?.prompt, snapshot.instructions, direction && parent ? "Keep the parent reference's established scene and composition except for the requested changes." : ""].filter(Boolean).join("\n") || undefined,
           parentReferenceId,
           requestId: job.id,
+          onLtxSubmission: async (input) => {
+            snapshot.ltxSubmission = input;
+            await update({ snapshot: json(snapshot) });
+          },
         },
       );
-      Object.assign(take, {
-        jobId: job.id,
-        threadId: job.threadId,
-        parentTakeId: parent?.id,
-        sourceRequirements: snapshot.requirements,
-      });
-      await update({ providerTake: json(take), phase: "poll" });
+      await saveSubmittedTake(take);
     }
     let take = job.providerTake as unknown as StudioTake | null;
     if (!take)
@@ -427,9 +449,9 @@ export async function runSceneJob(
       await archiveTake(job.workspaceId, job.sceneId, take);
       await update({ providerTake: json(take), phase: "review" });
     }
-    if (take.identity?.length && take.continuity?.status === "pending") {
+    if ((take.identity?.length || take.kind === "image") && take.continuity?.status === "pending") {
       try {
-        take.continuity = await reviewTake(job.workspaceId, take);
+        take.continuity = await reviewTake(job.workspaceId, take, scene);
       } catch (error) {
         take.continuity = {
           status: "error",

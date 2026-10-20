@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { showreelClip } from "@/lib/film/showreel";
 
 const clips = [
   { title: "The discovery", film: "emerald-world" },
@@ -11,6 +12,7 @@ const clips = [
 export function AssemblyPreview() {
   const [selected, setSelected] = useState(0);
   const clip = clips[selected];
+  const media = showreelClip(clip.film);
   return (
     <section className="public-assembly" aria-label="Assemble editor preview">
       <header>
@@ -23,11 +25,10 @@ export function AssemblyPreview() {
         muted
         playsInline
         preload="none"
-        poster={`/films/${clip.film}-poster.jpg`}
+        src={media.src}
+        poster={media.poster}
         aria-label={`Preview ${clip.title}`}
-      >
-        <source src={`/films/${clip.film}-web.mp4`} type="video/mp4" />
-      </video>
+      />
       <div className="public-assembly-sequence" role="group" aria-label="Example scene sequence">
         {clips.map((item, index) => (
           <button
@@ -36,7 +37,7 @@ export function AssemblyPreview() {
             aria-pressed={selected === index}
             onClick={() => setSelected(index)}
           >
-            <img src={`/films/${item.film}-poster.jpg`} alt="" loading="lazy" />
+            {showreelClip(item.film).poster ? <img src={showreelClip(item.film).poster} alt="" loading="lazy" /> : null}
             <span>0{index + 1} {item.title}</span>
           </button>
         ))}

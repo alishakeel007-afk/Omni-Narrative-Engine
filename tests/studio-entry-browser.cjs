@@ -512,7 +512,7 @@ const { EMPTY_STUDIO } = loadTs("types/studio.ts");
     await expect(page.getByRole("region", { name: "Assemble editor preview" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Message your director" })).toHaveCount(0);
     await page.getByRole("button", { name: /02 A hidden path/ }).click();
-    await expect(page.getByLabel("Preview A hidden path")).toHaveAttribute("poster", "/films/forest-light-poster.jpg");
+    await expect(page.getByLabel("Preview A hidden path")).toHaveAttribute("poster", "/posters/forest-light-frame.jpg");
     assert.equal(chats, 2, "Previewing assembly never submits a chat or generation request");
     assert.equal(new URL(page.url()).pathname, "/");
     await page.screenshot({ path: path.join(artifacts, "home-assemble-preview.png") });

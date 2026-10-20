@@ -30,7 +30,7 @@ function ProfileDropdown({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: PointerEvent) {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
@@ -38,8 +38,8 @@ function ProfileDropdown({
         setIsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -60,7 +60,8 @@ function ProfileDropdown({
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsOpen(false); }}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -78,7 +79,8 @@ function ProfileDropdown({
       </button>
 
       {isOpen && (
-        <div role="menu" aria-label="Profile menu" className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-[var(--line)] bg-white p-2 shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-0 top-full w-56 pt-2">
+        <div role="menu" aria-label="Profile menu" className="origin-top-right rounded-2xl border border-[var(--line)] bg-white p-2 shadow-2xl backdrop-blur-xl">
           <div className="mb-2 border-b border-[var(--line)] px-3 pb-3 pt-2">
             <p className="truncate text-sm font-semibold text-[var(--ink)]">
               {userName || "User"}
@@ -119,6 +121,7 @@ function ProfileDropdown({
               Logout
             </button>
           </div>
+        </div>
         </div>
       )}
     </div>
@@ -167,6 +170,8 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                data-selection-box
                 className={`rounded-full border px-4 py-2 text-sm transition ${
                   isActive(item.href)
                     ? "border-[var(--accent)] bg-transparent text-[var(--ink)] hover:bg-[var(--accent)]"
@@ -223,6 +228,8 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMenuOpen(false)}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                data-selection-box
                 className={`rounded-[1.2rem] border px-4 py-3 text-sm transition ${
                   isActive(item.href)
                     ? "border-[var(--accent)] bg-transparent text-[var(--ink)] hover:bg-[var(--accent)]"

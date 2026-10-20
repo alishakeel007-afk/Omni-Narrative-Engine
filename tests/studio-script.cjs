@@ -77,7 +77,8 @@ class StudioError extends Error {
   await ai.generateFilmScript({ state: { ...project, clipSeconds: 20 }, idea: "a caretaker" });
   assert.match(asked[0], /ONE clip of about 20\.0 seconds/);
   assert.match(asked[0], /A clip runs about 20\.0 seconds/);
-  const words = (prompt) => Number(prompt.match(/under about (\d+) words/)[1]);
+  const words = (prompt) => Number(prompt.match(/within about (\d+) words per scene/)[1]);
+  assert.match(asked[0], /TOTAL spoken dialogue across ALL speakers/);
   const longBudget = words(asked[0]);
 
   asked = [];

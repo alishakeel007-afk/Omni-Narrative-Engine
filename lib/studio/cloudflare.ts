@@ -18,9 +18,10 @@ export async function startCloudflareImage(workspaceId: string, request: StudioI
   if (ids.length > CLOUDFLARE_REFERENCE_LIMIT) throw new StudioError("Cloudflare supports four reference images per scene. Reduce the cast or reference views.");
   const form = new FormData();
   const mapping: string[] = [];
+  const references = await Promise.all(ids.map(id => referenceData(workspaceId, id)));
   for (const [index, id] of ids.entries()) {
     // referenceData is scoped to this workspace; arbitrary URLs are never fetched.
-    const reference = await referenceData(workspaceId, id);
+    const reference = references[index];
     const bytes = await sharp(Buffer.from(reference.data, "base64"), { limitInputPixels: 40_000_000 }).rotate().resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true }).png().toBuffer();
     form.set(`input_image_${index}`, new Blob([new Uint8Array(bytes)], { type: "image/png" }), `reference-${index}.png`);
     mapping.push(`image ${index} = ${request.identity?.find(identity => identity.referenceIds.includes(id))?.name ?? "scene composition reference"}`);

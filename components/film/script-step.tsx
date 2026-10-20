@@ -1,12 +1,15 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Scissors, MessageSquare, Trash2 } from "lucide-react";
 import { CharacterPanel } from "./character-panel";
 import { DecisionFlow, type DecisionPage } from "./decision-flow";
 import { FieldAssist, AssistedInput } from "./field-assist";
 import { sceneDecisionPages } from "./creative-decisions";
-import { dialogueFit, sceneSpeechFit, speechBudgetSeconds } from "@/lib/film/dialogue";
+import { estimateSpokenSeconds, sceneSpeechFit, wordCount } from "@/lib/film/dialogue";
+import { SpeechGuidance } from "./speech-guidance";
 import type { ClipCapability } from "@/lib/film/duration";
 import { MAX_BEATS } from "@/lib/film/shots";
 import type { FilmBeat, StudioScene, StudioState } from "@/types/studio";
@@ -61,6 +64,7 @@ export function ScriptStep({
   directing,
 }: Props) {
   const mode = state.directionMode;
+  const timingProblems = state.scenes.filter(scene => sceneSpeechFit(scene, state.language ?? "en", sceneSeconds(scene, state, capability)).overBudget);
   const pages: DecisionPage[] = [
     { id: "who-directs", title: "Who decides the details?", description: "Location, lighting, camera, background people, expressions, wardrobe and sound for every scene. Let Omni fill them in from your story, or set each one yourself. Anything you have already written is always kept.",
       content: <div className="grid gap-3 sm:grid-cols-2">
@@ -94,7 +98,15 @@ export function ScriptStep({
       { id: `${scene.id}:shots`, title: `Scene ${index + 1} · Camera cuts`, optional: true, content:
         <SceneCard key={`${scene.id}:shots`} projectId={projectId} state={state} capability={capability} scene={scene} index={index} part="shots" onScenePatch={onScenePatch} onDialogue={onDialogue} onBeats={onBeats} /> },
     ]),
-    { id: "ready", title: "Your script is ready to review", description: "Generation uses these saved scenes and approved character references.", content: <ul className="story-scene-list">{state.scenes.map((scene, index) => <li key={scene.id}><span className="story-scene-index">{index + 1}</span><div><strong>{scene.title}</strong><small>{scene.dialogues.length} dialogue lines · {scene.characterIds.length} characters</small></div></li>)}</ul> },
+    { id: "ready", title: timingProblems.length ? "Review dialogue timing before generating" : "Your script is ready to review", description: "Generation uses these saved scenes and approved character references.", content: <>
+      {timingProblems.length ? <p role="status" className="film-help">{timingProblems.length} scene{timingProblems.length === 1 ? " has" : "s have"} more dialogue than the selected duration allows. Shorten the dialogue, split the scene, or increase its length before video generation.</p> : null}
+      <ul className="story-scene-list">{state.scenes.map((scene, index) => {
+        const seconds = sceneSeconds(scene, state, capability);
+        const fit = sceneSpeechFit(scene, state.language ?? "en", seconds);
+        return <li key={scene.id}><span className="story-scene-index">{index + 1}</span><div><strong>{scene.title}</strong><small>{seconds}s video · {scene.dialogues.length} dialogue lines · {scene.characterIds.length} characters</small>
+          {fit.overBudget ? <small className="font-medium">Dialogue needs about {fit.estimatedSeconds.toFixed(1)}s; {fit.budgetSeconds.toFixed(1)}s available (estimated). Review this scene&apos;s dialogue.</small> : null}
+        </div></li>;
+      })}</ul></> },
   ];
   return <DecisionFlow storageKey={`story:${projectId}:script`} pages={pages} finish={onContinue} finishLabel="Continue to video" />;
 }
@@ -127,9 +139,26 @@ function SceneCard({
   const [visualAction, setVisualAction] = useState(scene.visualAction ?? scene.description ?? "");
   useEffect(() => { setVisualAction(scene.visualAction ?? scene.description ?? ""); }, [scene.visualAction, scene.description]);
   const [adding, setAdding] = useState(false);
+  const [dialogueDrafts, setDialogueDrafts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setDialogueDrafts(current => {
+      const next = { ...current };
+      let changed = false;
+      scene.dialogues.forEach((line, at) => {
+        const key = line.id ?? String(at);
+        if (next[key] === line.text) { delete next[key]; changed = true; }
+      });
+      return changed ? next : current;
+    });
+  }, [scene.dialogues]);
+  const draftScene = { ...scene, dialogues: scene.dialogues.map((line, at) => {
+    const draft = dialogueDrafts[line.id ?? String(at)];
+    return draft !== undefined ? { ...line, text: draft } : line;
+  }) };
 
   const seconds = sceneSeconds(scene, state, capability);
-  const fit = sceneSpeechFit(scene, language, seconds);
+  const fit = sceneSpeechFit(draftScene, language, seconds);
+  const speechHelpId = `scene-speech-${scene.id}`;
   const beats = scene.beats ?? [];
 
   const cast = state.characters.filter((character) => scene.characterIds.includes(character.id));
@@ -178,6 +207,7 @@ function SceneCard({
           className="mt-1.5 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm leading-6 text-[var(--ink)] outline-none focus:border-[var(--ink)]"
         />
       </label>
+      <p className="film-help">This action must unfold within {seconds}s. Keep it focused on a clear moment; split changes of location or a longer sequence into separate scenes. Descriptions are not spoken and do not use the dialogue word budget.</p>
       <FieldAssist projectId={projectId} state={state} sceneId={scene.id} field="sceneTitle" label="name this scene" value={title} onAccept={title => onScenePatch(scene.id, { title })} />
       <FieldAssist projectId={projectId} state={state} sceneId={scene.id} field="visualAction" label="describe the action" value={visualAction} onAccept={answer => { setVisualAction(answer); return onScenePatch(scene.id, { visualAction: answer }); }} />
       </> : null}
@@ -192,10 +222,11 @@ function SceneCard({
         {!state.characters.length ? <p className="film-help">No cast is needed for a landscape or other scene without people. Add characters above when the scene needs them.</p> : null}
       </fieldset>
 
-      {capability ? (
+      </> : null}
+      {(part === "cast" || part === "dialogue") && capability ? (
         <label className="mt-4 block">
           <span className="text-xs font-medium text-[var(--ink)]">This scene&apos;s length</span>
-          <select
+          <Select aria-label="This scene's length"
             value={scene.requestedSeconds ?? ""}
             onChange={(event) =>
               void onScenePatch(scene.id, {
@@ -212,28 +243,15 @@ function SceneCard({
                 {option.seconds}s{option.available ? "" : " — coming soon"}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       ) : null}
 
-      </> : null}
       {part === "dialogue" ? <div className="mt-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span className="text-xs font-medium text-[var(--ink)]">Dialogue</span>
-          {fit.lines > 0 ? (
-            <span className="text-xs text-[var(--muted)]">
-              about {fit.estimatedSeconds.toFixed(1)}s of {speechBudgetSeconds(seconds).toFixed(1)}s
-              available (estimated)
-            </span>
-          ) : null}
         </div>
-
-        {fit.overBudget ? (
-          <p className="mt-1.5 text-xs font-medium leading-5 text-[var(--ink)]">
-            This is more dialogue than a {seconds.toFixed(1)}s clip can hold.
-            Shorten a line, split the scene, or raise this scene&apos;s length.
-          </p>
-        ) : null}
+        <SpeechGuidance id={speechHelpId} scene={draftScene} language={language} seconds={seconds} options={capability?.options} />
         {oneTurnOnly && fit.lines > 1 ? (
           <p className="mt-1.5 text-xs font-medium leading-5 text-[var(--ink)]">
             Urdu clips are lip-synced from one speech track, so a clip carries a
@@ -249,16 +267,11 @@ function SceneCard({
         ) : (
           <ul className="mt-2 space-y-2">
             {scene.dialogues.map((line, lineIndex) => {
-              // On the Urdu path one line owns the whole speech budget; on the
-              // English path the lines share it.
-              const share = oneTurnOnly
-                ? speechBudgetSeconds(seconds)
-                : speechBudgetSeconds(seconds) / Math.max(1, scene.dialogues.length);
-              const lineFit = dialogueFit(line.text, language, share);
+              const draftText = draftScene.dialogues[lineIndex].text;
               return (
                 <li key={line.id} className="rounded-xl border border-[var(--line)] p-3">
                   <div className="flex items-center gap-2">
-                    <select
+                    <Select
                       defaultValue={line.character}
                       aria-label="Speaker"
                       onChange={(event) =>
@@ -277,7 +290,7 @@ function SceneCard({
                             {name}
                           </option>
                         ))}
-                    </select>
+                    </Select>
                     <span className="flex-1" />
                     {([-1, 1] as const).map(delta => <button type="button" key={delta}
                       aria-label={delta < 0 ? "Move dialogue up" : "Move dialogue down"}
@@ -298,16 +311,11 @@ function SceneCard({
                   </div>
                   <AssistedInput projectId={projectId} state={state} sceneId={scene.id} dialogueId={line.id} field="dialogue"
                     label={`rewrite ${line.character}’s line`} inputLabel={`${line.character}’s dialogue`} value={line.text} rows={2}
+                    describedBy={speechHelpId} invalid={fit.overBudget}
+                    onDraftChange={text => setDialogueDrafts(current => ({ ...current, [line.id ?? String(lineIndex)]: text }))}
                     onSave={text => onDialogue(scene.id, { kind: "update", dialogueId: line.id, text })} />
                   <p className="mt-1.5 text-xs text-[var(--muted)]">
-                    {lineFit.words} words · about {lineFit.estimatedSeconds.toFixed(1)}s
-                    (estimated)
-                    {lineFit.overBudget ? (
-                      <span className="ml-1 font-medium text-[var(--ink)]">
-                        — longer than the {lineFit.limitSeconds.toFixed(1)}s this
-                        line has. Shorten or split it.
-                      </span>
-                    ) : null}
+                    {wordCount(draftText)} words · about {estimateSpokenSeconds(draftText, language).toFixed(1)}s (estimated). All lines share the scene&apos;s speech budget.
                   </p>
                 </li>
               );
@@ -317,7 +325,7 @@ function SceneCard({
 
         {adding ? (
           <AddLine
-            projectId={projectId} state={state} scene={scene}
+            projectId={projectId} state={state} scene={draftScene} capability={capability}
             speakers={speakers.map((item) => item.name)}
             onCancel={() => setAdding(false)}
             onAdd={async (character, text) => {
@@ -558,6 +566,7 @@ function AddLine({
   projectId,
   state,
   scene,
+  capability,
   speakers,
   onAdd,
   onCancel,
@@ -565,15 +574,19 @@ function AddLine({
   projectId: string;
   state: StudioState;
   scene: StudioScene;
+  capability?: ClipCapability;
   speakers: string[];
   onAdd: (character: string, text: string) => Promise<boolean>;
   onCancel: () => void;
 }) {
   const [character, setCharacter] = useState(speakers[0] ?? "");
   const [text, setText] = useState("");
+  const seconds = sceneSeconds(scene, state, capability);
+  const preview = { dialogues: [...scene.dialogues, { character, text }] };
+  const helpId = `new-dialogue-speech-${scene.id}`;
   return (
     <div className="mt-3 rounded-xl border border-[var(--line)] p-3">
-      <select
+      <Select
         value={character}
         onChange={(event) => setCharacter(event.target.value)}
         aria-label="Speaker"
@@ -584,14 +597,18 @@ function AddLine({
             {name}
           </option>
         ))}
-      </select>
+      </Select>
       <textarea
+        aria-label="New dialogue"
+        aria-describedby={helpId}
+        aria-invalid={sceneSpeechFit(preview, state.language ?? "en", seconds).overBudget || undefined}
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={2}
         placeholder="What do they say?"
         className="mt-2 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--ink)]"
       />
+      <SpeechGuidance id={helpId} scene={preview} language={state.language ?? "en"} seconds={seconds} options={capability?.options} />
       <div className="mt-2 flex gap-2">
         <button
           type="button"

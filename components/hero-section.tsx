@@ -7,7 +7,7 @@ export function HeroSection() {
   return (
     <section className="public-hero" aria-labelledby="public-hero-heading">
       <div className="public-hero-panel">
-        <CinematicVideo film="hero-story" priority audioControl />
+        <CinematicVideo film="ltx-hero-20s" priority audioControl />
         <div className="public-hero-shade" />
         <div className="public-hero-copy">
           <span className="public-eyebrow light">

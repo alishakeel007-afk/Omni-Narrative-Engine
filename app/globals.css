@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.generate-change-options > summary { list-style: none; width: fit-content; }
+.generate-change-options > summary::-webkit-details-marker { display: none; }
+.generate-change-options[open] > summary svg { transform: rotate(180deg); }
+.scene-generation-flow { display: grid; gap: 18px; }
+.scene-media-stage { border-top: 1px solid var(--line); padding-top: 20px; min-width: 0; }
+.scene-reference-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; margin-top: 12px; }
+.scene-reference-option { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.scene-reference-option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.scene-reference-option img { display: block; width: 100%; border-radius: 8px; }
+.film-action-feedback, .film-reference-notice { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 1.6; }
+.film-action-feedback svg, .film-reference-notice svg, .film-action-error > svg { flex-shrink: 0; margin-top: 3px; }
+.film-action-error, .take-review-result { padding: 12px; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.65; }
+.film-action-error, .take-review-result.mismatch { border-color: #be7d37; background: #fff8ef; }
+.take-review-result p + p { margin-top: 6px; }
+
 :root {
   color-scheme: light;
   --font-heading: var(--font-body);

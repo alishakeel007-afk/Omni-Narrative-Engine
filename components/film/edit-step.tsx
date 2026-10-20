@@ -417,6 +417,7 @@ function ClipStrip({
           <button
             type="button"
             onClick={onFocus}
+            aria-pressed={selected}
             className="text-left text-xs font-medium uppercase tracking-wide text-[var(--muted)] transition hover:text-[var(--ink)]"
           >
             Clip {index + 1} · {scene?.title ?? "Removed scene"} ·{" "}
