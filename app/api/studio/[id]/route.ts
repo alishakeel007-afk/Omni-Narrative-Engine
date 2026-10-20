@@ -58,6 +58,7 @@ import {
 } from "@/lib/film/edit";
 import { listSceneJobs } from "@/lib/studio/scene-jobs";
 import { deleteSceneTake } from "@/lib/studio/take-deletion";
+import { normalizedCharacterDetails, characterAppearanceText } from "@/lib/film/character-details";
 import type { SceneJob, StudioTake } from "@/types/studio";
 
 export const runtime = "nodejs";
@@ -78,6 +79,11 @@ const directionSchema = z.object({
   expression: z.record(z.string().max(100), z.string().max(1000)).optional(),
 }).strict();
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("characterDetails"), characterId: z.string().min(1).max(100), details: z.object({
+    gender: z.string().trim().max(100).optional(), ageRange: z.string().trim().max(100).optional(),
+    nationality: z.string().trim().max(100).optional(), ethnicity: z.string().trim().max(100).optional(),
+    religion: z.string().trim().max(100).optional(), clothing: z.string().trim().max(1000).optional(),
+  }).strict() }),
   z.object({ action: z.literal("keepTakes"), sceneId: z.string().min(1).max(100), takeIds: z.array(z.string().min(1).max(100)).min(1).max(100) }),
   z.object({ action: z.literal("deleteTake"), sceneId: z.string().min(1).max(100), takeId: z.string().min(1).max(100) }),
   z.object({ action: z.literal("detectCast") }),
@@ -410,6 +416,18 @@ export async function POST(req: Request, context: Context) {
         : undefined;
     if ("sceneId" in body && body.sceneId && body.action !== "chat" && !scene)
       throw new StudioError("Scene not found.", 404);
+    if (body.action === "characterDetails") {
+      const character = state.characters.find(item => item.id === body.characterId);
+      if (!character) throw new StudioError("Character not found.", 404);
+      if (character.locked) throw new StudioError("Unlock this character's identity before changing its details.");
+      const details = normalizedCharacterDetails(body.details);
+      if (JSON.stringify(normalizedCharacterDetails(character.details)) !== JSON.stringify(details)) {
+        character.details = details;
+        character.origin = "user";
+        state.scenes.filter(item => item.characterIds.includes(character.id)).forEach(item => { item.outdated = true; });
+      }
+      return NextResponse.json({ state: await saveStudio(loaded, state) });
+    }
     if (body.action === "keepTakes") {
       if (body.takeIds.some(id => !scene!.takes.some(take => take.id === id && take.status === "complete")))
         throw new StudioError("A take to keep could not be found. Reload the scene and try again.", 404);
@@ -721,11 +739,11 @@ export async function POST(req: Request, context: Context) {
       if (!character) throw new StudioError("Character not found.", 404);
       const existing = state.messages.find(item => item.requestId === body.requestId);
       if (!existing) {
-        if (character.appearance.trim().length < 10) throw new StudioError("Describe the character before generating a portrait.");
+        if (characterAppearanceText(character).trim().length < 10) throw new StudioError("Save character details or an appearance before generating a portrait.");
         const message = makeMessage(`Concept portrait for ${character.name}. Review it before adding it as a reference.`, "assistant", "plan");
         message.requestId = body.requestId;
         message.portraitCharacterId = character.id;
-        message.imageRequest = { prompt: `Character reference portrait, clear face and silhouette, neutral background, no text. ${character.name}: ${character.appearance}. Visual style: ${state.visualStyle || state.world}.`,
+        message.imageRequest = { prompt: `Character reference portrait, clear face and silhouette, neutral background, no text. ${character.name}: ${characterAppearanceText(character)}. Visual style: ${state.visualStyle || state.world}.`,
           referenceIds: characterReferences(character).map(item => item.id) };
         state.messages.push(message);
         await submitChatImage(message);

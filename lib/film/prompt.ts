@@ -7,6 +7,8 @@ import type {
 } from "@/types/studio";
 import { spokenDialogue } from "@/types/studio";
 import { estimateSpokenSeconds } from "./dialogue";
+import { RENDER_CREATIVE_GUIDANCE, pakistanSceneNotes, storyIntentContext } from "./creative-direction";
+import { characterAppearanceText, characterDetailsText } from "./character-details";
 
 /** Official guidance: https://docs.ltx.io/api-documentation/implementation-guides/prompting-guide */
 export const LTX_PROMPT_GUIDANCE = "Write LTX 2.5 prompts as chronological, present-tense cinematic prose. Establish the shot, scene, concrete action, recurring subjects, camera movement and audio. For image-to-video let the approved opening image define appearance and composition; focus on motion and sound instead of reimagining it. Prefer one continuous shot, one coherent lighting setup and plausible actions. For requested multi-shot scenes prefer two to four shots with explicit prose transitions, repeated subject descriptors and audio continuity. Preserve exact quoted dialogue and named speakers. Add essential titles in post-production. Do not invent speech or add unrequested cuts.";
@@ -81,7 +83,7 @@ export function resolveBeats(
 
 function castBlock(cast: StudioCharacter[]) {
   if (!cast.length) return "";
-  return `The cast is ${cast.map(character => `${character.name}, ${character.appearance}`).join("; ")}.`;
+  return `The cast is ${cast.map(character => `${character.name}, ${characterAppearanceText(character)}`).join("; ")}.`;
 }
 
 function speechLine(
@@ -92,7 +94,7 @@ function speechLine(
   const character = cast.find((item) => item.name === line.character);
   // The descriptor is repeated at every cut on purpose: it is what keeps the
   // same face on the same voice across a cut.
-  const detail = character ? ` (${shortDescriptor(character.appearance)})` : "";
+  const detail = character ? ` (${shortDescriptor(characterAppearanceText(character))})` : "";
   const tongue = language === "ur" ? " in Urdu" : "";
   return `${line.character}${detail} says exactly${tongue}: ${JSON.stringify(line.text)}`;
 }
@@ -119,7 +121,7 @@ function audioDirection(
 
 export type FilmPromptInput = {
   imageConditioned?: boolean;
-  state: Pick<StudioState, "world" | "visualStyle" | "characters"> & Partial<Pick<StudioState, "scenes">>;
+  state: Pick<StudioState, "world" | "visualStyle" | "characters"> & Partial<Pick<StudioState, "scenes" | "premise" | "roughIdea">>;
   scene: StudioScene;
   language: FilmLanguage;
   /** The length actually being requested, already snapped to the frame grid. */
@@ -155,16 +157,20 @@ export function buildFilmPrompt({
     .map((beat, index) => {
       const label = index === 0 ? "The shot opens as" : "A hard cut transitions to the next view as";
       const speech = beat.lines.map((line) => speechLine(line, cast, language)).join(". ");
-      const returning = multiShot && index > 0 && cast.length ? ` The same ${cast.map(character => `${character.name} (${shortDescriptor(character.appearance)})`).join(" and ")} retain their established appearance; the ambience and score continue across the cut.` : "";
+      const returning = multiShot && index > 0 && cast.length ? ` The same ${cast.map(character => `${character.name} (${shortDescriptor(characterAppearanceText(character))})`).join(" and ")} retain their established appearance; the ambience and score continue across the cut.` : "";
       return `${label} ${beat.visualAction}${speech ? ` ${speech}.` : " No one speaks during this shot."}${returning}`;
     })
     .join(" ");
 
   return [
     header,
-    imageConditioned ? "The approved first-frame image establishes the composition, location, faces, wardrobe, props and lighting. Animate that image with the following actions while preserving its established appearance." : "",
+    RENDER_CREATIVE_GUIDANCE,
+    storyIntentContext(state),
+    pakistanSceneNotes(state, scene),
+    imageConditioned ? "The approved first-frame image establishes the composition, location, faces, wardrobe, props and lighting. Animate that image while preserving stable identity. Apply explicitly authored scene wardrobe changes only to clothing; defaults must never replace the supplied face or override explicit user requirements." : "",
     style && !imageConditioned ? `Visual style: ${style}` : "",
     imageConditioned ? "" : castBlock(cast),
+    imageConditioned ? cast.filter(character => characterDetailsText(character.details)).map(character => `Writer-specified details for ${character.name}: ${characterDetailsText(character.details)}. Preserve the supplied face; apply current scene wardrobe where explicitly requested.`).join(" ") : "",
     imageConditioned ? "" : precedingSceneContext(state, scene),
     direction,
     body,

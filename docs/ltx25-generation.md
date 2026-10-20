@@ -61,6 +61,11 @@ making a model request. None of these guidance checks calls a paid provider.
 
 ## Prompt and pipeline decisions
 
+Optional character controls and Pakistan-focused creative direction are described
+in [Pakistan and character direction](pakistan-character-direction.md). Explicit
+writer choices, including clothing exclusions, take priority over creative
+defaults and are carried into both image and video prompts.
+
 - Use present-tense prose covering shot, setting, action, subjects, camera and
   audio. Image-conditioned prompts focus on movement and sound while the first
   frame establishes appearance. Authored multi-shot sequences use explicit prose

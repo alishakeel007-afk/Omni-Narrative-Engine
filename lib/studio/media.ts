@@ -24,6 +24,7 @@ import { clipLengthProblem, clipSeconds as resolveClipSeconds } from "@/lib/film
 import { buildFilmPrompt } from "@/lib/film/prompt";
 import { clipProblem } from "@/lib/film/shots";
 import { referenceTakeProblem, sceneReferenceProblem } from "@/lib/film/reference";
+import { RENDER_CREATIVE_GUIDANCE } from "@/lib/film/creative-direction";
 
 export async function magicHour(path: string, body?: object) {
   const key = getEnvValue(["MAGIC_HOUR_API_KEY"]);
@@ -78,6 +79,7 @@ export async function startChatImage(
   request: StudioImageRequest,
   name = "Director image",
 ): Promise<StudioTake> {
+  request = { ...request, prompt: `${request.prompt}\n${RENDER_CREATIVE_GUIDANCE}` };
   const backend = imageBackend();
   if (backend.cloudflare) return startCloudflareImage(draftId, request);
   if (backend.selfHosted && request.referenceIds.length)
@@ -195,8 +197,10 @@ export async function startMedia(
     const problem = sceneReferenceProblem(state, scene);
     if (problem) throw new StudioError(problem);
   }
-  const identity = anchoredCast.map(character => ({ ...identityProfile(character),
-    ...(scene.direction?.wardrobe?.[character.id] ? { sceneWardrobe: scene.direction.wardrobe[character.id] } : {}) }));
+  const identity = anchoredCast.map(character => {
+    const wardrobe = scene.direction?.wardrobe?.[character.id] || character.details?.clothing;
+    return { ...identityProfile(character), ...(wardrobe ? { sceneWardrobe: wardrobe } : {}) };
+  });
   let result;
   if (kind === "image") {
     return {

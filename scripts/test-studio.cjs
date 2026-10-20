@@ -157,6 +157,7 @@ const SUITES = [
   "tests/studio-generate.cjs",
   "tests/studio-edit.cjs",
   "tests/studio-characters.cjs",
+  "tests/studio-character-details.cjs",
   "tests/studio-consistency.cjs",
   "tests/studio-director.cjs",
   "tests/studio-ltx.cjs",

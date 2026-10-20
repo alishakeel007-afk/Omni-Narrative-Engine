@@ -1,6 +1,8 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { CharacterDetailsEditor } from "./character-details-editor";
+import { characterAppearanceText } from "@/lib/film/character-details";
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Lock, MessageSquare, Star, Trash2, Unlock, Upload } from "lucide-react";
@@ -234,6 +236,7 @@ function CharacterCard({
       </label>
 
       {!character.locked ? <FieldAssist projectId={projectId} state={state} field="characterName" characterId={character.id} label="suggest a name" value={name} onAccept={setName} /> : null}
+      <CharacterDetailsEditor character={character} onSave={details => onAction({ action: "characterDetails", characterId: character.id, details })} />
       </div>
       <div hidden={part !== "story"}><p className="film-help mb-3">What drives this person, and how do they relate to the others?</p>
         {(["motivation", "relationships"] as const).map(field => <div className="mb-5" key={field}>
@@ -245,7 +248,7 @@ function CharacterCard({
 
       <div hidden={part !== "references"}>
       <div className="mt-3 flex flex-wrap gap-3">
-        <button type="button" className="guest-pill" disabled={Boolean(busy) || appearance.trim().length < 10 || dirty}
+        <button type="button" className="guest-pill" disabled={Boolean(busy) || characterAppearanceText(character).trim().length < 10 || dirty}
           onClick={async () => { setBusy("portrait"); portraitRequest.current ??= crypto.randomUUID();
             if (await onAction({ action: "generatePortrait", characterId: character.id, requestId: portraitRequest.current })) portraitRequest.current = null;
             setBusy(""); }}>

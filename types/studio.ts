@@ -1,9 +1,12 @@
 export type StudioTab = "plan" | "scenes" | "assemble";
 export type StudioMode = "discover" | "develop";
+export type CharacterDetails = Partial<Record<"gender" | "ageRange" | "nationality" | "ethnicity" | "religion" | "clothing", string>>;
 export type StudioCharacter = {
   id: string;
   name: string;
   appearance: string;
+  /** Optional facts supplied by the writer, never inferred from a name or photo. */
+  details?: CharacterDetails;
   referenceId?: string;
   references?: { id: string; label: string }[];
   locked: boolean;

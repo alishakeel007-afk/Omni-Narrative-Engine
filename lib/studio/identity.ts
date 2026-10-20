@@ -7,6 +7,7 @@ import type {
 } from "@/types/studio";
 import { clipSeconds } from "@/lib/film/duration";
 import { precedingSceneContext } from "@/lib/film/prompt";
+import { characterAppearanceText, normalizedCharacterDetails } from "@/lib/film/character-details";
 
 export function characterReferences(character: StudioCharacter) {
   const refs = [...(character.references || [])];
@@ -26,13 +27,14 @@ export function identityProfile(character: StudioCharacter): StudioIdentity {
   return {
     characterId: character.id,
     name: character.name,
-    appearance: character.appearance,
+    appearance: characterAppearanceText(character),
     referenceIds,
     key: JSON.stringify({
       name: character.name,
       appearance: character.appearance,
       locked: character.locked,
       referenceIds,
+      ...(Object.keys(normalizedCharacterDetails(character.details)).length ? { details: normalizedCharacterDetails(character.details) } : {}),
     }),
   };
 }
@@ -121,6 +123,8 @@ export function continuityProblem(
  * three-shot sequence asks for.
  */
 export function sceneRequirements(state: StudioState, scene: StudioScene) {
+  const details = state.characters.filter(character => scene.characterIds.includes(character.id) && Object.keys(normalizedCharacterDetails(character.details)).length)
+    .map(character => ({ id: character.id, details: normalizedCharacterDetails(character.details) }));
   return JSON.stringify({
     title: state.title,
     premise: state.premise,
@@ -150,6 +154,7 @@ export function sceneRequirements(state: StudioState, scene: StudioScene) {
       })),
     },
     cast: sceneIdentity(state, scene),
+    ...(details.length ? { characterDetails: details } : {}),
   });
 }
 

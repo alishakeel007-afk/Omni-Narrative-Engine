@@ -21,6 +21,7 @@
     "test:studio:media": ".venv-modal/Scripts/python.exe tests/studio-real-media.py",
     "test:studio:ltx:browser": "node tests/studio-live-editor.cjs",
     "test:studio:characters": "node tests/studio-characters.cjs",
+    "test:studio:character-details:browser": "node tests/studio-character-details-browser.cjs",
     "test:studio:consistency": "node tests/studio-consistency.cjs",
     "test:studio:reference": "node tests/studio-reference.cjs",
     "test:studio:reference:browser": "node tests/studio-reference-browser.cjs",

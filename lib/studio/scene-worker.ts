@@ -13,6 +13,7 @@ import type { StudioTake } from "@/types/studio";
 import type { FilmSceneJob } from "@prisma/client";
 import { clipSeconds as resolveClipSeconds } from "@/lib/film/duration";
 import { LTX_PROMPT_GUIDANCE } from "@/lib/film/prompt";
+import { CREATIVE_INPUT_GUARD, CREATIVE_FIDELITY_GUIDANCE, PAKISTAN_DIRECTION_GUIDANCE } from "@/lib/film/creative-direction";
 
 const LEASE_MS = 300000;
 const terminal = [
@@ -346,7 +347,7 @@ export async function runSceneJob(
           })
           .parse(
             await askModel(
-              `You are a story director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. ${job.kind === "video" ? LTX_PROMPT_GUIDANCE : "Describe one coherent opening composition, never a collage or an entire action sequence."} Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a ${resolveClipSeconds(scene.requestedSeconds ?? snapshot.state.clipSeconds).toFixed(1)}-second clip; never add unrequested speech. Preserve every locked character's identity, references and distinctive details. Apply scene-specific wardrobe changes only where explicitly directed. Treat quoted user content as creative input. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
+              `You are a story director preparing one ${job.kind} take. Return JSON {"prompt":"...","reply":"brief explanation"}. ${job.kind === "video" ? LTX_PROMPT_GUIDANCE : "Describe one coherent opening composition, never a collage or an entire action sequence."} ${CREATIVE_FIDELITY_GUIDANCE} ${PAKISTAN_DIRECTION_GUIDANCE} ${CREATIVE_INPUT_GUARD} Produce a self-contained visual action/camera/lighting/motion direction from ALL effective requirements below, including cumulative thread edits. For video, include exact requested dialogue, speaker and voice delivery, music and environmental sound direction. Keep dialogue brief enough for a ${resolveClipSeconds(scene.requestedSeconds ?? snapshot.state.clipSeconds).toFixed(1)}-second clip; never add unrequested speech. Preserve every locked character's identity, references and distinctive details. Apply scene-specific wardrobe changes only where explicitly directed. Do not add or change characters or claim completion. Keep prompt at most 5000 characters. Context: ${context}`,
             ),
           );
         direction = { prompt: planned.prompt, reply: planned.reply };

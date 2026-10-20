@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { precedingSceneContext, sceneDirectionText } from "@/lib/film/prompt";
+import { pakistanSceneNotes, storyIntentContext } from "@/lib/film/creative-direction";
+import { characterAppearanceText } from "@/lib/film/character-details";
 import { imageBackend } from "./image-backend";
 import type {
   StudioChoice,
@@ -64,6 +66,7 @@ export function chatImageRequest(
   const known: {
     name: string;
     appearance: string;
+    details?: import("@/types/studio").CharacterDetails;
     locked?: boolean;
     referenceId?: string;
     id?: string;
@@ -128,7 +131,7 @@ export function chatImageRequest(
   return {
     request: {
       variation: state.messages.filter((message) => message.image).length,
-      prompt: `${proposal?.prompt || text}\n${selected && /\bscene\b/i.test(text) ? `Scene context: ${selected.description}\n` : ""}World and visual style: ${state.world || draft?.world || "Follow the requested style."}\nCharacter continuity: ${cast.map((character) => `${character.name}: ${character.appearance}`).join("\n")}\nPreserve the identity, facial structure, hair and distinctive details of any supplied reference. No text overlays.`,
+      prompt: `${proposal?.prompt || text}\n${selected && /\bscene\b/i.test(text) ? `Scene context: ${selected.description}\n` : ""}World and visual style: ${state.world || draft?.world || "Follow the requested style."}\n${storyIntentContext(state)}\n${pakistanSceneNotes(state, selected)}\nCharacter continuity: ${cast.map((character) => `${character.name}: ${characterAppearanceText(character)}`).join("\n")}\nPreserve the identity, facial structure, hair and distinctive details of any supplied reference. No text overlays.\nCurrent explicit image requirements (take priority over a proposed prompt or defaults): ${text}`,
       referenceIds: conditioningReferences(
         cast
           .filter((character) => character.locked && character.id)
@@ -240,6 +243,6 @@ export function scenePrompt(state: StudioState, sceneId: string) {
         }),
       )
       .digest("hex"),
-    prompt: `${scene.description}\n${precedingSceneContext(state, scene)}\n${sceneDirectionText(state, scene)}\nWorld and visual style: ${state.world}\nCharacter descriptions: ${cast.map((character) => `${character.name}: ${character.appearance}`).join("\n")}\nUse image references only for characters whose appearance is locked. Preserve their facial proportions, hairline, hair texture, visible markings, silhouette and approved outfit across views unless this scene explicitly specifies a wardrobe change. For characters without a reference image, create their look from their written description and keep it coherent within this scene. Do not blend characters. Keep movement natural and restrained; no face morphing, age changes, hairstyle changes or outfit substitutions. Compose the requested scene with appropriate framing and setting. No text overlays or subtitles.`,
+    prompt: `${scene.description}\n${storyIntentContext(state)}\n${pakistanSceneNotes(state, scene)}\n${precedingSceneContext(state, scene)}\n${sceneDirectionText(state, scene)}\nWorld and visual style: ${state.world}\nCharacter descriptions: ${cast.map((character) => `${character.name}: ${characterAppearanceText(character)}`).join("\n")}\nUse image references only for characters whose appearance is locked. Preserve their facial proportions, hairline, hair texture, visible markings, silhouette and approved outfit across views unless this scene explicitly specifies a wardrobe change. For characters without a reference image, fill only missing visual details around their written description and keep one coherent look. Do not blend characters. Keep movement natural and restrained; no face morphing, age changes, hairstyle changes or unrequested outfit substitutions. Compose the requested scene with appropriate framing and setting. No text overlays or subtitles.`,
   };
 }
