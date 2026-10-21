@@ -90,6 +90,51 @@ draw on [Pakistan's official cultural overview](https://mofa.gov.pk/mazar-e-shar
 
 ## Checks
 
+Run the complete local test report (Chrome, Node dependencies and the Python
+worker environment must be installed). `npm test` runs the same report:
+
+```powershell
+npm run test:project
+Start-Process ".run-screenshots/test-report/index.html"
+```
+
+The report contains numbered cases with inputs, expected and observed results,
+individual Python results, regression logs, browser screenshots and CSV export.
+Use **Print / save PDF** for presentation evidence. Generated results stay local
+under the ignored `.run-screenshots` directory. Re-running replaces the report.
+To use a different Python interpreter, set `STUDIO_TEST_PYTHON` to its path.
+
+Run individual presentation categories:
+
+```powershell
+npm run test:unit
+npm run test:integration
+npm run test:business
+```
+
+| Category | Numbered cases | What is exercised |
+| --- | --- | --- |
+| Unit | UT-01–UT-12 | Frame grid and bounds, configuration, English/Urdu speech estimates, optional character details and identity keys |
+| Integration | IT-01–IT-10 | Real API handlers with fixture auth/storage: access control, validation, workflow saves, scene duration overrides, dialogue edits and explicit reference approval |
+| Business logic | BL-01–BL-08 | Shared dialogue budgets, duration suggestions, direct generation, cast-scoped reference gates and approval invalidation |
+
+Business logic describes the rules being checked; it can also be tested at unit
+or integration level. These categories organize presentation evidence rather
+than implying separate technical testing levels. Existing regression suites add
+retry/idempotency, deletion/cleanup, editing, prompts and provider contract checks.
+Four browser fixture suites check real React controls, immediate pending states,
+near-action errors, mobile layout, dialogue guidance and 20s hero playback.
+
+For a presentation, show the feature, its case ID/input/expected result, run the
+category command, then open the generated report and matching log/screenshot.
+The report counts cases/suites, **not code coverage or percentage implemented**.
+The automated integrations mock external services and do not prove real account
+login, database durability, GPU output quality or working Urdu generation. Keep
+live deployment smoke tests and generated-media quality review as separate
+evidence; the report command submits no paid renders.
+
+Existing individual regression commands:
+
 ```powershell
 npm run test:studio
 npm run test:studio:character-details:browser
@@ -101,7 +146,8 @@ npx tsc --noEmit --incremental false
 ```
 
 Browser checks require Chrome. The isolated suites use fixtures and mocked
-providers; the separate live/media scripts can require accounts or paid services.
+providers; separate live browser checks and Modal diagnostics can require accounts
+or paid services. The CPU export smoke check is `workers/video/check_export.py`.
 
 ## Assets and generated files
 
@@ -112,3 +158,4 @@ Keep public media and the font license at `public/fonts/Manrope-OFL.txt`.
 `.next`, `.next-dev`, `.studio-worker`, `node_modules` and `.venv-modal` are local
 build/runtime directories. Diagnostic screenshots, downloaded documentation and
 scratch render copies are not required source files and are ignored by Git.
+Generated reports and screenshots can be deleted; `npm test` recreates them.

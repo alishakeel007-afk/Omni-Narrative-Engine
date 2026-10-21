@@ -187,6 +187,15 @@ function SceneRow({ item, state, jobs, capability, onSubmit, onChange, onSelect,
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const actionError = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!error || !actionError.current) return;
+    const bounds = actionError.current.getBoundingClientRect();
+    // Inserting feedback below a button near the mobile viewport edge can
+    // hide the result. Reveal a new error without changing keyboard focus.
+    if (bounds.top < 0 || bounds.bottom > window.innerHeight)
+      actionError.current.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }, [error, action]);
   const [imageInstructions, setImageInstructions] = useState("");
   const [videoInstructions, setVideoInstructions] = useState("");
   const [useOptionalImage, setUseOptionalImage] = useState(!!scene.selectedImageId);
@@ -213,7 +222,7 @@ function SceneRow({ item, state, jobs, capability, onSubmit, onChange, onSelect,
   };
   const feedback = (name: string) => action === name ? <div className="basis-full" aria-live="polite">
     {pending ? <p role="status" className="film-action-feedback"><Loader2 size={15} className="animate-spin" aria-hidden />{pending.startsWith("delete:") || pending.startsWith("cleanup:") ? "Deleting the take and clearing storage…" : pending.startsWith("select:") ? "Saving your selection…" : pending.startsWith("check:") ? "Checking the scene and character profile…" : pending === "image" ? "Queueing the reference image…" : pending === "video" ? "Queueing the video…" : "Saving…"}</p>
-      : error ? <p role="alert" className="film-action-error"><AlertCircle size={16} aria-hidden />{error}</p>
+      : error ? <p ref={actionError} role="alert" className="film-action-error"><AlertCircle size={16} aria-hidden />{error}</p>
         : message ? <p role="status" className="film-action-feedback"><Check size={15} aria-hidden />{message}</p> : null}
   </div> : null;
   const select = (take: StudioTake, skipCheck = false) => run(`select:${take.id}`, async () => {

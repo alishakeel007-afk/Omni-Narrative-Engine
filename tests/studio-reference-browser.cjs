@@ -207,6 +207,7 @@ process.env.STUDIO_CLIP_SECONDS = "5,10,15,20";
     await generateDirect.click();
     const videoError = page.getByRole("region", { name: "Video", exact: true }).getByRole("alert").filter({ hasText: "video could not be queued" });
     await expect(videoError).toBeVisible(); await expect(videoError).toBeInViewport();
+    await page.screenshot({ path: ".run-screenshots/direct-video-error-mobile.png" });
     await generateDirect.click();
     await expect(page.getByText(/Video queued directly from your scene/)).toBeVisible();
     assert.equal(submissions.at(-1).direct, true);

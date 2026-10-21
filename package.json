@@ -15,10 +15,14 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "test": "node scripts/test-project.cjs",
     "test:studio": "node scripts/test-studio.cjs",
+    "test:project": "node scripts/test-project.cjs",
+    "test:unit": "node tests/project-cases.cjs --category unit",
+    "test:integration": "node tests/project-cases.cjs --category integration",
+    "test:business": "node tests/project-cases.cjs --category business",
     "test:studio:browser": "node tests/studio-guided-browser.cjs",
     "test:studio:auth:browser": "node tests/studio-guided-browser.cjs --authenticated",
-    "test:studio:media": ".venv-modal/Scripts/python.exe tests/studio-real-media.py",
     "test:studio:ltx:browser": "node tests/studio-live-editor.cjs",
     "test:studio:characters": "node tests/studio-characters.cjs",
     "test:studio:character-details:browser": "node tests/studio-character-details-browser.cjs",
@@ -53,7 +57,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sharp": "^0.34.5",
-    "sqlite3": "^6.0.1",
     "zod": "^4.4.3"
   },
   "overrides": {
@@ -61,7 +64,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.3",
     "@types/pg": "8.11.10",
     "@types/react": "^19.1.2",

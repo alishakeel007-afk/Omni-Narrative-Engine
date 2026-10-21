@@ -167,6 +167,9 @@ const SUITES = [
   "tests/studio-take-deletion.cjs",
 ];
 
+// The project report uses the same inventory as this regression command.
+module.exports.SUITES = SUITES;
+
 // Each suite runs in its own process: some self-run on require and some mutate
 // process.env, so isolation keeps ordering readable and exit codes accurate.
 function runSuites() {
